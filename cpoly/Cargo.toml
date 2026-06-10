@@ -1,0 +1,10 @@
+[package]
+name = "cpoly"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "cpoly"
+path = "src/lib.rs"
+
+[dependencies]
