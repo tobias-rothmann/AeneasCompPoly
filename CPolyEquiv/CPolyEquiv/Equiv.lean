@@ -20,8 +20,14 @@ The bridge has two layers:
   2. Polynomial layer.  A `Vec U64` whose entries are all `< P` represents the
      `CPolynomial.Raw (ZMod P)` obtained by mapping `toF` over its coefficients
      (`toRaw`).  Each `cpoly` polynomial operation is shown to commute with the
-     matching `CPolynomial.Raw` operation under this relation.  (Statements are
-     established and typecheck against both sides; proofs in progress.)
+     matching `CPolynomial.Raw` operation under this relation.  These are also
+     proved in full: `c`, `x`, `trim`, `eval`, `add_raw`, `add`, `neg`, `sub`,
+     `smul` and `mul`.
+
+     One caveat: `mul_spec` needs the extra hypothesis
+     `v.val.length + w.val.length ≤ Usize.max`, because the generated code sizes
+     its accumulator with a *checked* `Usize` addition `np + nq`.  Without it the
+     triple is false, not merely unprovable — see the docstring on `mul_spec`.
 
 Specs are stated in Aeneas's triple form `m ⦃ r => post r ⦄`, which is the
 shape the `step`/`progress` tactic consumes and is definitionally
@@ -150,6 +156,19 @@ theorem toRaw_coeff (v : alloc.vec.Vec Std.U64) (k : ℕ) :
   · simp [List.getElem?_eq_getElem h, dif_pos h]
   · simp [List.getElem?_eq_none_iff.mpr (not_lt.mp h), dif_neg h]
 
+@[simp] theorem toRaw_size (v : alloc.vec.Vec Std.U64) : (toRaw v).size = v.val.length := by
+  simp [toRaw]
+
+/-- In-range coefficients of `toRaw v` are the `toF`-images of the words. -/
+theorem toRaw_coeff_of_lt (v : alloc.vec.Vec Std.U64) {k : ℕ} (hk : k < v.val.length) :
+    (toRaw v).coeff k = toF v.val[k] := by
+  rw [toRaw_coeff, List.getD_eq_getElem _ _ (by simpa using hk), List.getElem_map]
+
+/-- Out-of-range coefficients of `toRaw v` are zero. -/
+theorem toRaw_coeff_of_ge (v : alloc.vec.Vec Std.U64) {k : ℕ} (hk : v.val.length ≤ k) :
+    (toRaw v).coeff k = 0 := by
+  rw [toRaw_coeff, List.getD_eq_default]; simpa using hk
+
 /-- Reading coefficient `i` with zero-padding (`if i < len then v[i] else 0`)
 returns the reduced word whose `toF` is `(toRaw v).coeff i`. -/
 theorem padded_read_spec (p : alloc.vec.Vec Std.U64) (np i : Std.Usize)
@@ -218,7 +237,7 @@ theorem trim_loop0_spec (p : alloc.vec.Vec Std.U64) (m : Std.Usize)
           List.getElem_map, hc]
       cases hcz : (c != 0#u64)
       · -- c = 0 : continue with i = m'-1
-        simp only [hcz, Bool.false_eq_true, if_false]
+        simp only [Bool.false_eq_true, if_false]
         have hc0 : c = 0#u64 := by simpa using hcz
         refine ⟨by scalar_tac, ?_, by scalar_tac⟩
         intro k hk1 hk2
@@ -227,7 +246,7 @@ theorem trim_loop0_spec (p : alloc.vec.Vec Std.U64) (m : Std.Usize)
           rw [hki, hcoeff, hc0]; simp [toF]
         · exact hm'z k hkm hk2
       · -- c ≠ 0 : done with m'
-        simp only [hcz, if_true]
+        simp only [if_true]
         refine ⟨hm'le, hm'z, Or.inr ?_⟩
         rw [show m'.val - 1 = i.val by rw [hi], hcoeff, Ne, toF_eq_zero_iff c hRc]
         simp only [bne_iff_ne, ne_eq] at hcz
@@ -446,7 +465,7 @@ theorem add_spec (v w : alloc.vec.Vec Std.U64)
 
 /-- `cpoly.neg` ↔ `CPolynomial.Raw.neg`.
 
-ROADMAP for this and the other loop-based operations.  The generated `*_loop`
+The shared recipe for all the loop-based operations.  The generated `*_loop`
 functions are `loop (fun s => body s) init`.  Reason about them with
 `Aeneas.Std.loop.spec_decr_nat`, instantiated with:
   • measure  `fun s => n.val - s.2.val`   (counter approaches the length)
@@ -459,8 +478,11 @@ is `Aeneas.Std.spec m P` (a WP predicate, NOT a bare `∃`), so compose loop
 specs into the top-level operation with `spec_mono` / `spec_bind`, then convert
 the `List.map toF` invariant to the `toRaw` (Array) equation via
 `Array.map_toArray` + `List.map_map`.  `eval`/`smul`/`add_raw` follow the same
-single-loop shape; `trim` adds a `lastNonzero`/`Array.extract` argument; `mul`
-needs a nested double-loop invariant plus `index_mut` reasoning. -/
+single-loop shape; `trim` adds a `lastNonzero`/`Array.extract` argument.
+
+`mul` is the one operation that does not fit the prefix-append mould: its inner
+loop updates a single slot of the accumulator in place, so its invariant is
+stated coefficient-wise (see `mul_loop1_loop0_spec`) rather than as a `take`. -/
 theorem neg_loop_spec (p : alloc.vec.Vec Std.U64) (n : Std.Usize)
     (hp : VecReduced p) (hn : n.val = p.val.length) (r : alloc.vec.Vec Std.U64)
     (i : Std.Usize) (hi : i.val ≤ n.val) (hr : VecReduced r)
@@ -579,32 +601,321 @@ theorem smul_spec (r : Std.U64) (v : alloc.vec.Vec Std.U64)
   simp only [toRaw, hzmap, CPolynomial.Raw.smul, List.map_toArray, List.map_map,
     Function.comp_def]
 
-/-- `cpoly.mul` ↔ `CPolynomial.Raw.mul`. -/
+/-! ### Multiplication
+
+`cpoly.mul` is a schoolbook convolution: it zero-fills an accumulator of length
+`np + nq - 1` (`mul_loop0`), then for each `i < np` and `j < nq` performs
+`r[i+j] += p[i] * q[j]` (`mul_loop1` around `mul_loop1_loop0`), and finally
+trims.  The reference `CPolynomial.Raw.mul` instead sums the shifted scalar
+multiples `(a i • q) * X^i`; the two are reconciled at the level of
+*coefficients* via `CPolynomial.Raw.mul_coeff`, so the bridge is the partial
+convolution sum `convol` below. -/
+
+/-- The contribution of the first `m` coefficients of `p` to coefficient `k` of
+the product `p * q`.  This is the loop invariant of `mul_loop1`, and
+`convol p q p.val.length` is the full convolution (`convol_eq_sum_range`). -/
+def convol (p q : alloc.vec.Vec Std.U64) (m k : ℕ) : F :=
+  ∑ i ∈ Finset.range m, if i ≤ k then (toRaw p).coeff i * (toRaw q).coeff (k - i) else 0
+
+theorem convol_zero (p q : alloc.vec.Vec Std.U64) (k : ℕ) : convol p q 0 k = 0 := by
+  simp [convol]
+
+theorem convol_succ (p q : alloc.vec.Vec Std.U64) (m k : ℕ) :
+    convol p q (m + 1) k
+      = convol p q m k + (if m ≤ k then (toRaw p).coeff m * (toRaw q).coeff (k - m) else 0) := by
+  simp [convol, Finset.sum_range_succ]
+
+/-- `mul_loop0` zero-fills the accumulator up to length `n`. -/
+theorem mul_loop0_spec (n : Std.Usize) :
+    ∀ (r : alloc.vec.Vec Std.U64) (k : Std.Usize),
+      k.val ≤ n.val → r.val = List.replicate k.val 0#u64 →
+      cpoly.mul_loop0 r n k ⦃ z => z.val = List.replicate n.val 0#u64 ⦄ := by
+  intro r k hk hrel
+  rw [cpoly.mul_loop0]
+  apply loop.spec_decr_nat (fun s => n.val - s.2.val)
+    (fun s => s.2.val ≤ n.val ∧ s.1.val = List.replicate s.2.val 0#u64)
+  · rintro ⟨r1, k1⟩ ⟨hk1, hrel1⟩
+    simp only [cpoly.mul_loop0.body]
+    by_cases hlt : k1 < n
+    · rw [if_pos hlt]
+      have hr1len : r1.val.length = k1.val := by
+        rw [hrel1, List.length_replicate]
+      have hpush : r1.val.length < Std.Usize.max := by
+        rw [hr1len]; scalar_tac
+      step as ⟨r2, hr2⟩
+      step as ⟨k2, hk2⟩
+      refine ⟨by scalar_tac, ?_, ?_⟩
+      · -- the zero prefix extends by one
+        rw [hr2, hk2, hrel1, ← List.replicate_succ']
+      · have hlt2 : k1.val < n.val := by scalar_tac
+        omega
+    · rw [if_neg hlt]
+      have heq : k1.val = n.val := by scalar_tac
+      have hrel1' : r1.val = List.replicate k1.val 0#u64 := hrel1
+      exact hrel1'.trans (by rw [heq])
+  · exact ⟨hk, hrel⟩
+
+/-- `mul_loop1_loop0` is the inner convolution loop: for a fixed `i` it performs
+`r[i+j] += p[i] * q[j]` for every `j ∈ [j₀, nq)`.  Since `i + j = k` has at most
+one solution `j` for fixed `i` and `k`, the total effect on slot `k` is the
+single guarded term below.  The hypothesis `i.val + nq.val ≤ r.val.length` is
+what keeps every written index in bounds. -/
+theorem mul_loop1_loop0_spec (p q : alloc.vec.Vec Std.U64) (nq i : Std.Usize)
+    (hp : VecReduced p) (hq : VecReduced q) (hnq : nq.val = q.val.length)
+    (hip : i.val < p.val.length) :
+    ∀ (r : alloc.vec.Vec Std.U64) (j : Std.Usize),
+      VecReduced r → j.val ≤ nq.val → i.val + nq.val ≤ r.val.length →
+      cpoly.mul_loop1_loop0 p q nq r i j ⦃ z => VecReduced z ∧
+        z.val.length = r.val.length ∧
+        ∀ k, (toRaw z).coeff k = (toRaw r).coeff k +
+          (if i.val + j.val ≤ k ∧ k < i.val + nq.val
+            then (toRaw p).coeff i.val * (toRaw q).coeff (k - i.val) else 0) ⦄ := by
+  intro r j hr hj hbound
+  rw [cpoly.mul_loop1_loop0]
+  apply loop.spec_decr_nat (fun s => nq.val - s.2.val)
+    (fun s => VecReduced s.1 ∧ s.2.val ≤ nq.val ∧ j.val ≤ s.2.val ∧
+      s.1.val.length = r.val.length ∧
+      ∀ k, (toRaw s.1).coeff k = (toRaw r).coeff k +
+        (if i.val + j.val ≤ k ∧ k < i.val + s.2.val
+          then (toRaw p).coeff i.val * (toRaw q).coeff (k - i.val) else 0))
+  · rintro ⟨r1, j1⟩ hinv
+    -- re-ascribe the invariant so `omega` sees `j1.val`, not `(r1, j1).2.val`
+    obtain ⟨hr1, hj1, hjj1, hlen1, hcoeff1⟩ :
+        VecReduced r1 ∧ j1.val ≤ nq.val ∧ j.val ≤ j1.val ∧
+        r1.val.length = r.val.length ∧
+        (∀ k, (toRaw r1).coeff k = (toRaw r).coeff k +
+          (if i.val + j.val ≤ k ∧ k < i.val + j1.val
+            then (toRaw p).coeff i.val * (toRaw q).coeff (k - i.val) else 0)) := hinv
+    simp only [cpoly.mul_loop1_loop0.body]
+    by_cases hlt : j1 < nq
+    · rw [if_pos hlt]
+      have hjb : j1.val < q.val.length := by scalar_tac
+      have hidxb : i.val + j1.val < r1.val.length := by scalar_tac
+      step as ⟨a, ha⟩                  -- a = p[i]
+      step as ⟨b, hb⟩                  -- b = q[j1]
+      have haR : Reduced a := ha ▸ hp _ (List.getElem_mem hip)
+      have hbR : Reduced b := hb ▸ hq _ (List.getElem_mem hjb)
+      step as ⟨prod, hprodR, hprodF⟩   -- prod = a * b
+      step as ⟨idx, hidx⟩              -- idx = i + j1
+      have hidxb2 : idx.val < r1.val.length := by scalar_tac
+      step as ⟨c, hc⟩                  -- c = r1[idx]
+      have hcR : Reduced c := hc ▸ hr1 _ (List.getElem_mem hidxb2)
+      step as ⟨w, hwR, hwF⟩            -- w = c + prod
+      step as ⟨_x, back, _hx, hback⟩   -- back = r1.set idx
+      step as ⟨j2, hj2⟩
+      subst hback
+      have hset : (r1.set idx w).val = r1.val.set idx.val w := by simp
+      have hsetlen : (r1.set idx w).val.length = r.val.length := by
+        rw [hset, List.length_set, hlen1]
+      have hpa : (toRaw p).coeff i.val = toF a := by rw [toRaw_coeff_of_lt p hip, ha]
+      have hqb : (toRaw q).coeff j1.val = toF b := by rw [toRaw_coeff_of_lt q hjb, hb]
+      have hrc : (toRaw r1).coeff idx.val = toF c := by
+        rw [toRaw_coeff_of_lt r1 hidxb2, hc]
+      -- pointwise description of the single-slot update
+      have hcset : ∀ k, (toRaw (r1.set idx w)).coeff k =
+          if idx.val = k then toF w else (toRaw r1).coeff k := by
+        intro k
+        by_cases hk : k < r1.val.length
+        · rw [toRaw_coeff_of_lt _ (by rw [hsetlen]; omega), toRaw_coeff_of_lt r1 hk,
+            getElem_of_list_eq hset, List.getElem_set]
+          split <;> rfl
+        · rw [toRaw_coeff_of_ge _ (by omega), toRaw_coeff_of_ge r1 (by omega),
+            if_neg (by omega)]
+      refine ⟨?_, by scalar_tac, by scalar_tac, hsetlen, ?_, by scalar_tac⟩
+      · intro u hu
+        rw [hset] at hu
+        rcases List.mem_or_eq_of_mem_set hu with h | h
+        · exact hr1 u h
+        · exact h ▸ hwR
+      · intro k
+        rw [hcset k]
+        by_cases hke : idx.val = k
+        · -- the slot just written: its new term is exactly `p[i] * q[j1]`
+          rw [if_pos hke, if_pos (show i.val + j.val ≤ k ∧ k < i.val + j2.val by omega),
+            hpa, show k - i.val = j1.val from by omega, hqb, hwF, hprodF]
+          have hcr : toF c = (toRaw r).coeff idx.val := by
+            rw [← hrc, hcoeff1 idx.val, if_neg (by omega), add_zero]
+          rw [hcr, hke]
+        · -- every other slot is untouched, and the two guards agree
+          rw [if_neg hke, hcoeff1 k]
+          congr 1
+          by_cases hcond : i.val + j.val ≤ k ∧ k < i.val + j1.val
+          · rw [if_pos hcond, if_pos (show i.val + j.val ≤ k ∧ k < i.val + j2.val by omega)]
+          · rw [if_neg hcond, if_neg (show ¬(i.val + j.val ≤ k ∧ k < i.val + j2.val) by omega)]
+    · rw [if_neg hlt]
+      have heq : j1.val = nq.val := by scalar_tac
+      refine ⟨hr1, hlen1, ?_⟩
+      intro k
+      rw [hcoeff1 k, heq]
+  · refine ⟨hr, hj, le_refl _, rfl, fun k => ?_⟩
+    have hfalse : ¬(i.val + j.val ≤ k ∧ k < i.val + j.val) := by omega
+    simp [hfalse]
+
+/-- `mul_loop1` is the outer convolution loop: it accumulates the inner loop's
+contributions for `i ∈ [i₀, np)`, building up `convol p q np`. -/
+theorem mul_loop1_spec (p q : alloc.vec.Vec Std.U64) (np nq : Std.Usize)
+    (hp : VecReduced p) (hq : VecReduced q)
+    (hnp : np.val = p.val.length) (hnq : nq.val = q.val.length) :
+    ∀ (r : alloc.vec.Vec Std.U64) (i : Std.Usize),
+      VecReduced r → i.val ≤ np.val → np.val + nq.val ≤ r.val.length + 1 →
+      (∀ k, (toRaw r).coeff k = convol p q i.val k) →
+      cpoly.mul_loop1 p q np nq r i ⦃ z => VecReduced z ∧
+        z.val.length = r.val.length ∧
+        ∀ k, (toRaw z).coeff k = convol p q np.val k ⦄ := by
+  intro r i hr hi hbound hcoeff
+  rw [cpoly.mul_loop1]
+  apply loop.spec_decr_nat (fun s => np.val - s.2.val)
+    (fun s => VecReduced s.1 ∧ s.2.val ≤ np.val ∧ s.1.val.length = r.val.length ∧
+      ∀ k, (toRaw s.1).coeff k = convol p q s.2.val k)
+  · rintro ⟨r1, i1⟩ hinv
+    obtain ⟨hr1, hi1, hlen1, hcoeff1⟩ : VecReduced r1 ∧ i1.val ≤ np.val ∧
+        r1.val.length = r.val.length ∧
+        (∀ k, (toRaw r1).coeff k = convol p q i1.val k) := hinv
+    simp only [cpoly.mul_loop1.body]
+    by_cases hlt : i1 < np
+    · rw [if_pos hlt]
+      have h1 : i1.val < np.val := by scalar_tac
+      have hip : i1.val < p.val.length := by omega
+      have hib : i1.val + nq.val ≤ r1.val.length := by omega
+      apply spec_bind (mul_loop1_loop0_spec p q nq i1 hp hq hnq hip
+        r1 0#usize hr1 (by scalar_tac) hib)
+      rintro r2 ⟨hr2, hlen2, hcoeff2⟩
+      step as ⟨i2, hi2⟩
+      have hz : (0#usize).val = 0 := by scalar_tac
+      refine ⟨hr2, by scalar_tac, by omega, ?_, by scalar_tac⟩
+      intro k
+      rw [hcoeff2 k, hz, Nat.add_zero, hcoeff1 k,
+        show i2.val = i1.val + 1 by scalar_tac, convol_succ]
+      congr 1
+      -- the inner loop's `k < i1 + nq` guard is redundant: past it, `q`'s
+      -- coefficient is out of range and hence zero
+      by_cases hk : i1.val ≤ k
+      · by_cases hk2 : k < i1.val + nq.val
+        · rw [if_pos ⟨hk, hk2⟩, if_pos hk]
+        · rw [if_neg (by tauto), if_pos hk, toRaw_coeff_of_ge q (by omega), mul_zero]
+      · rw [if_neg (by tauto), if_neg hk]
+    · rw [if_neg hlt]
+      have heq : i1.val = np.val := by scalar_tac
+      exact ⟨hr1, hlen1, by rw [← heq]; exact hcoeff1⟩
+  · exact ⟨hr, hi, rfl, hcoeff⟩
+
+private theorem convol_eq_sum_range_aux (n k : ℕ) :
+    (Finset.range n).filter (fun i => i ≤ k) = Finset.range (min n (k + 1)) := by
+  ext i
+  simp only [Finset.mem_filter, Finset.mem_range]
+  omega
+
+/-- The full convolution over all of `p` is the sum shape used by
+`CPolynomial.Raw.mul_coeff`: the `i ≤ k` guard drops the terms above `k`, and
+the terms with `i ≥ p.val.length` vanish because `(toRaw p).coeff i = 0` there. -/
+theorem convol_eq_sum_range (p q : alloc.vec.Vec Std.U64) (k : ℕ) :
+    convol p q p.val.length k
+      = ∑ i ∈ Finset.range (k + 1), (toRaw p).coeff i * (toRaw q).coeff (k - i) := by
+  have hL : convol p q p.val.length k
+      = ∑ i ∈ Finset.range (min p.val.length (k + 1)),
+          (toRaw p).coeff i * (toRaw q).coeff (k - i) := by
+    rw [convol, ← Finset.sum_filter, convol_eq_sum_range_aux]
+  have hR : ∑ i ∈ Finset.range (min p.val.length (k + 1)),
+          (toRaw p).coeff i * (toRaw q).coeff (k - i)
+      = ∑ i ∈ Finset.range (k + 1), (toRaw p).coeff i * (toRaw q).coeff (k - i) := by
+    refine Finset.sum_subset ?_ ?_
+    · intro x hx
+      simp only [Finset.mem_range] at hx ⊢
+      omega
+    · intro x hx hnx
+      simp only [Finset.mem_range] at hx hnx
+      rw [toRaw_coeff_of_ge p (by omega), zero_mul]
+  rw [hL, hR]
+
+/-- `cpoly.mul` ↔ `CPolynomial.Raw.mul`.
+
+Unlike every other operation here, this one needs a length hypothesis, and it is
+necessary rather than merely convenient: the generated code sizes its
+accumulator with a *checked* `Usize` addition (`Generated.lean`, `let i ← np +
+nq`, only then `n ← i - 1`), which returns `fail integerOverflow` whenever the
+two lengths sum above `Usize.max` — lengths `(Usize.max, 1)` already suffice, it
+is not only the both-maximal case.  So `hlen` is exactly the weakest hypothesis
+that makes the triple true; in particular it cannot be relaxed to
+`np + nq - 1 ≤ Usize.max`, which is all the *result* length needs, because the
+intermediate sum overflows first.  And it cannot be derived, since
+`alloc.vec.Vec` records only `length ≤ Usize.max` per vector.
+
+Note this is an artifact of that over-approximation, not a bug in `cpoly::mul`:
+a real `Vec<u64>` is capacity-bounded by `isize::MAX` bytes, so `np + nq` cannot
+overflow a `usize` in practice.
+
+The length bound in the postcondition is what makes the spec composable with
+itself (e.g. for `(v * w) * u`), since the caller then has a route to discharging
+`hlen` for the outer product. -/
 theorem mul_spec (v w : alloc.vec.Vec Std.U64)
-    (hv : VecReduced v) (hw : VecReduced w) :
+    (hv : VecReduced v) (hw : VecReduced w)
+    (hlen : v.val.length + w.val.length ≤ Std.Usize.max) :
     cpoly.mul v w ⦃ z => VecReduced z ∧
-        toRaw z = CPolynomial.Raw.mul (toRaw v) (toRaw w) ⦄ := by
-  -- ROADMAP (the one remaining obligation; everything it depends on is proved).
-  --
-  -- Target: after the convolution, the accumulator `r1` satisfies
-  --   (toRaw r1).coeff k = ∑_{i ∈ range (k+1)} (toRaw v).coeff i * (toRaw w).coeff (k-i)
-  -- which is exactly `CompPoly.CPolynomial.Raw.mul_coeff` for `(toRaw v * toRaw w)`.
-  -- Then `toRaw (trim r1) = (toRaw r1).trim = (toRaw v * toRaw w)` by
-  -- `eq_of_equiv` (equal coefficients ⇒ equal trims), and `mul = mulRaw |>.trim`.
-  --
-  -- Three loop lemmas (all via `loop.spec_decr_nat`, like the proofs above):
-  --  1. `mul_loop0`  (zero-fill): result `z.val = List.replicate n 0#u64`
-  --       (single loop; `List.replicate_succ'` extends by one each step).
-  --  2. `mul_loop1_loop0` (inner): for fixed outer `i`, performs
-  --       `r[i+j] += p[i]*q[j]` for `j ∈ [0,nq)`.  Each step reads `r[idx]`,
-  --       `fadd`s `p[i]*q[j]`, and writes back via
-  --       `Aeneas.Std.Vec.index_mut_usize_spec` (`back x = r.set idx x`, i.e.
-  --       `r.val.set idx x`).  Invariant: `toF (r'.val[k])` equals the original
-  --       plus `∑_{j'<j, i+j'=k} toF p[i] * toF q[j']`.
-  --  3. `mul_loop1` (outer): accumulates 1.+2. into the full convolution
-  --       `toF (r1.val[k]) = ∑_{i'<np} toF p[i'] * toF q[k-i']`.
-  -- Compose with `spec_bind`/`spec_mono` + `trim_spec`, discharging the
-  -- `np = 0` / `nq = 0` cases (empty product) up front.
-  sorry
+        toRaw z = CPolynomial.Raw.mul (toRaw v) (toRaw w) ∧
+        z.val.length ≤ v.val.length + w.val.length ⦄ := by
+  have hnewred : VecReduced (alloc.vec.Vec.new Std.U64) := by intro u hu; simp at hu
+  have hnewraw : toRaw (alloc.vec.Vec.new Std.U64) = (0 : CPolynomial.Raw F) := by
+    simp [toRaw]
+  rw [cpoly.mul]
+  by_cases hp0 : alloc.vec.Vec.len v = 0#usize
+  · -- empty left factor
+    rw [if_pos hp0]
+    simp only [spec_ok]
+    refine ⟨hnewred, ?_, by simp⟩
+    have hvz : toRaw v = (0 : CPolynomial.Raw F) := by
+      have hl : v.val.length = 0 := by scalar_tac
+      simp [toRaw, List.length_eq_zero_iff.mp hl]
+    rw [hnewraw, hvz]
+    exact (CPolynomial.Raw.zero_mul (toRaw w)).symm
+  · rw [if_neg hp0]
+    by_cases hq0 : alloc.vec.Vec.len w = 0#usize
+    · -- empty right factor
+      rw [if_pos hq0]
+      simp only [spec_ok]
+      refine ⟨hnewred, ?_, by simp⟩
+      have hwz : toRaw w = (0 : CPolynomial.Raw F) := by
+        have hl : w.val.length = 0 := by scalar_tac
+        simp [toRaw, List.length_eq_zero_iff.mp hl]
+      rw [hnewraw, hwz]
+      exact (CPolynomial.Raw.mul_zero (toRaw v)).symm
+    · rw [if_neg hq0]
+      have hvpos : 0 < v.val.length := by scalar_tac
+      have hwpos : 0 < w.val.length := by scalar_tac
+      step as ⟨i, hi⟩          -- i = np + nq   (needs `hlen`: this is a checked add)
+      step as ⟨n, hn⟩          -- n = i - 1
+      apply spec_bind (mul_loop0_spec n (alloc.vec.Vec.new Std.U64) 0#usize
+        (by scalar_tac) (by simp))
+      intro r hr
+      have hrlen : r.val.length = n.val := by simp [hr]
+      have hrred : VecReduced r := by
+        intro u hu
+        rw [hr] at hu
+        rw [List.eq_of_mem_replicate hu]
+        unfold Reduced; decide
+      have hrcoeff : ∀ k, (toRaw r).coeff k = 0 := by
+        intro k
+        rcases Nat.lt_or_ge k r.val.length with h | h
+        · rw [toRaw_coeff_of_lt r h]; simp [hr, toF]
+        · exact toRaw_coeff_of_ge r h
+      apply spec_bind (mul_loop1_spec v w (alloc.vec.Vec.len v) (alloc.vec.Vec.len w)
+        hv hw (by simp) (by simp) r 0#usize hrred (by simp) (by scalar_tac)
+        (by intro k; rw [hrcoeff k, show (0#usize).val = 0 from by scalar_tac, convol_zero]))
+      rintro r1 ⟨hr1red, hr1len, hr1coeff⟩
+      apply spec_mono (trim_spec r1 hr1red)
+      rintro z ⟨hzred, hztrim⟩
+      -- trimming only shortens, so the result fits in `np + nq - 1`
+      have hzlen : z.val.length ≤ r1.val.length := by
+        rw [← toRaw_size z, ← toRaw_size r1, hztrim]
+        exact CPolynomial.Raw.Trim.size_le_size (toRaw r1)
+      refine ⟨hzred, ?_, by scalar_tac⟩
+      rw [hztrim]
+      have hlenv : (alloc.vec.Vec.len v).val = v.val.length := by simp
+      -- equal coefficients ⇒ equal trims, and the reference product is already trimmed
+      have h2 : (toRaw r1).trim = ((toRaw v) * (toRaw w)).trim := by
+        apply CPolynomial.Raw.Trim.eq_of_equiv
+        intro k
+        rw [hr1coeff k, CPolynomial.Raw.mul_coeff, hlenv, convol_eq_sum_range]
+      rw [h2, CPolynomial.Raw.mul_is_trimmed]
+      rfl
 
 end CPolyEquiv
