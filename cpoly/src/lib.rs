@@ -14,6 +14,8 @@
 //! Style notes (for clean Aeneas output): explicit index-based `while` loops,
 //! no iterators / closures / slices, fresh `Vec`s built with `push`.
 
+pub mod mlpoly;
+
 /// The field modulus (BabyBear prime). P < 2^31.
 pub const P: u64 = 2013265921;
 
