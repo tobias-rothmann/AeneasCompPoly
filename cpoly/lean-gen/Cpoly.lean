@@ -15,19 +15,24 @@ set_option maxRecDepth 2048
 namespace cpoly
 
 /-- [cpoly::P]
-    Source: 'src/lib.rs', lines 20:0-20:30
+    Source: 'src/lib.rs', lines 47:0-47:30
     Visibility: public -/
-@[global_simps, irreducible] def P : Std.U64 := 2013265921#u64
+@[global_simps, irreducible] def P : Std.U64 := 4294967197#u64
+
+/-- [cpoly::W]
+    Source: 'src/lib.rs', lines 53:0-53:21
+    Visibility: public -/
+@[global_simps, irreducible] def W : Std.U64 := 2#u64
 
 /-- [cpoly::fadd]:
-    Source: 'src/lib.rs', lines 29:0-31:1
+    Source: 'src/lib.rs', lines 62:0-64:1
     Visibility: public -/
 def fadd (a : Std.U64) (b : Std.U64) : Result Std.U64 := do
   let i ← a + b
   i % P
 
 /-- [cpoly::fsub]:
-    Source: 'src/lib.rs', lines 34:0-36:1
+    Source: 'src/lib.rs', lines 67:0-69:1
     Visibility: public -/
 def fsub (a : Std.U64) (b : Std.U64) : Result Std.U64 := do
   let i ← a + P
@@ -35,376 +40,497 @@ def fsub (a : Std.U64) (b : Std.U64) : Result Std.U64 := do
   i1 % P
 
 /-- [cpoly::fmul]:
-    Source: 'src/lib.rs', lines 39:0-41:1
+    Source: 'src/lib.rs', lines 72:0-74:1
     Visibility: public -/
 def fmul (a : Std.U64) (b : Std.U64) : Result Std.U64 := do
   let i ← a * b
   i % P
 
 /-- [cpoly::fneg]:
-    Source: 'src/lib.rs', lines 44:0-46:1
+    Source: 'src/lib.rs', lines 77:0-79:1
     Visibility: public -/
 def fneg (a : Std.U64) : Result Std.U64 := do
   let i ← P - a
   i % P
 
-/-- [cpoly::c]:
-    Source: 'src/lib.rs', lines 53:0-57:1
+/-- [cpoly::Ext4]
+    Source: 'src/lib.rs', lines 93:0-98:1
     Visibility: public -/
-def c (r : Std.U64) : Result (alloc.vec.Vec Std.U64) := do
-  alloc.vec.Vec.push (alloc.vec.Vec.new Std.U64) r
+structure Ext4 where
+  c0 : Std.U64
+  c1 : Std.U64
+  c2 : Std.U64
+  c3 : Std.U64
+
+/-- [cpoly::{impl core::clone::Clone for cpoly::Ext4}::clone]:
+    Source: 'src/lib.rs', lines 92:15-92:20
+    Visibility: public -/
+def Ext4.Insts.CoreCloneClone.clone (self : Ext4) : Result Ext4 := do
+  ok self
+
+/-- Trait implementation: [cpoly::{impl core::clone::Clone for cpoly::Ext4}]
+    Source: 'src/lib.rs', lines 92:15-92:20 -/
+@[reducible]
+def Ext4.Insts.CoreCloneClone : core.clone.Clone Ext4 := {
+  clone := Ext4.Insts.CoreCloneClone.clone
+}
+
+/-- Trait implementation: [cpoly::{impl core::marker::Copy for cpoly::Ext4}]
+    Source: 'src/lib.rs', lines 92:9-92:13 -/
+@[reducible]
+def Ext4.Insts.CoreMarkerCopy : core.marker.Copy Ext4 := {
+  cloneInst := Ext4.Insts.CoreCloneClone
+}
+
+/-- [cpoly::EZERO]
+    Source: 'src/lib.rs', lines 101:0-106:2
+    Visibility: public -/
+@[global_simps, irreducible]
+def EZERO : Ext4 := { c0 := 0#u64, c1 := 0#u64, c2 := 0#u64, c3 := 0#u64 }
+
+/-- [cpoly::EONE]
+    Source: 'src/lib.rs', lines 109:0-114:2
+    Visibility: public -/
+@[global_simps, irreducible]
+def EONE : Ext4 := { c0 := 1#u64, c1 := 0#u64, c2 := 0#u64, c3 := 0#u64 }
+
+/-- [cpoly::EGEN]
+    Source: 'src/lib.rs', lines 117:0-122:2
+    Visibility: public -/
+@[global_simps, irreducible]
+def EGEN : Ext4 := { c0 := 0#u64, c1 := 1#u64, c2 := 0#u64, c3 := 0#u64 }
+
+/-- [cpoly::eof_base]:
+    Source: 'src/lib.rs', lines 126:0-133:1
+    Visibility: public -/
+def eof_base (a : Std.U64) : Result Ext4 := do
+  ok { c0 := a, c1 := 0#u64, c2 := 0#u64, c3 := 0#u64 }
+
+/-- [cpoly::is_ezero]:
+    Source: 'src/lib.rs', lines 138:0-140:1
+    Visibility: public -/
+def is_ezero (a : Ext4) : Result Bool := do
+  if a.c0 = 0#u64
+  then
+    if a.c1 = 0#u64
+    then if a.c2 = 0#u64
+         then ok (a.c3 = 0#u64)
+         else ok false
+    else ok false
+  else ok false
+
+/-- [cpoly::eadd]:
+    Source: 'src/lib.rs', lines 143:0-150:1
+    Visibility: public -/
+def eadd (a : Ext4) (b : Ext4) : Result Ext4 := do
+  let i ← fadd a.c0 b.c0
+  let i1 ← fadd a.c1 b.c1
+  let i2 ← fadd a.c2 b.c2
+  let i3 ← fadd a.c3 b.c3
+  ok { c0 := i, c1 := i1, c2 := i2, c3 := i3 }
+
+/-- [cpoly::esub]:
+    Source: 'src/lib.rs', lines 153:0-160:1
+    Visibility: public -/
+def esub (a : Ext4) (b : Ext4) : Result Ext4 := do
+  let i ← fsub a.c0 b.c0
+  let i1 ← fsub a.c1 b.c1
+  let i2 ← fsub a.c2 b.c2
+  let i3 ← fsub a.c3 b.c3
+  ok { c0 := i, c1 := i1, c2 := i2, c3 := i3 }
+
+/-- [cpoly::eneg]:
+    Source: 'src/lib.rs', lines 163:0-170:1
+    Visibility: public -/
+def eneg (a : Ext4) : Result Ext4 := do
+  let i ← fneg a.c0
+  let i1 ← fneg a.c1
+  let i2 ← fneg a.c2
+  let i3 ← fneg a.c3
+  ok { c0 := i, c1 := i1, c2 := i2, c3 := i3 }
+
+/-- [cpoly::emul]:
+    Source: 'src/lib.rs', lines 178:0-195:1
+    Visibility: public -/
+def emul (a : Ext4) (b : Ext4) : Result Ext4 := do
+  let t0 ← fmul a.c0 b.c0
+  let i ← fmul a.c0 b.c1
+  let i1 ← fmul a.c1 b.c0
+  let t1 ← fadd i i1
+  let i2 ← fmul a.c0 b.c2
+  let i3 ← fmul a.c1 b.c1
+  let i4 ← fadd i2 i3
+  let i5 ← fmul a.c2 b.c0
+  let t2 ← fadd i4 i5
+  let i6 ← fmul a.c0 b.c3
+  let i7 ← fmul a.c1 b.c2
+  let i8 ← fadd i6 i7
+  let i9 ← fmul a.c2 b.c1
+  let i10 ← fadd i8 i9
+  let i11 ← fmul a.c3 b.c0
+  let t3 ← fadd i10 i11
+  let i12 ← fmul a.c1 b.c3
+  let i13 ← fmul a.c2 b.c2
+  let i14 ← fadd i12 i13
+  let i15 ← fmul a.c3 b.c1
+  let t4 ← fadd i14 i15
+  let i16 ← fmul a.c2 b.c3
+  let i17 ← fmul a.c3 b.c2
+  let t5 ← fadd i16 i17
+  let t6 ← fmul a.c3 b.c3
+  let i18 ← fmul W t4
+  let i19 ← fadd t0 i18
+  let i20 ← fmul W t5
+  let i21 ← fadd t1 i20
+  let i22 ← fmul W t6
+  let i23 ← fadd t2 i22
+  ok { c0 := i19, c1 := i21, c2 := i23, c3 := t3 }
+
+/-- [cpoly::c]:
+    Source: 'src/lib.rs', lines 202:0-206:1
+    Visibility: public -/
+def c (r : Ext4) : Result (alloc.vec.Vec Ext4) := do
+  alloc.vec.Vec.push (alloc.vec.Vec.new Ext4) r
 
 /-- [cpoly::x]:
-    Source: 'src/lib.rs', lines 60:0-65:1
+    Source: 'src/lib.rs', lines 209:0-214:1
     Visibility: public -/
-def x : Result (alloc.vec.Vec Std.U64) := do
-  let p ← alloc.vec.Vec.push (alloc.vec.Vec.new Std.U64) 0#u64
-  alloc.vec.Vec.push p 1#u64
+def x : Result (alloc.vec.Vec Ext4) := do
+  let p ← alloc.vec.Vec.push (alloc.vec.Vec.new Ext4) EZERO
+  alloc.vec.Vec.push p EONE
 
 /-- [cpoly::trim]: loop body 0:
-    Source: 'src/lib.rs', lines 1:0-81:5
+    Source: 'src/lib.rs', lines 1:0-230:5
     Visibility: public -/
 @[rust_loop_body]
 def trim_loop0.body
-  (p : alloc.vec.Vec Std.U64) (n : Std.Usize) :
+  (p : alloc.vec.Vec Ext4) (n : Std.Usize) :
   Result (ControlFlow Std.Usize Std.Usize)
   := do
   if n > 0#usize
   then
     let i ← n - 1#usize
-    let i1 ←
-      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Std.U64) p i
-    if i1 != 0#u64
-    then ok (done n)
-    else ok (cont i)
+    let e ←
+      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Ext4) p i
+    let b ← is_ezero e
+    if b
+    then ok (cont i)
+    else ok (done n)
   else ok (done n)
 
 /-- [cpoly::trim]: loop 0:
-    Source: 'src/lib.rs', lines 1:0-81:5
+    Source: 'src/lib.rs', lines 1:0-230:5
     Visibility: public -/
 @[rust_loop]
 def trim_loop0
-  (p : alloc.vec.Vec Std.U64) (n : Std.Usize) : Result Std.Usize := do
+  (p : alloc.vec.Vec Ext4) (n : Std.Usize) : Result Std.Usize := do
   loop
     (fun n1 => trim_loop0.body p n1)
     n
 
 /-- [cpoly::trim]: loop body 1:
-    Source: 'src/lib.rs', lines 84:4-87:5
+    Source: 'src/lib.rs', lines 233:4-236:5
     Visibility: public -/
 @[rust_loop_body]
 def trim_loop1.body
-  (p : alloc.vec.Vec Std.U64) (n : Std.Usize) (r : alloc.vec.Vec Std.U64)
+  (p : alloc.vec.Vec Ext4) (n : Std.Usize) (r : alloc.vec.Vec Ext4)
   (i : Std.Usize) :
-  Result (ControlFlow ((alloc.vec.Vec Std.U64) × Std.Usize) (alloc.vec.Vec
-    Std.U64))
+  Result (ControlFlow ((alloc.vec.Vec Ext4) × Std.Usize) (alloc.vec.Vec Ext4))
   := do
   if i < n
   then
-    let i1 ←
-      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Std.U64) p i
-    let r1 ← alloc.vec.Vec.push r i1
-    let i2 ← i + 1#usize
-    ok (cont (r1, i2))
+    let e ←
+      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Ext4) p i
+    let r1 ← alloc.vec.Vec.push r e
+    let i1 ← i + 1#usize
+    ok (cont (r1, i1))
   else ok (done r)
 
 /-- [cpoly::trim]: loop 1:
-    Source: 'src/lib.rs', lines 84:4-87:5
+    Source: 'src/lib.rs', lines 233:4-236:5
     Visibility: public -/
 @[rust_loop]
 def trim_loop1
-  (p : alloc.vec.Vec Std.U64) (n : Std.Usize) (r : alloc.vec.Vec Std.U64)
+  (p : alloc.vec.Vec Ext4) (n : Std.Usize) (r : alloc.vec.Vec Ext4)
   (i : Std.Usize) :
-  Result (alloc.vec.Vec Std.U64)
+  Result (alloc.vec.Vec Ext4)
   := do
   loop
     (fun (r1, i1) => trim_loop1.body p n r1 i1)
     (r, i)
 
 /-- [cpoly::trim]:
-    Source: 'src/lib.rs', lines 73:0-89:1
+    Source: 'src/lib.rs', lines 222:0-238:1
     Visibility: public -/
-def trim (p : alloc.vec.Vec Std.U64) : Result (alloc.vec.Vec Std.U64) := do
+def trim (p : alloc.vec.Vec Ext4) : Result (alloc.vec.Vec Ext4) := do
   let n := alloc.vec.Vec.len p
   let n1 ← trim_loop0 p n
-  trim_loop1 p n1 (alloc.vec.Vec.new Std.U64) 0#usize
+  trim_loop1 p n1 (alloc.vec.Vec.new Ext4) 0#usize
 
 /-- [cpoly::eval]: loop body 0:
-    Source: 'src/lib.rs', lines 99:4-102:5
+    Source: 'src/lib.rs', lines 248:4-251:5
     Visibility: public -/
 @[rust_loop_body]
 def eval_loop.body
-  (p : alloc.vec.Vec Std.U64) (xv : Std.U64) (acc : Std.U64) (i : Std.Usize) :
-  Result (ControlFlow (Std.U64 × Std.Usize) Std.U64)
+  (p : alloc.vec.Vec Ext4) (xv : Ext4) (acc : Ext4) (i : Std.Usize) :
+  Result (ControlFlow (Ext4 × Std.Usize) Ext4)
   := do
   if i > 0#usize
   then
     let i1 ← i - 1#usize
-    let i2 ← fmul acc xv
-    let i3 ←
-      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Std.U64) p i1
-    let acc1 ← fadd i2 i3
+    let e ← emul acc xv
+    let e1 ←
+      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Ext4) p i1
+    let acc1 ← eadd e e1
     ok (cont (acc1, i1))
   else ok (done acc)
 
 /-- [cpoly::eval]: loop 0:
-    Source: 'src/lib.rs', lines 99:4-102:5
+    Source: 'src/lib.rs', lines 248:4-251:5
     Visibility: public -/
 @[rust_loop]
 def eval_loop
-  (p : alloc.vec.Vec Std.U64) (xv : Std.U64) (acc : Std.U64) (i : Std.Usize) :
-  Result Std.U64
+  (p : alloc.vec.Vec Ext4) (xv : Ext4) (acc : Ext4) (i : Std.Usize) :
+  Result Ext4
   := do
   loop
     (fun (acc1, i1) => eval_loop.body p xv acc1 i1)
     (acc, i)
 
 /-- [cpoly::eval]:
-    Source: 'src/lib.rs', lines 96:0-104:1
+    Source: 'src/lib.rs', lines 245:0-253:1
     Visibility: public -/
-def eval (p : alloc.vec.Vec Std.U64) (xv : Std.U64) : Result Std.U64 := do
+def eval (p : alloc.vec.Vec Ext4) (xv : Ext4) : Result Ext4 := do
   let i := alloc.vec.Vec.len p
-  eval_loop p xv 0#u64 i
+  eval_loop p xv EZERO i
 
 /-- [cpoly::add_raw]: loop body 0:
-    Source: 'src/lib.rs', lines 117:4-122:5
+    Source: 'src/lib.rs', lines 266:4-271:5
     Visibility: public -/
 @[rust_loop_body]
 def add_raw_loop.body
-  (p : alloc.vec.Vec Std.U64) (q : alloc.vec.Vec Std.U64) (np : Std.Usize)
-  (nq : Std.Usize) (n : Std.Usize) (r : alloc.vec.Vec Std.U64) (i : Std.Usize)
-  :
-  Result (ControlFlow ((alloc.vec.Vec Std.U64) × Std.Usize) (alloc.vec.Vec
-    Std.U64))
+  (p : alloc.vec.Vec Ext4) (q : alloc.vec.Vec Ext4) (np : Std.Usize)
+  (nq : Std.Usize) (n : Std.Usize) (r : alloc.vec.Vec Ext4) (i : Std.Usize) :
+  Result (ControlFlow ((alloc.vec.Vec Ext4) × Std.Usize) (alloc.vec.Vec Ext4))
   := do
   if i < n
   then
     let a ←
       if i < np
-      then
-        alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Std.U64) p i
-      else ok 0#u64
+      then alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Ext4) p i
+      else ok EZERO
     let b ←
       if i < nq
-      then
-        alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Std.U64) q i
-      else ok 0#u64
-    let i1 ← fadd a b
-    let r1 ← alloc.vec.Vec.push r i1
-    let i2 ← i + 1#usize
-    ok (cont (r1, i2))
+      then alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Ext4) q i
+      else ok EZERO
+    let e ← eadd a b
+    let r1 ← alloc.vec.Vec.push r e
+    let i1 ← i + 1#usize
+    ok (cont (r1, i1))
   else ok (done r)
 
 /-- [cpoly::add_raw]: loop 0:
-    Source: 'src/lib.rs', lines 117:4-122:5
+    Source: 'src/lib.rs', lines 266:4-271:5
     Visibility: public -/
 @[rust_loop]
 def add_raw_loop
-  (p : alloc.vec.Vec Std.U64) (q : alloc.vec.Vec Std.U64) (np : Std.Usize)
-  (nq : Std.Usize) (n : Std.Usize) (r : alloc.vec.Vec Std.U64) (i : Std.Usize)
-  :
-  Result (alloc.vec.Vec Std.U64)
+  (p : alloc.vec.Vec Ext4) (q : alloc.vec.Vec Ext4) (np : Std.Usize)
+  (nq : Std.Usize) (n : Std.Usize) (r : alloc.vec.Vec Ext4) (i : Std.Usize) :
+  Result (alloc.vec.Vec Ext4)
   := do
   loop
     (fun (r1, i1) => add_raw_loop.body p q np nq n r1 i1)
     (r, i)
 
 /-- [cpoly::add_raw]:
-    Source: 'src/lib.rs', lines 111:0-124:1
+    Source: 'src/lib.rs', lines 260:0-273:1
     Visibility: public -/
 def add_raw
-  (p : alloc.vec.Vec Std.U64) (q : alloc.vec.Vec Std.U64) :
-  Result (alloc.vec.Vec Std.U64)
+  (p : alloc.vec.Vec Ext4) (q : alloc.vec.Vec Ext4) :
+  Result (alloc.vec.Vec Ext4)
   := do
   let np := alloc.vec.Vec.len p
   let nq := alloc.vec.Vec.len q
   let n ← if np >= nq
             then ok np
             else ok nq
-  add_raw_loop p q np nq n (alloc.vec.Vec.new Std.U64) 0#usize
+  add_raw_loop p q np nq n (alloc.vec.Vec.new Ext4) 0#usize
 
 /-- [cpoly::add]:
-    Source: 'src/lib.rs', lines 127:0-129:1
+    Source: 'src/lib.rs', lines 276:0-278:1
     Visibility: public -/
 def add
-  (p : alloc.vec.Vec Std.U64) (q : alloc.vec.Vec Std.U64) :
-  Result (alloc.vec.Vec Std.U64)
+  (p : alloc.vec.Vec Ext4) (q : alloc.vec.Vec Ext4) :
+  Result (alloc.vec.Vec Ext4)
   := do
   let v ← add_raw p q
   trim v
 
 /-- [cpoly::neg]: loop body 0:
-    Source: 'src/lib.rs', lines 136:4-139:5
+    Source: 'src/lib.rs', lines 285:4-288:5
     Visibility: public -/
 @[rust_loop_body]
 def neg_loop.body
-  (p : alloc.vec.Vec Std.U64) (n : Std.Usize) (r : alloc.vec.Vec Std.U64)
+  (p : alloc.vec.Vec Ext4) (n : Std.Usize) (r : alloc.vec.Vec Ext4)
   (i : Std.Usize) :
-  Result (ControlFlow ((alloc.vec.Vec Std.U64) × Std.Usize) (alloc.vec.Vec
-    Std.U64))
+  Result (ControlFlow ((alloc.vec.Vec Ext4) × Std.Usize) (alloc.vec.Vec Ext4))
   := do
   if i < n
   then
-    let i1 ←
-      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Std.U64) p i
-    let i2 ← fneg i1
-    let r1 ← alloc.vec.Vec.push r i2
-    let i3 ← i + 1#usize
-    ok (cont (r1, i3))
+    let e ←
+      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Ext4) p i
+    let e1 ← eneg e
+    let r1 ← alloc.vec.Vec.push r e1
+    let i1 ← i + 1#usize
+    ok (cont (r1, i1))
   else ok (done r)
 
 /-- [cpoly::neg]: loop 0:
-    Source: 'src/lib.rs', lines 136:4-139:5
+    Source: 'src/lib.rs', lines 285:4-288:5
     Visibility: public -/
 @[rust_loop]
 def neg_loop
-  (p : alloc.vec.Vec Std.U64) (n : Std.Usize) (r : alloc.vec.Vec Std.U64)
+  (p : alloc.vec.Vec Ext4) (n : Std.Usize) (r : alloc.vec.Vec Ext4)
   (i : Std.Usize) :
-  Result (alloc.vec.Vec Std.U64)
+  Result (alloc.vec.Vec Ext4)
   := do
   loop
     (fun (r1, i1) => neg_loop.body p n r1 i1)
     (r, i)
 
 /-- [cpoly::neg]:
-    Source: 'src/lib.rs', lines 132:0-141:1
+    Source: 'src/lib.rs', lines 281:0-290:1
     Visibility: public -/
-def neg (p : alloc.vec.Vec Std.U64) : Result (alloc.vec.Vec Std.U64) := do
+def neg (p : alloc.vec.Vec Ext4) : Result (alloc.vec.Vec Ext4) := do
   let n := alloc.vec.Vec.len p
-  neg_loop p n (alloc.vec.Vec.new Std.U64) 0#usize
+  neg_loop p n (alloc.vec.Vec.new Ext4) 0#usize
 
 /-- [cpoly::sub]:
-    Source: 'src/lib.rs', lines 144:0-147:1
+    Source: 'src/lib.rs', lines 293:0-296:1
     Visibility: public -/
 def sub
-  (p : alloc.vec.Vec Std.U64) (q : alloc.vec.Vec Std.U64) :
-  Result (alloc.vec.Vec Std.U64)
+  (p : alloc.vec.Vec Ext4) (q : alloc.vec.Vec Ext4) :
+  Result (alloc.vec.Vec Ext4)
   := do
   let nq ← neg q
   add p nq
 
 /-- [cpoly::smul]: loop body 0:
-    Source: 'src/lib.rs', lines 154:4-157:5
+    Source: 'src/lib.rs', lines 303:4-306:5
     Visibility: public -/
 @[rust_loop_body]
 def smul_loop.body
-  (r : Std.U64) (p : alloc.vec.Vec Std.U64) (n : Std.Usize)
-  (out : alloc.vec.Vec Std.U64) (i : Std.Usize) :
-  Result (ControlFlow ((alloc.vec.Vec Std.U64) × Std.Usize) (alloc.vec.Vec
-    Std.U64))
+  (r : Ext4) (p : alloc.vec.Vec Ext4) (n : Std.Usize)
+  (out : alloc.vec.Vec Ext4) (i : Std.Usize) :
+  Result (ControlFlow ((alloc.vec.Vec Ext4) × Std.Usize) (alloc.vec.Vec Ext4))
   := do
   if i < n
   then
-    let i1 ←
-      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Std.U64) p i
-    let i2 ← fmul r i1
-    let out1 ← alloc.vec.Vec.push out i2
-    let i3 ← i + 1#usize
-    ok (cont (out1, i3))
+    let e ←
+      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Ext4) p i
+    let e1 ← emul r e
+    let out1 ← alloc.vec.Vec.push out e1
+    let i1 ← i + 1#usize
+    ok (cont (out1, i1))
   else ok (done out)
 
 /-- [cpoly::smul]: loop 0:
-    Source: 'src/lib.rs', lines 154:4-157:5
+    Source: 'src/lib.rs', lines 303:4-306:5
     Visibility: public -/
 @[rust_loop]
 def smul_loop
-  (r : Std.U64) (p : alloc.vec.Vec Std.U64) (n : Std.Usize)
-  (out : alloc.vec.Vec Std.U64) (i : Std.Usize) :
-  Result (alloc.vec.Vec Std.U64)
+  (r : Ext4) (p : alloc.vec.Vec Ext4) (n : Std.Usize)
+  (out : alloc.vec.Vec Ext4) (i : Std.Usize) :
+  Result (alloc.vec.Vec Ext4)
   := do
   loop
     (fun (out1, i1) => smul_loop.body r p n out1 i1)
     (out, i)
 
 /-- [cpoly::smul]:
-    Source: 'src/lib.rs', lines 150:0-159:1
+    Source: 'src/lib.rs', lines 299:0-308:1
     Visibility: public -/
 def smul
-  (r : Std.U64) (p : alloc.vec.Vec Std.U64) :
-  Result (alloc.vec.Vec Std.U64)
-  := do
+  (r : Ext4) (p : alloc.vec.Vec Ext4) : Result (alloc.vec.Vec Ext4) := do
   let n := alloc.vec.Vec.len p
-  smul_loop r p n (alloc.vec.Vec.new Std.U64) 0#usize
+  smul_loop r p n (alloc.vec.Vec.new Ext4) 0#usize
 
 /-- [cpoly::mul]: loop body 0:
-    Source: 'src/lib.rs', lines 172:4-175:5
+    Source: 'src/lib.rs', lines 321:4-324:5
     Visibility: public -/
 @[rust_loop_body]
 def mul_loop0.body
-  (n : Std.Usize) (r : alloc.vec.Vec Std.U64) (k : Std.Usize) :
-  Result (ControlFlow ((alloc.vec.Vec Std.U64) × Std.Usize) (alloc.vec.Vec
-    Std.U64))
+  (n : Std.Usize) (r : alloc.vec.Vec Ext4) (k : Std.Usize) :
+  Result (ControlFlow ((alloc.vec.Vec Ext4) × Std.Usize) (alloc.vec.Vec Ext4))
   := do
   if k < n
   then
-    let r1 ← alloc.vec.Vec.push r 0#u64
+    let r1 ← alloc.vec.Vec.push r EZERO
     let k1 ← k + 1#usize
     ok (cont (r1, k1))
   else ok (done r)
 
 /-- [cpoly::mul]: loop 0:
-    Source: 'src/lib.rs', lines 172:4-175:5
+    Source: 'src/lib.rs', lines 321:4-324:5
     Visibility: public -/
 @[rust_loop]
 def mul_loop0
-  (r : alloc.vec.Vec Std.U64) (n : Std.Usize) (k : Std.Usize) :
-  Result (alloc.vec.Vec Std.U64)
+  (r : alloc.vec.Vec Ext4) (n : Std.Usize) (k : Std.Usize) :
+  Result (alloc.vec.Vec Ext4)
   := do
   loop
     (fun (r1, k1) => mul_loop0.body n r1 k1)
     (r, k)
 
 /-- [cpoly::mul]: loop body 2:
-    Source: 'src/lib.rs', lines 180:8-185:9
+    Source: 'src/lib.rs', lines 329:8-334:9
     Visibility: public -/
 @[rust_loop_body]
 def mul_loop1_loop0.body
-  (p : alloc.vec.Vec Std.U64) (q : alloc.vec.Vec Std.U64) (nq : Std.Usize)
-  (i : Std.Usize) (r : alloc.vec.Vec Std.U64) (j : Std.Usize) :
-  Result (ControlFlow ((alloc.vec.Vec Std.U64) × Std.Usize) (alloc.vec.Vec
-    Std.U64))
+  (p : alloc.vec.Vec Ext4) (q : alloc.vec.Vec Ext4) (nq : Std.Usize)
+  (i : Std.Usize) (r : alloc.vec.Vec Ext4) (j : Std.Usize) :
+  Result (ControlFlow ((alloc.vec.Vec Ext4) × Std.Usize) (alloc.vec.Vec Ext4))
   := do
   if j < nq
   then
-    let i1 ←
-      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Std.U64) p i
-    let i2 ←
-      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Std.U64) q j
-    let prod ← fmul i1 i2
+    let e ←
+      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Ext4) p i
+    let e1 ←
+      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Ext4) q j
+    let prod ← emul e e1
     let idx ← i + j
-    let i3 ←
-      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Std.U64) r idx
-    let i4 ← fadd i3 prod
+    let e2 ←
+      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Ext4) r idx
+    let e3 ← eadd e2 prod
     let (_, index_mut_back) ←
-      alloc.vec.Vec.index_mut (core.slice.index.SliceIndexUsizeSlice Std.U64) r
+      alloc.vec.Vec.index_mut (core.slice.index.SliceIndexUsizeSlice Ext4) r
         idx
     let j1 ← j + 1#usize
-    let r1 := index_mut_back i4
+    let r1 := index_mut_back e3
     ok (cont (r1, j1))
   else ok (done r)
 
 /-- [cpoly::mul]: loop 2:
-    Source: 'src/lib.rs', lines 180:8-185:9
+    Source: 'src/lib.rs', lines 329:8-334:9
     Visibility: public -/
 @[rust_loop]
 def mul_loop1_loop0
-  (p : alloc.vec.Vec Std.U64) (q : alloc.vec.Vec Std.U64) (nq : Std.Usize)
-  (r : alloc.vec.Vec Std.U64) (i : Std.Usize) (j : Std.Usize) :
-  Result (alloc.vec.Vec Std.U64)
+  (p : alloc.vec.Vec Ext4) (q : alloc.vec.Vec Ext4) (nq : Std.Usize)
+  (r : alloc.vec.Vec Ext4) (i : Std.Usize) (j : Std.Usize) :
+  Result (alloc.vec.Vec Ext4)
   := do
   loop
     (fun (r1, j1) => mul_loop1_loop0.body p q nq i r1 j1)
     (r, j)
 
 /-- [cpoly::mul]: loop body 1:
-    Source: 'src/lib.rs', lines 178:4-187:5
+    Source: 'src/lib.rs', lines 327:4-336:5
     Visibility: public -/
 @[rust_loop_body]
 def mul_loop1.body
-  (p : alloc.vec.Vec Std.U64) (q : alloc.vec.Vec Std.U64) (np : Std.Usize)
-  (nq : Std.Usize) (r : alloc.vec.Vec Std.U64) (i : Std.Usize) :
-  Result (ControlFlow ((alloc.vec.Vec Std.U64) × Std.Usize) (alloc.vec.Vec
-    Std.U64))
+  (p : alloc.vec.Vec Ext4) (q : alloc.vec.Vec Ext4) (np : Std.Usize)
+  (nq : Std.Usize) (r : alloc.vec.Vec Ext4) (i : Std.Usize) :
+  Result (ControlFlow ((alloc.vec.Vec Ext4) × Std.Usize) (alloc.vec.Vec Ext4))
   := do
   if i < np
   then
@@ -414,41 +540,41 @@ def mul_loop1.body
   else ok (done r)
 
 /-- [cpoly::mul]: loop 1:
-    Source: 'src/lib.rs', lines 178:4-187:5
+    Source: 'src/lib.rs', lines 327:4-336:5
     Visibility: public -/
 @[rust_loop]
 def mul_loop1
-  (p : alloc.vec.Vec Std.U64) (q : alloc.vec.Vec Std.U64) (np : Std.Usize)
-  (nq : Std.Usize) (r : alloc.vec.Vec Std.U64) (i : Std.Usize) :
-  Result (alloc.vec.Vec Std.U64)
+  (p : alloc.vec.Vec Ext4) (q : alloc.vec.Vec Ext4) (np : Std.Usize)
+  (nq : Std.Usize) (r : alloc.vec.Vec Ext4) (i : Std.Usize) :
+  Result (alloc.vec.Vec Ext4)
   := do
   loop
     (fun (r1, i1) => mul_loop1.body p q np nq r1 i1)
     (r, i)
 
 /-- [cpoly::mul]:
-    Source: 'src/lib.rs', lines 162:0-189:1
+    Source: 'src/lib.rs', lines 311:0-338:1
     Visibility: public -/
 def mul
-  (p : alloc.vec.Vec Std.U64) (q : alloc.vec.Vec Std.U64) :
-  Result (alloc.vec.Vec Std.U64)
+  (p : alloc.vec.Vec Ext4) (q : alloc.vec.Vec Ext4) :
+  Result (alloc.vec.Vec Ext4)
   := do
   let np := alloc.vec.Vec.len p
   let nq := alloc.vec.Vec.len q
   if np = 0#usize
-  then ok (alloc.vec.Vec.new Std.U64)
+  then ok (alloc.vec.Vec.new Ext4)
   else
     if nq = 0#usize
-    then ok (alloc.vec.Vec.new Std.U64)
+    then ok (alloc.vec.Vec.new Ext4)
     else
       let i ← np + nq
       let n ← i - 1#usize
-      let r ← mul_loop0 (alloc.vec.Vec.new Std.U64) n 0#usize
+      let r ← mul_loop0 (alloc.vec.Vec.new Ext4) n 0#usize
       let r1 ← mul_loop1 p q np nq r 0#usize
       trim r1
 
 /-- [cpoly::mlpoly::pow2]: loop body 0:
-    Source: 'src/mlpoly.rs', lines 53:4-56:5
+    Source: 'src/mlpoly.rs', lines 55:4-58:5
     Visibility: public -/
 @[rust_loop_body]
 def mlpoly.pow2_loop.body
@@ -462,7 +588,7 @@ def mlpoly.pow2_loop.body
   else ok (done m)
 
 /-- [cpoly::mlpoly::pow2]: loop 0:
-    Source: 'src/mlpoly.rs', lines 53:4-56:5
+    Source: 'src/mlpoly.rs', lines 55:4-58:5
     Visibility: public -/
 @[rust_loop]
 def mlpoly.pow2_loop
@@ -472,56 +598,54 @@ def mlpoly.pow2_loop
     (m, k)
 
 /-- [cpoly::mlpoly::pow2]:
-    Source: 'src/mlpoly.rs', lines 50:0-58:1
+    Source: 'src/mlpoly.rs', lines 52:0-60:1
     Visibility: public -/
 @[reducible]
 def mlpoly.pow2 (n : Std.Usize) : Result Std.Usize := do
   mlpoly.pow2_loop n 1#usize 0#usize
 
 /-- [cpoly::mlpoly::zero]: loop body 0:
-    Source: 'src/mlpoly.rs', lines 69:4-72:5
+    Source: 'src/mlpoly.rs', lines 71:4-74:5
     Visibility: public -/
 @[rust_loop_body]
 def mlpoly.zero_loop.body
-  (sz : Std.Usize) (r : alloc.vec.Vec Std.U64) (i : Std.Usize) :
-  Result (ControlFlow ((alloc.vec.Vec Std.U64) × Std.Usize) (alloc.vec.Vec
-    Std.U64))
+  (sz : Std.Usize) (r : alloc.vec.Vec Ext4) (i : Std.Usize) :
+  Result (ControlFlow ((alloc.vec.Vec Ext4) × Std.Usize) (alloc.vec.Vec Ext4))
   := do
   if i < sz
   then
-    let r1 ← alloc.vec.Vec.push r 0#u64
+    let r1 ← alloc.vec.Vec.push r EZERO
     let i1 ← i + 1#usize
     ok (cont (r1, i1))
   else ok (done r)
 
 /-- [cpoly::mlpoly::zero]: loop 0:
-    Source: 'src/mlpoly.rs', lines 69:4-72:5
+    Source: 'src/mlpoly.rs', lines 71:4-74:5
     Visibility: public -/
 @[rust_loop]
 def mlpoly.zero_loop
-  (sz : Std.Usize) (r : alloc.vec.Vec Std.U64) (i : Std.Usize) :
-  Result (alloc.vec.Vec Std.U64)
+  (sz : Std.Usize) (r : alloc.vec.Vec Ext4) (i : Std.Usize) :
+  Result (alloc.vec.Vec Ext4)
   := do
   loop
     (fun (r1, i1) => mlpoly.zero_loop.body sz r1 i1)
     (r, i)
 
 /-- [cpoly::mlpoly::zero]:
-    Source: 'src/mlpoly.rs', lines 65:0-74:1
+    Source: 'src/mlpoly.rs', lines 67:0-76:1
     Visibility: public -/
-def mlpoly.zero (n : Std.Usize) : Result (alloc.vec.Vec Std.U64) := do
+def mlpoly.zero (n : Std.Usize) : Result (alloc.vec.Vec Ext4) := do
   let sz ← mlpoly.pow2 n
-  mlpoly.zero_loop sz (alloc.vec.Vec.new Std.U64) 0#usize
+  mlpoly.zero_loop sz (alloc.vec.Vec.new Ext4) 0#usize
 
 /-- [cpoly::mlpoly::of_array]: loop body 0:
-    Source: 'src/mlpoly.rs', lines 83:4-90:5
+    Source: 'src/mlpoly.rs', lines 85:4-92:5
     Visibility: public -/
 @[rust_loop_body]
 def mlpoly.of_array_loop.body
-  (coeffs : alloc.vec.Vec Std.U64) (sz : Std.Usize) (m : Std.Usize)
-  (r : alloc.vec.Vec Std.U64) (i : Std.Usize) :
-  Result (ControlFlow ((alloc.vec.Vec Std.U64) × Std.Usize) (alloc.vec.Vec
-    Std.U64))
+  (coeffs : alloc.vec.Vec Ext4) (sz : Std.Usize) (m : Std.Usize)
+  (r : alloc.vec.Vec Ext4) (i : Std.Usize) :
+  Result (ControlFlow ((alloc.vec.Vec Ext4) × Std.Usize) (alloc.vec.Vec Ext4))
   := do
   if i < sz
   then
@@ -529,92 +653,91 @@ def mlpoly.of_array_loop.body
       if i < m
       then
         do
-        let i1 ←
-          alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Std.U64)
+        let e ←
+          alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Ext4)
             coeffs i
-        alloc.vec.Vec.push r i1
-      else alloc.vec.Vec.push r 0#u64
+        alloc.vec.Vec.push r e
+      else alloc.vec.Vec.push r EZERO
     let i1 ← i + 1#usize
     ok (cont (r1, i1))
   else ok (done r)
 
 /-- [cpoly::mlpoly::of_array]: loop 0:
-    Source: 'src/mlpoly.rs', lines 83:4-90:5
+    Source: 'src/mlpoly.rs', lines 85:4-92:5
     Visibility: public -/
 @[rust_loop]
 def mlpoly.of_array_loop
-  (coeffs : alloc.vec.Vec Std.U64) (sz : Std.Usize) (m : Std.Usize)
-  (r : alloc.vec.Vec Std.U64) (i : Std.Usize) :
-  Result (alloc.vec.Vec Std.U64)
+  (coeffs : alloc.vec.Vec Ext4) (sz : Std.Usize) (m : Std.Usize)
+  (r : alloc.vec.Vec Ext4) (i : Std.Usize) :
+  Result (alloc.vec.Vec Ext4)
   := do
   loop
     (fun (r1, i1) => mlpoly.of_array_loop.body coeffs sz m r1 i1)
     (r, i)
 
 /-- [cpoly::mlpoly::of_array]:
-    Source: 'src/mlpoly.rs', lines 78:0-92:1
+    Source: 'src/mlpoly.rs', lines 80:0-94:1
     Visibility: public -/
 def mlpoly.of_array
-  (coeffs : alloc.vec.Vec Std.U64) (n : Std.Usize) :
-  Result (alloc.vec.Vec Std.U64)
+  (coeffs : alloc.vec.Vec Ext4) (n : Std.Usize) :
+  Result (alloc.vec.Vec Ext4)
   := do
   let sz ← mlpoly.pow2 n
   let m := alloc.vec.Vec.len coeffs
-  mlpoly.of_array_loop coeffs sz m (alloc.vec.Vec.new Std.U64) 0#usize
+  mlpoly.of_array_loop coeffs sz m (alloc.vec.Vec.new Ext4) 0#usize
 
 /-- [cpoly::mlpoly::add]: loop body 0:
-    Source: 'src/mlpoly.rs', lines 103:4-107:5
+    Source: 'src/mlpoly.rs', lines 105:4-109:5
     Visibility: public -/
 @[rust_loop_body]
 def mlpoly.add_loop.body
-  (p : alloc.vec.Vec Std.U64) (q : alloc.vec.Vec Std.U64) (n : Std.Usize)
-  (r : alloc.vec.Vec Std.U64) (i : Std.Usize) :
-  Result (ControlFlow ((alloc.vec.Vec Std.U64) × Std.Usize) (alloc.vec.Vec
-    Std.U64))
+  (p : alloc.vec.Vec Ext4) (q : alloc.vec.Vec Ext4) (n : Std.Usize)
+  (r : alloc.vec.Vec Ext4) (i : Std.Usize) :
+  Result (ControlFlow ((alloc.vec.Vec Ext4) × Std.Usize) (alloc.vec.Vec Ext4))
   := do
   if i < n
   then
-    let i1 ←
-      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Std.U64) p i
-    let i2 ←
-      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Std.U64) q i
-    let s ← fadd i1 i2
+    let e ←
+      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Ext4) p i
+    let e1 ←
+      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Ext4) q i
+    let s ← eadd e e1
     let r1 ← alloc.vec.Vec.push r s
-    let i3 ← i + 1#usize
-    ok (cont (r1, i3))
+    let i1 ← i + 1#usize
+    ok (cont (r1, i1))
   else ok (done r)
 
 /-- [cpoly::mlpoly::add]: loop 0:
-    Source: 'src/mlpoly.rs', lines 103:4-107:5
+    Source: 'src/mlpoly.rs', lines 105:4-109:5
     Visibility: public -/
 @[rust_loop]
 def mlpoly.add_loop
-  (p : alloc.vec.Vec Std.U64) (q : alloc.vec.Vec Std.U64) (n : Std.Usize)
-  (r : alloc.vec.Vec Std.U64) (i : Std.Usize) :
-  Result (alloc.vec.Vec Std.U64)
+  (p : alloc.vec.Vec Ext4) (q : alloc.vec.Vec Ext4) (n : Std.Usize)
+  (r : alloc.vec.Vec Ext4) (i : Std.Usize) :
+  Result (alloc.vec.Vec Ext4)
   := do
   loop
     (fun (r1, i1) => mlpoly.add_loop.body p q n r1 i1)
     (r, i)
 
 /-- [cpoly::mlpoly::add]:
-    Source: 'src/mlpoly.rs', lines 99:0-109:1
+    Source: 'src/mlpoly.rs', lines 101:0-111:1
     Visibility: public -/
 def mlpoly.add
-  (p : alloc.vec.Vec Std.U64) (q : alloc.vec.Vec Std.U64) :
-  Result (alloc.vec.Vec Std.U64)
+  (p : alloc.vec.Vec Ext4) (q : alloc.vec.Vec Ext4) :
+  Result (alloc.vec.Vec Ext4)
   := do
   let n := alloc.vec.Vec.len p
-  mlpoly.add_loop p q n (alloc.vec.Vec.new Std.U64) 0#usize
+  mlpoly.add_loop p q n (alloc.vec.Vec.new Ext4) 0#usize
 
 /-- [cpoly::mlpoly::monomial_basis]: loop body 1:
-    Source: 'src/mlpoly.rs', lines 129:8-135:9
+    Source: 'src/mlpoly.rs', lines 131:8-137:9
     Visibility: public -/
 @[rust_loop_body]
 def mlpoly.monomial_basis_loop0_loop0.body
-  (w : alloc.vec.Vec Std.U64) (n : Std.Usize) (acc : Std.U64) (m : Std.Usize)
+  (w : alloc.vec.Vec Ext4) (n : Std.Usize) (acc : Ext4) (m : Std.Usize)
   (j : Std.Usize) :
-  Result (ControlFlow (Std.U64 × Std.Usize × Std.Usize) Std.U64)
+  Result (ControlFlow (Ext4 × Std.Usize × Std.Usize) Ext4)
   := do
   if j < n
   then
@@ -623,10 +746,9 @@ def mlpoly.monomial_basis_loop0_loop0.body
       if i = 1#usize
       then
         do
-        let i1 ←
-          alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Std.U64) w
-            j
-        fmul acc i1
+        let e ←
+          alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Ext4) w j
+        emul acc e
       else ok acc
     let m1 ← m / 2#usize
     let j1 ← j + 1#usize
@@ -634,13 +756,13 @@ def mlpoly.monomial_basis_loop0_loop0.body
   else ok (done acc)
 
 /-- [cpoly::mlpoly::monomial_basis]: loop 1:
-    Source: 'src/mlpoly.rs', lines 129:8-135:9
+    Source: 'src/mlpoly.rs', lines 131:8-137:9
     Visibility: public -/
 @[rust_loop]
 def mlpoly.monomial_basis_loop0_loop0
-  (w : alloc.vec.Vec Std.U64) (n : Std.Usize) (acc : Std.U64) (m : Std.Usize)
+  (w : alloc.vec.Vec Ext4) (n : Std.Usize) (acc : Ext4) (m : Std.Usize)
   (j : Std.Usize) :
-  Result Std.U64
+  Result Ext4
   := do
   loop
     (fun (acc1, m1, j1) => mlpoly.monomial_basis_loop0_loop0.body w n acc1 m1
@@ -648,53 +770,52 @@ def mlpoly.monomial_basis_loop0_loop0
     (acc, m, j)
 
 /-- [cpoly::mlpoly::monomial_basis]: loop body 0:
-    Source: 'src/mlpoly.rs', lines 125:4-138:5
+    Source: 'src/mlpoly.rs', lines 127:4-140:5
     Visibility: public -/
 @[rust_loop_body]
 def mlpoly.monomial_basis_loop0.body
-  (w : alloc.vec.Vec Std.U64) (n : Std.Usize) (sz : Std.Usize)
-  (basis : alloc.vec.Vec Std.U64) (i : Std.Usize) :
-  Result (ControlFlow ((alloc.vec.Vec Std.U64) × Std.Usize) (alloc.vec.Vec
-    Std.U64))
+  (w : alloc.vec.Vec Ext4) (n : Std.Usize) (sz : Std.Usize)
+  (basis : alloc.vec.Vec Ext4) (i : Std.Usize) :
+  Result (ControlFlow ((alloc.vec.Vec Ext4) × Std.Usize) (alloc.vec.Vec Ext4))
   := do
   if i < sz
   then
-    let acc ← mlpoly.monomial_basis_loop0_loop0 w n 1#u64 i 0#usize
+    let acc ← mlpoly.monomial_basis_loop0_loop0 w n EONE i 0#usize
     let basis1 ← alloc.vec.Vec.push basis acc
     let i1 ← i + 1#usize
     ok (cont (basis1, i1))
   else ok (done basis)
 
 /-- [cpoly::mlpoly::monomial_basis]: loop 0:
-    Source: 'src/mlpoly.rs', lines 125:4-138:5
+    Source: 'src/mlpoly.rs', lines 127:4-140:5
     Visibility: public -/
 @[rust_loop]
 def mlpoly.monomial_basis_loop0
-  (w : alloc.vec.Vec Std.U64) (n : Std.Usize) (sz : Std.Usize)
-  (basis : alloc.vec.Vec Std.U64) (i : Std.Usize) :
-  Result (alloc.vec.Vec Std.U64)
+  (w : alloc.vec.Vec Ext4) (n : Std.Usize) (sz : Std.Usize)
+  (basis : alloc.vec.Vec Ext4) (i : Std.Usize) :
+  Result (alloc.vec.Vec Ext4)
   := do
   loop
     (fun (basis1, i1) => mlpoly.monomial_basis_loop0.body w n sz basis1 i1)
     (basis, i)
 
 /-- [cpoly::mlpoly::monomial_basis]:
-    Source: 'src/mlpoly.rs', lines 120:0-140:1
+    Source: 'src/mlpoly.rs', lines 122:0-142:1
     Visibility: public -/
 def mlpoly.monomial_basis
-  (w : alloc.vec.Vec Std.U64) : Result (alloc.vec.Vec Std.U64) := do
+  (w : alloc.vec.Vec Ext4) : Result (alloc.vec.Vec Ext4) := do
   let n := alloc.vec.Vec.len w
   let sz ← mlpoly.pow2 n
-  mlpoly.monomial_basis_loop0 w n sz (alloc.vec.Vec.new Std.U64) 0#usize
+  mlpoly.monomial_basis_loop0 w n sz (alloc.vec.Vec.new Ext4) 0#usize
 
 /-- [cpoly::mlpoly::lagrange_basis]: loop body 1:
-    Source: 'src/mlpoly.rs', lines 154:8-163:9
+    Source: 'src/mlpoly.rs', lines 156:8-165:9
     Visibility: public -/
 @[rust_loop_body]
 def mlpoly.lagrange_basis_loop0_loop0.body
-  (w : alloc.vec.Vec Std.U64) (n : Std.Usize) (acc : Std.U64) (m : Std.Usize)
+  (w : alloc.vec.Vec Ext4) (n : Std.Usize) (acc : Ext4) (m : Std.Usize)
   (j : Std.Usize) :
-  Result (ControlFlow (Std.U64 × Std.Usize × Std.Usize) Std.U64)
+  Result (ControlFlow (Ext4 × Std.Usize × Std.Usize) Ext4)
   := do
   if j < n
   then
@@ -703,30 +824,28 @@ def mlpoly.lagrange_basis_loop0_loop0.body
       if i = 1#usize
       then
         do
-        let i1 ←
-          alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Std.U64) w
-            j
-        fmul acc i1
+        let e ←
+          alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Ext4) w j
+        emul acc e
       else
         do
-        let i1 ←
-          alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Std.U64) w
-            j
-        let t ← fsub 1#u64 i1
-        fmul acc t
+        let e ←
+          alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Ext4) w j
+        let t ← esub EONE e
+        emul acc t
     let m1 ← m / 2#usize
     let j1 ← j + 1#usize
     ok (cont (acc1, m1, j1))
   else ok (done acc)
 
 /-- [cpoly::mlpoly::lagrange_basis]: loop 1:
-    Source: 'src/mlpoly.rs', lines 154:8-163:9
+    Source: 'src/mlpoly.rs', lines 156:8-165:9
     Visibility: public -/
 @[rust_loop]
 def mlpoly.lagrange_basis_loop0_loop0
-  (w : alloc.vec.Vec Std.U64) (n : Std.Usize) (acc : Std.U64) (m : Std.Usize)
+  (w : alloc.vec.Vec Ext4) (n : Std.Usize) (acc : Ext4) (m : Std.Usize)
   (j : Std.Usize) :
-  Result Std.U64
+  Result Ext4
   := do
   loop
     (fun (acc1, m1, j1) => mlpoly.lagrange_basis_loop0_loop0.body w n acc1 m1
@@ -734,156 +853,147 @@ def mlpoly.lagrange_basis_loop0_loop0
     (acc, m, j)
 
 /-- [cpoly::mlpoly::lagrange_basis]: loop body 0:
-    Source: 'src/mlpoly.rs', lines 150:4-166:5
+    Source: 'src/mlpoly.rs', lines 152:4-168:5
     Visibility: public -/
 @[rust_loop_body]
 def mlpoly.lagrange_basis_loop0.body
-  (w : alloc.vec.Vec Std.U64) (n : Std.Usize) (sz : Std.Usize)
-  (basis : alloc.vec.Vec Std.U64) (i : Std.Usize) :
-  Result (ControlFlow ((alloc.vec.Vec Std.U64) × Std.Usize) (alloc.vec.Vec
-    Std.U64))
+  (w : alloc.vec.Vec Ext4) (n : Std.Usize) (sz : Std.Usize)
+  (basis : alloc.vec.Vec Ext4) (i : Std.Usize) :
+  Result (ControlFlow ((alloc.vec.Vec Ext4) × Std.Usize) (alloc.vec.Vec Ext4))
   := do
   if i < sz
   then
-    let acc ← mlpoly.lagrange_basis_loop0_loop0 w n 1#u64 i 0#usize
+    let acc ← mlpoly.lagrange_basis_loop0_loop0 w n EONE i 0#usize
     let basis1 ← alloc.vec.Vec.push basis acc
     let i1 ← i + 1#usize
     ok (cont (basis1, i1))
   else ok (done basis)
 
 /-- [cpoly::mlpoly::lagrange_basis]: loop 0:
-    Source: 'src/mlpoly.rs', lines 150:4-166:5
+    Source: 'src/mlpoly.rs', lines 152:4-168:5
     Visibility: public -/
 @[rust_loop]
 def mlpoly.lagrange_basis_loop0
-  (w : alloc.vec.Vec Std.U64) (n : Std.Usize) (sz : Std.Usize)
-  (basis : alloc.vec.Vec Std.U64) (i : Std.Usize) :
-  Result (alloc.vec.Vec Std.U64)
+  (w : alloc.vec.Vec Ext4) (n : Std.Usize) (sz : Std.Usize)
+  (basis : alloc.vec.Vec Ext4) (i : Std.Usize) :
+  Result (alloc.vec.Vec Ext4)
   := do
   loop
     (fun (basis1, i1) => mlpoly.lagrange_basis_loop0.body w n sz basis1 i1)
     (basis, i)
 
 /-- [cpoly::mlpoly::lagrange_basis]:
-    Source: 'src/mlpoly.rs', lines 145:0-168:1
+    Source: 'src/mlpoly.rs', lines 147:0-170:1
     Visibility: public -/
 def mlpoly.lagrange_basis
-  (w : alloc.vec.Vec Std.U64) : Result (alloc.vec.Vec Std.U64) := do
+  (w : alloc.vec.Vec Ext4) : Result (alloc.vec.Vec Ext4) := do
   let n := alloc.vec.Vec.len w
   let sz ← mlpoly.pow2 n
-  mlpoly.lagrange_basis_loop0 w n sz (alloc.vec.Vec.new Std.U64) 0#usize
+  mlpoly.lagrange_basis_loop0 w n sz (alloc.vec.Vec.new Ext4) 0#usize
 
 /-- [cpoly::mlpoly::dot]: loop body 0:
-    Source: 'src/mlpoly.rs', lines 180:4-184:5
+    Source: 'src/mlpoly.rs', lines 182:4-186:5
     Visibility: public -/
 @[rust_loop_body]
 def mlpoly.dot_loop.body
-  (a : alloc.vec.Vec Std.U64) (b : alloc.vec.Vec Std.U64) (n : Std.Usize)
-  (acc : Std.U64) (i : Std.Usize) :
-  Result (ControlFlow (Std.U64 × Std.Usize) Std.U64)
+  (a : alloc.vec.Vec Ext4) (b : alloc.vec.Vec Ext4) (n : Std.Usize)
+  (acc : Ext4) (i : Std.Usize) :
+  Result (ControlFlow (Ext4 × Std.Usize) Ext4)
   := do
   if i < n
   then
-    let i1 ←
-      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Std.U64) a i
-    let i2 ←
-      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Std.U64) b i
-    let t ← fmul i1 i2
-    let acc1 ← fadd acc t
-    let i3 ← i + 1#usize
-    ok (cont (acc1, i3))
+    let e ←
+      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Ext4) a i
+    let e1 ←
+      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Ext4) b i
+    let t ← emul e e1
+    let acc1 ← eadd acc t
+    let i1 ← i + 1#usize
+    ok (cont (acc1, i1))
   else ok (done acc)
 
 /-- [cpoly::mlpoly::dot]: loop 0:
-    Source: 'src/mlpoly.rs', lines 180:4-184:5
+    Source: 'src/mlpoly.rs', lines 182:4-186:5
     Visibility: public -/
 @[rust_loop]
 def mlpoly.dot_loop
-  (a : alloc.vec.Vec Std.U64) (b : alloc.vec.Vec Std.U64) (n : Std.Usize)
-  (acc : Std.U64) (i : Std.Usize) :
-  Result Std.U64
+  (a : alloc.vec.Vec Ext4) (b : alloc.vec.Vec Ext4) (n : Std.Usize)
+  (acc : Ext4) (i : Std.Usize) :
+  Result Ext4
   := do
   loop
     (fun (acc1, i1) => mlpoly.dot_loop.body a b n acc1 i1)
     (acc, i)
 
 /-- [cpoly::mlpoly::dot]:
-    Source: 'src/mlpoly.rs', lines 177:0-186:1
+    Source: 'src/mlpoly.rs', lines 179:0-188:1
     Visibility: public -/
 @[reducible]
 def mlpoly.dot
-  (a : alloc.vec.Vec Std.U64) (b : alloc.vec.Vec Std.U64) (n : Std.Usize) :
-  Result Std.U64
+  (a : alloc.vec.Vec Ext4) (b : alloc.vec.Vec Ext4) (n : Std.Usize) :
+  Result Ext4
   := do
-  mlpoly.dot_loop a b n 0#u64 0#usize
+  mlpoly.dot_loop a b n EZERO 0#usize
 
 /-- [cpoly::mlpoly::eval]:
-    Source: 'src/mlpoly.rs', lines 190:0-194:1
+    Source: 'src/mlpoly.rs', lines 192:0-196:1
     Visibility: public -/
 def mlpoly.eval
-  (p : alloc.vec.Vec Std.U64) (w : alloc.vec.Vec Std.U64) :
-  Result Std.U64
-  := do
+  (p : alloc.vec.Vec Ext4) (w : alloc.vec.Vec Ext4) : Result Ext4 := do
   let basis ← mlpoly.monomial_basis w
   let sz := alloc.vec.Vec.len basis
   mlpoly.dot p basis sz
 
 /-- [cpoly::mlpoly::eval_lagrange]:
-    Source: 'src/mlpoly.rs', lines 199:0-203:1
+    Source: 'src/mlpoly.rs', lines 201:0-205:1
     Visibility: public -/
 def mlpoly.eval_lagrange
-  (p : alloc.vec.Vec Std.U64) (w : alloc.vec.Vec Std.U64) :
-  Result Std.U64
-  := do
+  (p : alloc.vec.Vec Ext4) (w : alloc.vec.Vec Ext4) : Result Ext4 := do
   let basis ← mlpoly.lagrange_basis w
   let sz := alloc.vec.Vec.len basis
   mlpoly.dot p basis sz
 
 /-- [cpoly::mlpoly::eq_tilde]:
-    Source: 'src/mlpoly.rs', lines 207:0-210:1
+    Source: 'src/mlpoly.rs', lines 209:0-212:1
     Visibility: public -/
 def mlpoly.eq_tilde
-  (w : alloc.vec.Vec Std.U64) (x1 : alloc.vec.Vec Std.U64) :
-  Result Std.U64
-  := do
+  (w : alloc.vec.Vec Ext4) (x1 : alloc.vec.Vec Ext4) : Result Ext4 := do
   let b ← mlpoly.lagrange_basis w
   mlpoly.eval_lagrange b x1
 
 /-- [cpoly::mlpoly::eval_horner_layer]: loop body 0:
-    Source: 'src/mlpoly.rs', lines 225:4-232:5
+    Source: 'src/mlpoly.rs', lines 227:4-234:5
     Visibility: public -/
 @[rust_loop_body]
 def mlpoly.eval_horner_layer_loop.body
-  (coeffs : alloc.vec.Vec Std.U64) (x0 : Std.U64) (half : Std.Usize)
-  (out : alloc.vec.Vec Std.U64) (j : Std.Usize) :
-  Result (ControlFlow ((alloc.vec.Vec Std.U64) × Std.Usize) (alloc.vec.Vec
-    Std.U64))
+  (coeffs : alloc.vec.Vec Ext4) (x0 : Ext4) (half : Std.Usize)
+  (out : alloc.vec.Vec Ext4) (j : Std.Usize) :
+  Result (ControlFlow ((alloc.vec.Vec Ext4) × Std.Usize) (alloc.vec.Vec Ext4))
   := do
   if j < half
   then
     let i ← 2#usize * j
     let lo ←
-      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Std.U64)
-        coeffs i
+      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Ext4) coeffs i
     let i1 ← i + 1#usize
     let hi ←
-      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Std.U64)
-        coeffs i1
-    let t ← fmul x0 hi
-    let v ← fadd lo t
+      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Ext4) coeffs
+        i1
+    let t ← emul x0 hi
+    let v ← eadd lo t
     let out1 ← alloc.vec.Vec.push out v
     let j1 ← j + 1#usize
     ok (cont (out1, j1))
   else ok (done out)
 
 /-- [cpoly::mlpoly::eval_horner_layer]: loop 0:
-    Source: 'src/mlpoly.rs', lines 225:4-232:5
+    Source: 'src/mlpoly.rs', lines 227:4-234:5
     Visibility: public -/
 @[rust_loop]
 def mlpoly.eval_horner_layer_loop
-  (coeffs : alloc.vec.Vec Std.U64) (x0 : Std.U64) (half : Std.Usize)
-  (out : alloc.vec.Vec Std.U64) (j : Std.Usize) :
-  Result (alloc.vec.Vec Std.U64)
+  (coeffs : alloc.vec.Vec Ext4) (x0 : Ext4) (half : Std.Usize)
+  (out : alloc.vec.Vec Ext4) (j : Std.Usize) :
+  Result (alloc.vec.Vec Ext4)
   := do
   loop
     (fun (out1, j1) => mlpoly.eval_horner_layer_loop.body coeffs x0 half out1
@@ -891,131 +1001,121 @@ def mlpoly.eval_horner_layer_loop
     (out, j)
 
 /-- [cpoly::mlpoly::eval_horner_layer]:
-    Source: 'src/mlpoly.rs', lines 221:0-234:1
+    Source: 'src/mlpoly.rs', lines 223:0-236:1
     Visibility: public -/
 def mlpoly.eval_horner_layer
-  (coeffs : alloc.vec.Vec Std.U64) (x0 : Std.U64) :
-  Result (alloc.vec.Vec Std.U64)
-  := do
+  (coeffs : alloc.vec.Vec Ext4) (x0 : Ext4) : Result (alloc.vec.Vec Ext4) := do
   let i := alloc.vec.Vec.len coeffs
   let half ← i / 2#usize
-  mlpoly.eval_horner_layer_loop coeffs x0 half (alloc.vec.Vec.new Std.U64)
-    0#usize
+  mlpoly.eval_horner_layer_loop coeffs x0 half (alloc.vec.Vec.new Ext4) 0#usize
 
 /-- [cpoly::mlpoly::eval_horner]: loop body 0:
-    Source: 'src/mlpoly.rs', lines 246:4-249:5
+    Source: 'src/mlpoly.rs', lines 248:4-251:5
     Visibility: public -/
 @[rust_loop_body]
 def mlpoly.eval_horner_loop0.body
-  (p : alloc.vec.Vec Std.U64) (sz : Std.Usize) (cur : alloc.vec.Vec Std.U64)
+  (p : alloc.vec.Vec Ext4) (sz : Std.Usize) (cur : alloc.vec.Vec Ext4)
   (i : Std.Usize) :
-  Result (ControlFlow ((alloc.vec.Vec Std.U64) × Std.Usize) (alloc.vec.Vec
-    Std.U64))
+  Result (ControlFlow ((alloc.vec.Vec Ext4) × Std.Usize) (alloc.vec.Vec Ext4))
   := do
   if i < sz
   then
-    let i1 ←
-      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Std.U64) p i
-    let cur1 ← alloc.vec.Vec.push cur i1
-    let i2 ← i + 1#usize
-    ok (cont (cur1, i2))
+    let e ←
+      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Ext4) p i
+    let cur1 ← alloc.vec.Vec.push cur e
+    let i1 ← i + 1#usize
+    ok (cont (cur1, i1))
   else ok (done cur)
 
 /-- [cpoly::mlpoly::eval_horner]: loop 0:
-    Source: 'src/mlpoly.rs', lines 246:4-249:5
+    Source: 'src/mlpoly.rs', lines 248:4-251:5
     Visibility: public -/
 @[rust_loop]
 def mlpoly.eval_horner_loop0
-  (p : alloc.vec.Vec Std.U64) (sz : Std.Usize) (cur : alloc.vec.Vec Std.U64)
+  (p : alloc.vec.Vec Ext4) (sz : Std.Usize) (cur : alloc.vec.Vec Ext4)
   (i : Std.Usize) :
-  Result (alloc.vec.Vec Std.U64)
+  Result (alloc.vec.Vec Ext4)
   := do
   loop
     (fun (cur1, i1) => mlpoly.eval_horner_loop0.body p sz cur1 i1)
     (cur, i)
 
 /-- [cpoly::mlpoly::eval_horner]: loop body 1:
-    Source: 'src/mlpoly.rs', lines 251:4-254:5
+    Source: 'src/mlpoly.rs', lines 253:4-256:5
     Visibility: public -/
 @[rust_loop_body]
 def mlpoly.eval_horner_loop1.body
-  (w : alloc.vec.Vec Std.U64) (n : Std.Usize) (cur : alloc.vec.Vec Std.U64)
+  (w : alloc.vec.Vec Ext4) (n : Std.Usize) (cur : alloc.vec.Vec Ext4)
   (j : Std.Usize) :
-  Result (ControlFlow ((alloc.vec.Vec Std.U64) × Std.Usize) (alloc.vec.Vec
-    Std.U64))
+  Result (ControlFlow ((alloc.vec.Vec Ext4) × Std.Usize) (alloc.vec.Vec Ext4))
   := do
   if j < n
   then
-    let i ←
-      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Std.U64) w j
-    let cur1 ← mlpoly.eval_horner_layer cur i
+    let e ←
+      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Ext4) w j
+    let cur1 ← mlpoly.eval_horner_layer cur e
     let j1 ← j + 1#usize
     ok (cont (cur1, j1))
   else ok (done cur)
 
 /-- [cpoly::mlpoly::eval_horner]: loop 1:
-    Source: 'src/mlpoly.rs', lines 251:4-254:5
+    Source: 'src/mlpoly.rs', lines 253:4-256:5
     Visibility: public -/
 @[rust_loop]
 def mlpoly.eval_horner_loop1
-  (w : alloc.vec.Vec Std.U64) (n : Std.Usize) (cur : alloc.vec.Vec Std.U64)
+  (w : alloc.vec.Vec Ext4) (n : Std.Usize) (cur : alloc.vec.Vec Ext4)
   (j : Std.Usize) :
-  Result (alloc.vec.Vec Std.U64)
+  Result (alloc.vec.Vec Ext4)
   := do
   loop
     (fun (cur1, j1) => mlpoly.eval_horner_loop1.body w n cur1 j1)
     (cur, j)
 
 /-- [cpoly::mlpoly::eval_horner]:
-    Source: 'src/mlpoly.rs', lines 241:0-256:1
+    Source: 'src/mlpoly.rs', lines 243:0-258:1
     Visibility: public -/
 def mlpoly.eval_horner
-  (p : alloc.vec.Vec Std.U64) (w : alloc.vec.Vec Std.U64) :
-  Result Std.U64
-  := do
+  (p : alloc.vec.Vec Ext4) (w : alloc.vec.Vec Ext4) : Result Ext4 := do
   let n := alloc.vec.Vec.len w
   let sz ← mlpoly.pow2 n
-  let cur ← mlpoly.eval_horner_loop0 p sz (alloc.vec.Vec.new Std.U64) 0#usize
+  let cur ← mlpoly.eval_horner_loop0 p sz (alloc.vec.Vec.new Ext4) 0#usize
   let cur1 ← mlpoly.eval_horner_loop1 w n cur 0#usize
-  alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Std.U64) cur1
-    0#usize
+  alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Ext4) cur1 0#usize
 
 /-- [cpoly::mlpoly::eval_mle_layer]: loop body 0:
-    Source: 'src/mlpoly.rs', lines 268:4-276:5
+    Source: 'src/mlpoly.rs', lines 270:4-278:5
     Visibility: public -/
 @[rust_loop_body]
 def mlpoly.eval_mle_layer_loop.body
-  (values : alloc.vec.Vec Std.U64) (x0 : Std.U64) (half : Std.Usize)
-  (one_minus : Std.U64) (out : alloc.vec.Vec Std.U64) (j : Std.Usize) :
-  Result (ControlFlow ((alloc.vec.Vec Std.U64) × Std.Usize) (alloc.vec.Vec
-    Std.U64))
+  (values : alloc.vec.Vec Ext4) (x0 : Ext4) (half : Std.Usize)
+  (one_minus : Ext4) (out : alloc.vec.Vec Ext4) (j : Std.Usize) :
+  Result (ControlFlow ((alloc.vec.Vec Ext4) × Std.Usize) (alloc.vec.Vec Ext4))
   := do
   if j < half
   then
     let i ← 2#usize * j
     let lo ←
-      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Std.U64)
-        values i
+      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Ext4) values i
     let i1 ← i + 1#usize
     let hi ←
-      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Std.U64)
-        values i1
-    let a ← fmul one_minus lo
-    let b ← fmul x0 hi
-    let v ← fadd a b
+      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Ext4) values
+        i1
+    let a ← emul one_minus lo
+    let b ← emul x0 hi
+    let v ← eadd a b
     let out1 ← alloc.vec.Vec.push out v
     let j1 ← j + 1#usize
     ok (cont (out1, j1))
   else ok (done out)
 
 /-- [cpoly::mlpoly::eval_mle_layer]: loop 0:
-    Source: 'src/mlpoly.rs', lines 268:4-276:5
+    Source: 'src/mlpoly.rs', lines 270:4-278:5
     Visibility: public -/
 @[rust_loop]
 def mlpoly.eval_mle_layer_loop
-  (values : alloc.vec.Vec Std.U64) (x0 : Std.U64) (half : Std.Usize)
-  (one_minus : Std.U64) (out : alloc.vec.Vec Std.U64) (j : Std.Usize) :
-  Result (alloc.vec.Vec Std.U64)
+  (values : alloc.vec.Vec Ext4) (x0 : Ext4) (half : Std.Usize)
+  (one_minus : Ext4) (out : alloc.vec.Vec Ext4) (j : Std.Usize) :
+  Result (alloc.vec.Vec Ext4)
   := do
   loop
     (fun (out1, j1) => mlpoly.eval_mle_layer_loop.body values x0 half one_minus
@@ -1023,107 +1123,97 @@ def mlpoly.eval_mle_layer_loop
     (out, j)
 
 /-- [cpoly::mlpoly::eval_mle_layer]:
-    Source: 'src/mlpoly.rs', lines 263:0-278:1
+    Source: 'src/mlpoly.rs', lines 265:0-280:1
     Visibility: public -/
 def mlpoly.eval_mle_layer
-  (values : alloc.vec.Vec Std.U64) (x0 : Std.U64) :
-  Result (alloc.vec.Vec Std.U64)
-  := do
+  (values : alloc.vec.Vec Ext4) (x0 : Ext4) : Result (alloc.vec.Vec Ext4) := do
   let i := alloc.vec.Vec.len values
   let half ← i / 2#usize
-  let one_minus ← fsub 1#u64 x0
-  mlpoly.eval_mle_layer_loop values x0 half one_minus (alloc.vec.Vec.new
-    Std.U64) 0#usize
+  let one_minus ← esub EONE x0
+  mlpoly.eval_mle_layer_loop values x0 half one_minus (alloc.vec.Vec.new Ext4)
+    0#usize
 
 /-- [cpoly::mlpoly::eval_mle]: loop body 0:
-    Source: 'src/mlpoly.rs', lines 287:4-290:5
+    Source: 'src/mlpoly.rs', lines 289:4-292:5
     Visibility: public -/
 @[rust_loop_body]
 def mlpoly.eval_mle_loop0.body
-  (values : alloc.vec.Vec Std.U64) (sz : Std.Usize)
-  (cur : alloc.vec.Vec Std.U64) (i : Std.Usize) :
-  Result (ControlFlow ((alloc.vec.Vec Std.U64) × Std.Usize) (alloc.vec.Vec
-    Std.U64))
+  (values : alloc.vec.Vec Ext4) (sz : Std.Usize) (cur : alloc.vec.Vec Ext4)
+  (i : Std.Usize) :
+  Result (ControlFlow ((alloc.vec.Vec Ext4) × Std.Usize) (alloc.vec.Vec Ext4))
   := do
   if i < sz
   then
-    let i1 ←
-      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Std.U64)
-        values i
-    let cur1 ← alloc.vec.Vec.push cur i1
-    let i2 ← i + 1#usize
-    ok (cont (cur1, i2))
+    let e ←
+      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Ext4) values i
+    let cur1 ← alloc.vec.Vec.push cur e
+    let i1 ← i + 1#usize
+    ok (cont (cur1, i1))
   else ok (done cur)
 
 /-- [cpoly::mlpoly::eval_mle]: loop 0:
-    Source: 'src/mlpoly.rs', lines 287:4-290:5
+    Source: 'src/mlpoly.rs', lines 289:4-292:5
     Visibility: public -/
 @[rust_loop]
 def mlpoly.eval_mle_loop0
-  (values : alloc.vec.Vec Std.U64) (sz : Std.Usize)
-  (cur : alloc.vec.Vec Std.U64) (i : Std.Usize) :
-  Result (alloc.vec.Vec Std.U64)
+  (values : alloc.vec.Vec Ext4) (sz : Std.Usize) (cur : alloc.vec.Vec Ext4)
+  (i : Std.Usize) :
+  Result (alloc.vec.Vec Ext4)
   := do
   loop
     (fun (cur1, i1) => mlpoly.eval_mle_loop0.body values sz cur1 i1)
     (cur, i)
 
 /-- [cpoly::mlpoly::eval_mle]: loop body 1:
-    Source: 'src/mlpoly.rs', lines 292:4-295:5
+    Source: 'src/mlpoly.rs', lines 294:4-297:5
     Visibility: public -/
 @[rust_loop_body]
 def mlpoly.eval_mle_loop1.body
-  (w : alloc.vec.Vec Std.U64) (n : Std.Usize) (cur : alloc.vec.Vec Std.U64)
+  (w : alloc.vec.Vec Ext4) (n : Std.Usize) (cur : alloc.vec.Vec Ext4)
   (j : Std.Usize) :
-  Result (ControlFlow ((alloc.vec.Vec Std.U64) × Std.Usize) (alloc.vec.Vec
-    Std.U64))
+  Result (ControlFlow ((alloc.vec.Vec Ext4) × Std.Usize) (alloc.vec.Vec Ext4))
   := do
   if j < n
   then
-    let i ←
-      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Std.U64) w j
-    let cur1 ← mlpoly.eval_mle_layer cur i
+    let e ←
+      alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Ext4) w j
+    let cur1 ← mlpoly.eval_mle_layer cur e
     let j1 ← j + 1#usize
     ok (cont (cur1, j1))
   else ok (done cur)
 
 /-- [cpoly::mlpoly::eval_mle]: loop 1:
-    Source: 'src/mlpoly.rs', lines 292:4-295:5
+    Source: 'src/mlpoly.rs', lines 294:4-297:5
     Visibility: public -/
 @[rust_loop]
 def mlpoly.eval_mle_loop1
-  (w : alloc.vec.Vec Std.U64) (n : Std.Usize) (cur : alloc.vec.Vec Std.U64)
+  (w : alloc.vec.Vec Ext4) (n : Std.Usize) (cur : alloc.vec.Vec Ext4)
   (j : Std.Usize) :
-  Result (alloc.vec.Vec Std.U64)
+  Result (alloc.vec.Vec Ext4)
   := do
   loop
     (fun (cur1, j1) => mlpoly.eval_mle_loop1.body w n cur1 j1)
     (cur, j)
 
 /-- [cpoly::mlpoly::eval_mle]:
-    Source: 'src/mlpoly.rs', lines 282:0-297:1
+    Source: 'src/mlpoly.rs', lines 284:0-299:1
     Visibility: public -/
 def mlpoly.eval_mle
-  (values : alloc.vec.Vec Std.U64) (w : alloc.vec.Vec Std.U64) :
-  Result Std.U64
-  := do
+  (values : alloc.vec.Vec Ext4) (w : alloc.vec.Vec Ext4) : Result Ext4 := do
   let n := alloc.vec.Vec.len w
   let sz ← mlpoly.pow2 n
-  let cur ←
-    mlpoly.eval_mle_loop0 values sz (alloc.vec.Vec.new Std.U64) 0#usize
+  let cur ← mlpoly.eval_mle_loop0 values sz (alloc.vec.Vec.new Ext4) 0#usize
   let cur1 ← mlpoly.eval_mle_loop1 w n cur 0#usize
-  alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Std.U64) cur1
-    0#usize
+  alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Ext4) cur1 0#usize
 
 /-- [cpoly::mlpoly::mono_to_lagrange_level]: loop body 0:
-    Source: 'src/mlpoly.rs', lines 315:4-323:5
+    Source: 'src/mlpoly.rs', lines 317:4-325:5
     Visibility: public -/
 @[rust_loop_body]
 def mlpoly.mono_to_lagrange_level_loop.body
-  (v : alloc.vec.Vec Std.U64) (n : Std.Usize) (stride : Std.Usize)
-  (r : alloc.vec.Vec Std.U64) (i : Std.Usize) :
-  Result (ControlFlow ((alloc.vec.Vec Std.U64) × Std.Usize) (alloc.vec.Vec
-    Std.U64))
+  (v : alloc.vec.Vec Ext4) (n : Std.Usize) (stride : Std.Usize)
+  (r : alloc.vec.Vec Ext4) (i : Std.Usize) :
+  Result (ControlFlow ((alloc.vec.Vec Ext4) × Std.Usize) (alloc.vec.Vec Ext4))
   := do
   if i < n
   then
@@ -1133,58 +1223,52 @@ def mlpoly.mono_to_lagrange_level_loop.body
       if i2 = 1#usize
       then
         do
-        let i3 ←
-          alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Std.U64) v
-            i
-        let i4 ← i - stride
-        let i5 ←
-          alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Std.U64) v
-            i4
-        let s ← fadd i3 i5
+        let e ←
+          alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Ext4) v i
+        let i3 ← i - stride
+        let e1 ←
+          alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Ext4) v i3
+        let s ← eadd e e1
         alloc.vec.Vec.push r s
       else
         do
-        let i3 ←
-          alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Std.U64) v
-            i
-        alloc.vec.Vec.push r i3
+        let e ←
+          alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Ext4) v i
+        alloc.vec.Vec.push r e
     let i3 ← i + 1#usize
     ok (cont (r1, i3))
   else ok (done r)
 
 /-- [cpoly::mlpoly::mono_to_lagrange_level]: loop 0:
-    Source: 'src/mlpoly.rs', lines 315:4-323:5
+    Source: 'src/mlpoly.rs', lines 317:4-325:5
     Visibility: public -/
 @[rust_loop]
 def mlpoly.mono_to_lagrange_level_loop
-  (v : alloc.vec.Vec Std.U64) (n : Std.Usize) (stride : Std.Usize)
-  (r : alloc.vec.Vec Std.U64) (i : Std.Usize) :
-  Result (alloc.vec.Vec Std.U64)
+  (v : alloc.vec.Vec Ext4) (n : Std.Usize) (stride : Std.Usize)
+  (r : alloc.vec.Vec Ext4) (i : Std.Usize) :
+  Result (alloc.vec.Vec Ext4)
   := do
   loop
     (fun (r1, i1) => mlpoly.mono_to_lagrange_level_loop.body v n stride r1 i1)
     (r, i)
 
 /-- [cpoly::mlpoly::mono_to_lagrange_level]:
-    Source: 'src/mlpoly.rs', lines 310:0-325:1
+    Source: 'src/mlpoly.rs', lines 312:0-327:1
     Visibility: public -/
 def mlpoly.mono_to_lagrange_level
-  (v : alloc.vec.Vec Std.U64) (j : Std.Usize) :
-  Result (alloc.vec.Vec Std.U64)
-  := do
+  (v : alloc.vec.Vec Ext4) (j : Std.Usize) : Result (alloc.vec.Vec Ext4) := do
   let n := alloc.vec.Vec.len v
   let stride ← mlpoly.pow2 j
-  mlpoly.mono_to_lagrange_level_loop v n stride (alloc.vec.Vec.new Std.U64)
+  mlpoly.mono_to_lagrange_level_loop v n stride (alloc.vec.Vec.new Ext4)
     0#usize
 
 /-- [cpoly::mlpoly::mono_to_lagrange]: loop body 0:
-    Source: 'src/mlpoly.rs', lines 334:4-337:5
+    Source: 'src/mlpoly.rs', lines 336:4-339:5
     Visibility: public -/
 @[rust_loop_body]
 def mlpoly.mono_to_lagrange_loop.body
-  (n : Std.Usize) (cur : alloc.vec.Vec Std.U64) (j : Std.Usize) :
-  Result (ControlFlow ((alloc.vec.Vec Std.U64) × Std.Usize) (alloc.vec.Vec
-    Std.U64))
+  (n : Std.Usize) (cur : alloc.vec.Vec Ext4) (j : Std.Usize) :
+  Result (ControlFlow ((alloc.vec.Vec Ext4) × Std.Usize) (alloc.vec.Vec Ext4))
   := do
   if j < n
   then
@@ -1194,36 +1278,33 @@ def mlpoly.mono_to_lagrange_loop.body
   else ok (done cur)
 
 /-- [cpoly::mlpoly::mono_to_lagrange]: loop 0:
-    Source: 'src/mlpoly.rs', lines 334:4-337:5
+    Source: 'src/mlpoly.rs', lines 336:4-339:5
     Visibility: public -/
 @[rust_loop]
 def mlpoly.mono_to_lagrange_loop
-  (n : Std.Usize) (cur : alloc.vec.Vec Std.U64) (j : Std.Usize) :
-  Result (alloc.vec.Vec Std.U64)
+  (n : Std.Usize) (cur : alloc.vec.Vec Ext4) (j : Std.Usize) :
+  Result (alloc.vec.Vec Ext4)
   := do
   loop
     (fun (cur1, j1) => mlpoly.mono_to_lagrange_loop.body n cur1 j1)
     (cur, j)
 
 /-- [cpoly::mlpoly::mono_to_lagrange]:
-    Source: 'src/mlpoly.rs', lines 331:0-339:1
+    Source: 'src/mlpoly.rs', lines 333:0-341:1
     Visibility: public -/
 @[reducible]
 def mlpoly.mono_to_lagrange
-  (v : alloc.vec.Vec Std.U64) (n : Std.Usize) :
-  Result (alloc.vec.Vec Std.U64)
-  := do
+  (v : alloc.vec.Vec Ext4) (n : Std.Usize) : Result (alloc.vec.Vec Ext4) := do
   mlpoly.mono_to_lagrange_loop n v 0#usize
 
 /-- [cpoly::mlpoly::lagrange_to_mono_level]: loop body 0:
-    Source: 'src/mlpoly.rs', lines 353:4-361:5
+    Source: 'src/mlpoly.rs', lines 355:4-363:5
     Visibility: public -/
 @[rust_loop_body]
 def mlpoly.lagrange_to_mono_level_loop.body
-  (v : alloc.vec.Vec Std.U64) (n : Std.Usize) (stride : Std.Usize)
-  (r : alloc.vec.Vec Std.U64) (i : Std.Usize) :
-  Result (ControlFlow ((alloc.vec.Vec Std.U64) × Std.Usize) (alloc.vec.Vec
-    Std.U64))
+  (v : alloc.vec.Vec Ext4) (n : Std.Usize) (stride : Std.Usize)
+  (r : alloc.vec.Vec Ext4) (i : Std.Usize) :
+  Result (ControlFlow ((alloc.vec.Vec Ext4) × Std.Usize) (alloc.vec.Vec Ext4))
   := do
   if i < n
   then
@@ -1233,58 +1314,52 @@ def mlpoly.lagrange_to_mono_level_loop.body
       if i2 = 1#usize
       then
         do
-        let i3 ←
-          alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Std.U64) v
-            i
-        let i4 ← i - stride
-        let i5 ←
-          alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Std.U64) v
-            i4
-        let s ← fsub i3 i5
+        let e ←
+          alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Ext4) v i
+        let i3 ← i - stride
+        let e1 ←
+          alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Ext4) v i3
+        let s ← esub e e1
         alloc.vec.Vec.push r s
       else
         do
-        let i3 ←
-          alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Std.U64) v
-            i
-        alloc.vec.Vec.push r i3
+        let e ←
+          alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice Ext4) v i
+        alloc.vec.Vec.push r e
     let i3 ← i + 1#usize
     ok (cont (r1, i3))
   else ok (done r)
 
 /-- [cpoly::mlpoly::lagrange_to_mono_level]: loop 0:
-    Source: 'src/mlpoly.rs', lines 353:4-361:5
+    Source: 'src/mlpoly.rs', lines 355:4-363:5
     Visibility: public -/
 @[rust_loop]
 def mlpoly.lagrange_to_mono_level_loop
-  (v : alloc.vec.Vec Std.U64) (n : Std.Usize) (stride : Std.Usize)
-  (r : alloc.vec.Vec Std.U64) (i : Std.Usize) :
-  Result (alloc.vec.Vec Std.U64)
+  (v : alloc.vec.Vec Ext4) (n : Std.Usize) (stride : Std.Usize)
+  (r : alloc.vec.Vec Ext4) (i : Std.Usize) :
+  Result (alloc.vec.Vec Ext4)
   := do
   loop
     (fun (r1, i1) => mlpoly.lagrange_to_mono_level_loop.body v n stride r1 i1)
     (r, i)
 
 /-- [cpoly::mlpoly::lagrange_to_mono_level]:
-    Source: 'src/mlpoly.rs', lines 348:0-363:1
+    Source: 'src/mlpoly.rs', lines 350:0-365:1
     Visibility: public -/
 def mlpoly.lagrange_to_mono_level
-  (v : alloc.vec.Vec Std.U64) (j : Std.Usize) :
-  Result (alloc.vec.Vec Std.U64)
-  := do
+  (v : alloc.vec.Vec Ext4) (j : Std.Usize) : Result (alloc.vec.Vec Ext4) := do
   let n := alloc.vec.Vec.len v
   let stride ← mlpoly.pow2 j
-  mlpoly.lagrange_to_mono_level_loop v n stride (alloc.vec.Vec.new Std.U64)
+  mlpoly.lagrange_to_mono_level_loop v n stride (alloc.vec.Vec.new Ext4)
     0#usize
 
 /-- [cpoly::mlpoly::lagrange_to_mono]: loop body 0:
-    Source: 'src/mlpoly.rs', lines 370:4-373:5
+    Source: 'src/mlpoly.rs', lines 372:4-375:5
     Visibility: public -/
 @[rust_loop_body]
 def mlpoly.lagrange_to_mono_loop.body
-  (cur : alloc.vec.Vec Std.U64) (j : Std.Usize) :
-  Result (ControlFlow ((alloc.vec.Vec Std.U64) × Std.Usize) (alloc.vec.Vec
-    Std.U64))
+  (cur : alloc.vec.Vec Ext4) (j : Std.Usize) :
+  Result (ControlFlow ((alloc.vec.Vec Ext4) × Std.Usize) (alloc.vec.Vec Ext4))
   := do
   if j > 0#usize
   then
@@ -1294,25 +1369,23 @@ def mlpoly.lagrange_to_mono_loop.body
   else ok (done cur)
 
 /-- [cpoly::mlpoly::lagrange_to_mono]: loop 0:
-    Source: 'src/mlpoly.rs', lines 370:4-373:5
+    Source: 'src/mlpoly.rs', lines 372:4-375:5
     Visibility: public -/
 @[rust_loop]
 def mlpoly.lagrange_to_mono_loop
-  (cur : alloc.vec.Vec Std.U64) (j : Std.Usize) :
-  Result (alloc.vec.Vec Std.U64)
+  (cur : alloc.vec.Vec Ext4) (j : Std.Usize) :
+  Result (alloc.vec.Vec Ext4)
   := do
   loop
     (fun (cur1, j1) => mlpoly.lagrange_to_mono_loop.body cur1 j1)
     (cur, j)
 
 /-- [cpoly::mlpoly::lagrange_to_mono]:
-    Source: 'src/mlpoly.rs', lines 367:0-375:1
+    Source: 'src/mlpoly.rs', lines 369:0-377:1
     Visibility: public -/
 @[reducible]
 def mlpoly.lagrange_to_mono
-  (v : alloc.vec.Vec Std.U64) (n : Std.Usize) :
-  Result (alloc.vec.Vec Std.U64)
-  := do
+  (v : alloc.vec.Vec Ext4) (n : Std.Usize) : Result (alloc.vec.Vec Ext4) := do
   mlpoly.lagrange_to_mono_loop v n
 
 end cpoly

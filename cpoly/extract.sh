@@ -10,10 +10,14 @@
 # `Generated.lean` is DERIVED OUTPUT: never hand-edit it, run this instead.
 #
 # Toolchain: charon and aeneas must match each other and the Aeneas Lean backend
-# checked out at ../aeneas. The simplest way to get a matching pair is the
-# release built from that exact commit:
+# that CPolyEquiv builds against. That backend is ../aeneas-432/backends/lean --
+# a git worktree of ../aeneas at commit 3a8586f (nightly-2026.07.26-3a8586f) on
+# branch `lean-4.32.0`, carrying only Lean v4.32.0 API-drift fixes; the
+# extraction contract is unchanged from that commit, so these binaries still
+# match. The simplest way to get a matching pair is the release built from that
+# exact commit:
 #
-#   cd .. && git -C aeneas describe --tags        # e.g. nightly-2026.07.28-3a8586f
+#   cd .. && git -C aeneas describe --tags        # e.g. nightly-2026.07.26-3a8586f
 #   curl -sSL -o t.tar.gz \
 #     https://github.com/AeneasVerif/aeneas/releases/download/<TAG>/aeneas-macos-aarch64.tar.gz
 #   mkdir -p toolchain && tar xzf t.tar.gz -C toolchain
