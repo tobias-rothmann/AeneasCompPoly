@@ -1,17 +1,18 @@
 /-
-Equivalence between the Aeneas-extracted Rust model (`cpoly.mlpoly.*`, see
-`CPolyEquiv/Generated.lean`) and CompPoly's reference **multilinear**
+Equivalence between the Aeneas-extracted Rust model (`cpoly.cmlpoly.*`, see
+`Generated.lean`) and CompPoly's reference **multilinear**
 polynomials (`CompPoly.CMlPolynomial` / `CompPoly.CMlPolynomialEval`, see
 CompPoly/Multilinear/Basic.lean).
 
-This is the multilinear counterpart of `CPolyEquiv/Equiv.lean`, and it reuses
-that file's field layer verbatim: a generated `cpoly.Ext4` struct denotes the
-element `toExt a` of `F = Hachi.Ext4`, the quartic extension `F_P[Y]/(Y^4 - 2)`
-of the Hachi prime field `P = 2^32 - 99`, and the four extension operations
-`eadd`/`esub`/`eneg`/`emul` are already known to be total and to commute with
-`Ext`'s ring operations under the reducedness invariant `Reduced`/`VecReduced`.
-Nothing below depends on which field it is: the arguments only use that `F` is a
-commutative ring and that the field layer is `@[step]`-available.
+This is the multilinear counterpart of `CPoly.lean`, and it reuses
+`Field.lean` verbatim: a generated `cpoly.field.Ext4` struct denotes
+the element `toExt a` of `F = Hachi.Ext4`, the quartic extension
+`F_P[Y]/(Y^4 - 2)` of the Hachi prime field `P = 2^32 - 99`, and the four
+extension operations `eadd`/`esub`/`eneg`/`emul` are already known to be total
+and to commute with `Ext`'s ring operations under the reducedness invariant
+`Reduced`/`VecReduced`.  Nothing below depends on which field it is: the
+arguments only use that `F` is a commutative ring and that the field layer is
+`@[step]`-available.
 
 ## Representation
 
@@ -43,23 +44,23 @@ evaluation algorithms free of `Vector.head`/`Vector.tail` reasoning.
    with `CMlPolynomial.eval` / `CMlPolynomialEval.eval`, which are
    `Vector.dotProduct` against `monomialBasis` / `lagrangeBasis`.
 
-3. **Aeneas layer** (everything named `*_spec`).  Each generated `cpoly.mlpoly`
+3. **Aeneas layer** (everything named `*_spec`).  Each generated `cpoly.cmlpoly`
    function is shown to succeed, to preserve `VecReduced` and the length
    `2 ^ n`, and to compute the corresponding CompPoly operation.  Loop bodies
    are handled with `Aeneas.Std.loop.spec_decr_nat` exactly as in
-   `Equiv.lean`; the top-level specs are composed with `spec_bind`/`spec_mono`.
+   `CPoly.lean`; the top-level specs are composed with `spec_bind`/`spec_mono`.
 
 ## Size side conditions
 
-`cpoly::mlpoly::pow2` builds `2 ^ n` by repeated *checked* doubling, so it fails
+`cpoly::cmlpoly::pow2` builds `2 ^ n` by repeated *checked* doubling, so it fails
 once `2 ^ n` exceeds `Usize.max`.  Specs whose inputs already include a vector
 of length `2 ^ n` get `2 ^ n ≤ Usize.max` for free from the `alloc.vec.Vec`
 invariant (`Vec α = { l : List α // l.length ≤ Usize.max }`); the others
 (`zero`, `of_array`, the two bases, `eq_tilde`) take it as a hypothesis, which
 is exactly the weakest condition making the triple true.
 -/
-import CPolyEquiv.Generated
-import CPolyEquiv.Equiv
+import Field
+import CPoly
 import CompPoly.Multilinear.Basic
 
 open Aeneas Aeneas.Std Aeneas.Std.WP Result
@@ -69,8 +70,8 @@ namespace CPolyEquiv.Ml
 
 /-! ## Word-level helpers
 
-The `0`/`1` of the coefficient field are the extracted constants `cpoly.EZERO`
-and `cpoly.EONE`; `Equiv.lean` supplies `toExt_EZERO`/`toExt_EONE` and
+The `0`/`1` of the coefficient field are the extracted constants `cpoly.field.EZERO`
+and `cpoly.field.EONE`; `Field.lean` supplies `toExt_EZERO`/`toExt_EONE` and
 `reduced_EZERO`/`reduced_EONE` for them, and tags every extension operation
 `@[step]`. -/
 
@@ -160,58 +161,59 @@ theorem pow_le_of_lt {j n : ℕ} (h : j < n) (hn : 2 ^ n ≤ Std.Usize.max) :
 /-! ## Bridge: words ↔ multilinear tables and points -/
 
 /-- Coefficient reader: entry `i` of `v` as a field element, `0` past the end. -/
-def coeffFn (v : alloc.vec.Vec cpoly.Ext4) : ℕ → F :=
+def coeffFn (v : alloc.vec.Vec cpoly.field.Ext4) : ℕ → F :=
   fun i => (v.val.map toExt).getD i 0
 
 /-- Point reader: coordinate `k` of the point stored in `v` starting at offset
 `o`.  The offset is what makes "eliminate the least-significant variable"
 into `o + 1`. -/
-def pointFn (v : alloc.vec.Vec cpoly.Ext4) (o : ℕ) : ℕ → F :=
+def pointFn (v : alloc.vec.Vec cpoly.field.Ext4) (o : ℕ) : ℕ → F :=
   fun k => (v.val.map toExt).getD (o + k) 0
 
-theorem coeffFn_of_lt (v : alloc.vec.Vec cpoly.Ext4) {i : ℕ} (hi : i < v.val.length) :
+theorem coeffFn_of_lt (v : alloc.vec.Vec cpoly.field.Ext4) {i : ℕ} (hi : i < v.val.length) :
     coeffFn v i = toExt v.val[i] := by
   unfold coeffFn
   rw [List.getD_eq_getElem _ _ (by simpa using hi), List.getElem_map]
 
-theorem coeffFn_of_ge (v : alloc.vec.Vec cpoly.Ext4) {i : ℕ} (hi : v.val.length ≤ i) :
+theorem coeffFn_of_ge (v : alloc.vec.Vec cpoly.field.Ext4) {i : ℕ} (hi : v.val.length ≤ i) :
     coeffFn v i = 0 := by
   unfold coeffFn
   rw [List.getD_eq_default]; simpa using hi
 
-theorem pointFn_of_lt (v : alloc.vec.Vec cpoly.Ext4) (o : ℕ) {k : ℕ}
+theorem pointFn_of_lt (v : alloc.vec.Vec cpoly.field.Ext4) (o : ℕ) {k : ℕ}
     (hk : o + k < v.val.length) : pointFn v o k = toExt v.val[o + k] := by
   unfold pointFn
   rw [List.getD_eq_getElem _ _ (by simpa using hk), List.getElem_map]
 
-theorem pointFn_succ (v : alloc.vec.Vec cpoly.Ext4) (o k : ℕ) :
+theorem pointFn_succ (v : alloc.vec.Vec cpoly.field.Ext4) (o k : ℕ) :
     pointFn v o (k + 1) = pointFn v (o + 1) k := by
   unfold pointFn; rw [show o + (k + 1) = o + 1 + k by omega]
 
 /-- The multilinear table (in either basis) represented by a `Vec Ext4`. -/
-def toMl (n : ℕ) (v : alloc.vec.Vec cpoly.Ext4) : CMlPolynomial F n :=
+def toMl (n : ℕ) (v : alloc.vec.Vec cpoly.field.Ext4) : CMlPolynomial F n :=
   Vector.ofFn (fun i : Fin (2 ^ n) => coeffFn v i.val)
 
 /-- The same words read as a Boolean-hypercube value table. -/
-abbrev toMlEval (n : ℕ) (v : alloc.vec.Vec cpoly.Ext4) : CMlPolynomialEval F n := toMl n v
+abbrev toMlEval (n : ℕ) (v : alloc.vec.Vec cpoly.field.Ext4) : CMlPolynomialEval F n := toMl n v
 
 /-- The point of `F^n` stored in `v` starting at offset `o`. -/
-def toPointFrom (n : ℕ) (v : alloc.vec.Vec cpoly.Ext4) (o : ℕ) : Vector F n :=
+def toPointFrom (n : ℕ) (v : alloc.vec.Vec cpoly.field.Ext4) (o : ℕ) : Vector F n :=
   Vector.ofFn (fun k : Fin n => pointFn v o k.val)
 
 /-- The point of `F^n` stored in `v`. -/
-abbrev toPoint (n : ℕ) (v : alloc.vec.Vec cpoly.Ext4) : Vector F n := toPointFrom n v 0
+abbrev toPoint (n : ℕ) (v : alloc.vec.Vec cpoly.field.Ext4) : Vector F n := toPointFrom n v 0
 
-@[simp] theorem toMl_getElem (n : ℕ) (v : alloc.vec.Vec cpoly.Ext4) (i : ℕ) (hi : i < 2 ^ n) :
+@[simp] theorem toMl_getElem (n : ℕ) (v : alloc.vec.Vec cpoly.field.Ext4) (i : ℕ)
+    (hi : i < 2 ^ n) :
     (toMl n v)[i] = coeffFn v i := by
   simp [toMl]
 
-@[simp] theorem toPointFrom_getElem (n : ℕ) (v : alloc.vec.Vec cpoly.Ext4) (o k : ℕ)
+@[simp] theorem toPointFrom_getElem (n : ℕ) (v : alloc.vec.Vec cpoly.field.Ext4) (o k : ℕ)
     (hk : k < n) : (toPointFrom n v o)[k] = pointFn v o k := by
   simp [toPointFrom]
 
 /-- Two `Vec`s that agree coefficient-wise below `2 ^ n` give the same table. -/
-theorem toMl_congr (n : ℕ) (v w : alloc.vec.Vec cpoly.Ext4)
+theorem toMl_congr (n : ℕ) (v w : alloc.vec.Vec cpoly.field.Ext4)
     (h : ∀ i, i < 2 ^ n → coeffFn v i = coeffFn w i) : toMl n v = toMl n w := by
   unfold toMl
   apply Vector.ext
@@ -220,7 +222,8 @@ theorem toMl_congr (n : ℕ) (v w : alloc.vec.Vec cpoly.Ext4)
   exact h i hi
 
 /-- A vector of length `2 ^ n` witnesses that `2 ^ n` is a legal `usize`. -/
-theorem pow2_le_usize_max {n : ℕ} {v : alloc.vec.Vec cpoly.Ext4} (hv : v.val.length = 2 ^ n) :
+theorem pow2_le_usize_max {n : ℕ} {v : alloc.vec.Vec cpoly.field.Ext4}
+    (hv : v.val.length = 2 ^ n) :
     2 ^ n ≤ Std.Usize.max := hv ▸ v.property
 
 /-! ## Explicit-value layer
@@ -323,7 +326,7 @@ theorem lagProd_succ_odd (n j : ℕ) (x : ℕ → F) :
 /-- **One Horner layer preserves the value.**  Eliminating the
 least-significant variable of a *coefficient* table at `x 0` and evaluating the
 half-size table at the remaining coordinates gives the original value.  This is
-the mathematical heart of `cpoly::mlpoly::eval_horner`. -/
+the mathematical heart of `cpoly::cmlpoly::eval_horner`. -/
 theorem mlVal_layer (n : ℕ) (c x : ℕ → F) :
     mlVal n (fun j => c (2 * j) + x 0 * c (2 * j + 1)) (fun k => x (k + 1))
       = mlVal (n + 1) c x := by
@@ -336,7 +339,7 @@ theorem mlVal_layer (n : ℕ) (c x : ℕ → F) :
 
 /-- **One multilinear-extension layer preserves the value.**  The
 `CMlPolynomialEval` analogue of `mlVal_layer`, and the heart of
-`cpoly::mlpoly::eval_mle`. -/
+`cpoly::cmlpoly::eval_mle`. -/
 theorem mlValL_layer (n : ℕ) (c x : ℕ → F) :
     mlValL n (fun j => (1 - x 0) * c (2 * j) + x 0 * c (2 * j + 1)) (fun k => x (k + 1))
       = mlValL (n + 1) c x := by
@@ -355,7 +358,7 @@ theorem getLsb_ofFin {m : ℕ} (i : Fin (2 ^ m)) (j : Fin m) :
   rfl
 
 /-- The monomial basis at a `Vec`-represented point, coefficient-wise. -/
-theorem monomialBasis_getElem' (n : ℕ) (w : alloc.vec.Vec cpoly.Ext4) (o i : ℕ)
+theorem monomialBasis_getElem' (n : ℕ) (w : alloc.vec.Vec cpoly.field.Ext4) (o i : ℕ)
     (hi : i < 2 ^ n) :
     (CMlPolynomial.monomialBasis (toPointFrom n w o))[i] = monoProd n i (pointFn w o) := by
   simp [CMlPolynomial.monomialBasis, monoProd, toPointFrom]
@@ -363,7 +366,7 @@ theorem monomialBasis_getElem' (n : ℕ) (w : alloc.vec.Vec cpoly.Ext4) (o i : �
     (f := fun k => if Nat.testBit i k then pointFn w o k else 1) n
 
 /-- The Lagrange basis at a `Vec`-represented point, coefficient-wise. -/
-theorem lagrangeBasis_getElem' (n : ℕ) (w : alloc.vec.Vec cpoly.Ext4) (o i : ℕ)
+theorem lagrangeBasis_getElem' (n : ℕ) (w : alloc.vec.Vec cpoly.field.Ext4) (o i : ℕ)
     (hi : i < 2 ^ n) :
     (CMlPolynomialEval.lagrangeBasis (toPointFrom n w o))[i] = lagProd n i (pointFn w o) := by
   simp [CMlPolynomialEval.lagrangeBasis, lagProd, toPointFrom]
@@ -377,7 +380,7 @@ theorem dotProduct_eq_sum_univ {m : ℕ} (a b : Vector F m) :
   rfl
 
 /-- The explicit value equals `CMlPolynomial.eval`. -/
-theorem mlVal_eq_eval (n : ℕ) (p w : alloc.vec.Vec cpoly.Ext4) (o : ℕ) :
+theorem mlVal_eq_eval (n : ℕ) (p w : alloc.vec.Vec cpoly.field.Ext4) (o : ℕ) :
     mlVal n (coeffFn p) (pointFn w o)
       = CMlPolynomial.eval (toMl n p) (toPointFrom n w o) := by
   rw [CMlPolynomial.eval, dotProduct_eq_sum_univ]
@@ -395,7 +398,7 @@ theorem mlVal_eq_eval (n : ℕ) (p w : alloc.vec.Vec cpoly.Ext4) (o : ℕ) :
     (fun i => coeffFn p i * monoProd n i (pointFn w o)) (2 ^ n)
 
 /-- The explicit value equals `CMlPolynomialEval.eval`. -/
-theorem mlValL_eq_eval (n : ℕ) (p w : alloc.vec.Vec cpoly.Ext4) (o : ℕ) :
+theorem mlValL_eq_eval (n : ℕ) (p w : alloc.vec.Vec cpoly.field.Ext4) (o : ℕ) :
     mlValL n (coeffFn p) (pointFn w o)
       = CMlPolynomialEval.eval (toMlEval n p) (toPointFrom n w o) := by
   rw [CMlPolynomialEval.eval, dotProduct_eq_sum_univ]
@@ -416,13 +419,13 @@ theorem mlValL_eq_eval (n : ℕ) (p w : alloc.vec.Vec cpoly.Ext4) (o : ℕ) :
 
 theorem pow2_loop_spec (n : Std.Usize) (hn : 2 ^ n.val ≤ Std.Usize.max) :
     ∀ (m k : Std.Usize), k.val ≤ n.val → m.val = 2 ^ k.val →
-      cpoly.mlpoly.pow2_loop n m k ⦃ z => z.val = 2 ^ n.val ⦄ := by
+      cpoly.cmlpoly.pow2_loop n m k ⦃ z => z.val = 2 ^ n.val ⦄ := by
   intro m k hk hm
-  rw [cpoly.mlpoly.pow2_loop]
+  rw [cpoly.cmlpoly.pow2_loop]
   apply loop.spec_decr_nat (fun s => n.val - s.2.val)
     (fun s => s.2.val ≤ n.val ∧ s.1.val = 2 ^ s.2.val)
   · rintro ⟨m1, k1⟩ ⟨hk1, hm1⟩
-    simp only [cpoly.mlpoly.pow2_loop.body]
+    simp only [cpoly.cmlpoly.pow2_loop.body]
     by_cases hlt : k1 < n
     · rw [if_pos hlt]
       have hklt : k1.val < n.val := by scalar_tac
@@ -443,24 +446,25 @@ theorem pow2_loop_spec (n : Std.Usize) (hn : 2 ^ n.val ≤ Std.Usize.max) :
       rw [hm1, heq]
   · exact ⟨hk, hm⟩
 
-/-- `cpoly::mlpoly::pow2` computes `2 ^ n`, provided that fits in a `usize`. -/
+/-- `cpoly::cmlpoly::pow2` computes `2 ^ n`, provided that fits in a `usize`. -/
 theorem pow2_spec (n : Std.Usize) (hn : 2 ^ n.val ≤ Std.Usize.max) :
-    cpoly.mlpoly.pow2 n ⦃ z => z.val = 2 ^ n.val ⦄ := by
-  rw [cpoly.mlpoly.pow2]
+    cpoly.cmlpoly.pow2 n ⦃ z => z.val = 2 ^ n.val ⦄ := by
+  rw [cpoly.cmlpoly.pow2]
   exact pow2_loop_spec n hn 1#usize 0#usize (by simp) (by simp)
 
 /-! ## `zero` -/
 
 theorem zero_loop_spec (sz : Std.Usize) :
-    ∀ (r : alloc.vec.Vec cpoly.Ext4) (i : Std.Usize), i.val ≤ sz.val →
-      r.val = List.replicate i.val cpoly.EZERO →
-      cpoly.mlpoly.zero_loop sz r i ⦃ z => z.val = List.replicate sz.val cpoly.EZERO ⦄ := by
+    ∀ (r : alloc.vec.Vec cpoly.field.Ext4) (i : Std.Usize), i.val ≤ sz.val →
+      r.val = List.replicate i.val cpoly.field.EZERO →
+      cpoly.cmlpoly.zero_loop sz r i
+        ⦃ z => z.val = List.replicate sz.val cpoly.field.EZERO ⦄ := by
   intro r i hi hr
-  rw [cpoly.mlpoly.zero_loop]
+  rw [cpoly.cmlpoly.zero_loop]
   apply loop.spec_decr_nat (fun s => sz.val - s.2.val)
-    (fun s => s.2.val ≤ sz.val ∧ s.1.val = List.replicate s.2.val cpoly.EZERO)
+    (fun s => s.2.val ≤ sz.val ∧ s.1.val = List.replicate s.2.val cpoly.field.EZERO)
   · rintro ⟨r1, i1⟩ ⟨hi1, hr1⟩
-    simp only [cpoly.mlpoly.zero_loop.body]
+    simp only [cpoly.cmlpoly.zero_loop.body]
     by_cases hlt : i1 < sz
     · rw [if_pos hlt]
       have hlen : r1.val.length < Std.Usize.max := by
@@ -478,19 +482,20 @@ theorem zero_loop_spec (sz : Std.Usize) :
       rw [hr1, this]
   · exact ⟨hi, hr⟩
 
-/-- `cpoly::mlpoly::zero` ↔ `CMlPolynomial.zero`. -/
+/-- `cpoly::cmlpoly::zero` ↔ `CMlPolynomial.zero`. -/
 theorem zero_spec (n : Std.Usize) (hn : 2 ^ n.val ≤ Std.Usize.max) :
-    cpoly.mlpoly.zero n ⦃ z => VecReduced z ∧ z.val.length = 2 ^ n.val ∧
+    cpoly.cmlpoly.zero n ⦃ z => VecReduced z ∧ z.val.length = 2 ^ n.val ∧
       toMl n.val z = (CMlPolynomial.zero : CMlPolynomial F n.val) ⦄ := by
-  rw [cpoly.mlpoly.zero]
+  rw [cpoly.cmlpoly.zero]
   apply spec_bind (pow2_spec n hn)
   intro sz hsz
-  apply spec_mono (zero_loop_spec sz (alloc.vec.Vec.new cpoly.Ext4) 0#usize (by simp) (by simp))
+  apply spec_mono (zero_loop_spec sz (alloc.vec.Vec.new cpoly.field.Ext4) 0#usize
+    (by simp) (by simp))
   intro z hz
   refine ⟨?_, ?_, ?_⟩
   · intro u hu
     rw [hz] at hu
-    have : u = cpoly.EZERO := List.eq_of_mem_replicate hu
+    have : u = cpoly.field.EZERO := List.eq_of_mem_replicate hu
     rw [this]
     exact reduced_EZERO
   · simp [hz, hsz]
@@ -500,19 +505,19 @@ theorem zero_spec (n : Std.Usize) (hn : 2 ^ n.val ≤ Std.Usize.max) :
 
 /-! ## `of_array` -/
 
-theorem of_array_loop_spec (coeffs : alloc.vec.Vec cpoly.Ext4) (sz m : Std.Usize)
+theorem of_array_loop_spec (coeffs : alloc.vec.Vec cpoly.field.Ext4) (sz m : Std.Usize)
     (hc : VecReduced coeffs) (hm : m.val = coeffs.val.length) :
-    ∀ (r : alloc.vec.Vec cpoly.Ext4) (i : Std.Usize), i.val ≤ sz.val → VecReduced r →
+    ∀ (r : alloc.vec.Vec cpoly.field.Ext4) (i : Std.Usize), i.val ≤ sz.val → VecReduced r →
       r.val.map toExt = (List.range i.val).map (coeffFn coeffs) →
-      cpoly.mlpoly.of_array_loop coeffs sz m r i ⦃ z => VecReduced z ∧
+      cpoly.cmlpoly.of_array_loop coeffs sz m r i ⦃ z => VecReduced z ∧
         z.val.map toExt = (List.range sz.val).map (coeffFn coeffs) ⦄ := by
   intro r i hi hr hrel
-  rw [cpoly.mlpoly.of_array_loop]
+  rw [cpoly.cmlpoly.of_array_loop]
   apply loop.spec_decr_nat (fun s => sz.val - s.2.val)
     (fun s => s.2.val ≤ sz.val ∧ VecReduced s.1 ∧
       s.1.val.map toExt = (List.range s.2.val).map (coeffFn coeffs))
   · rintro ⟨r1, i1⟩ ⟨hi1, hr1, hrel1⟩
-    simp only [cpoly.mlpoly.of_array_loop.body]
+    simp only [cpoly.cmlpoly.of_array_loop.body]
     by_cases hlt : i1 < sz
     · rw [if_pos hlt]
       have hrlen : r1.val.length = i1.val := by
@@ -554,17 +559,17 @@ theorem of_array_loop_spec (coeffs : alloc.vec.Vec cpoly.Ext4) (sz m : Std.Usize
       exact ⟨hr1, by simpa [heq] using hrel1⟩
   · exact ⟨hi, hr, hrel⟩
 
-/-- `cpoly::mlpoly::of_array` ↔ `CMlPolynomial.ofArray`. -/
-theorem of_array_spec (coeffs : alloc.vec.Vec cpoly.Ext4) (n : Std.Usize)
+/-- `cpoly::cmlpoly::of_array` ↔ `CMlPolynomial.ofArray`. -/
+theorem of_array_spec (coeffs : alloc.vec.Vec cpoly.field.Ext4) (n : Std.Usize)
     (hc : VecReduced coeffs) (hn : 2 ^ n.val ≤ Std.Usize.max) :
-    cpoly.mlpoly.of_array coeffs n ⦃ z => VecReduced z ∧ z.val.length = 2 ^ n.val ∧
+    cpoly.cmlpoly.of_array coeffs n ⦃ z => VecReduced z ∧ z.val.length = 2 ^ n.val ∧
       toMl n.val z
         = CMlPolynomial.ofArray (coeffs.val.map toExt).toArray n.val ⦄ := by
-  rw [cpoly.mlpoly.of_array]
+  rw [cpoly.cmlpoly.of_array]
   apply spec_bind (pow2_spec n hn)
   intro sz hsz
   apply spec_mono (of_array_loop_spec coeffs sz (alloc.vec.Vec.len coeffs) hc (by simp)
-    (alloc.vec.Vec.new cpoly.Ext4) 0#usize (by simp) (by intro u hu; simp at hu) (by simp))
+    (alloc.vec.Vec.new cpoly.field.Ext4) 0#usize (by simp) (by intro u hu; simp at hu) (by simp))
   rintro z ⟨hz, hmap⟩
   have hlen : z.val.length = 2 ^ n.val := by
     have h := congrArg List.length hmap
@@ -589,23 +594,23 @@ theorem of_array_spec (coeffs : alloc.vec.Vec cpoly.Ext4) (n : Std.Usize)
 
 /-! ## `add` -/
 
-theorem add_loop_spec (p q : alloc.vec.Vec cpoly.Ext4) (n : Std.Usize)
+theorem add_loop_spec (p q : alloc.vec.Vec cpoly.field.Ext4) (n : Std.Usize)
     (hp : VecReduced p) (hq : VecReduced q)
     (hn : n.val = p.val.length) (hlen : p.val.length ≤ q.val.length) :
-    ∀ (r : alloc.vec.Vec cpoly.Ext4) (i : Std.Usize), i.val ≤ n.val → VecReduced r →
+    ∀ (r : alloc.vec.Vec cpoly.field.Ext4) (i : Std.Usize), i.val ≤ n.val → VecReduced r →
       r.val.map toExt
         = (List.range i.val).map (fun k => coeffFn p k + coeffFn q k) →
-      cpoly.mlpoly.add_loop p q n r i ⦃ z => VecReduced z ∧
+      cpoly.cmlpoly.add_loop p q n r i ⦃ z => VecReduced z ∧
         z.val.map toExt
           = (List.range n.val).map (fun k => coeffFn p k + coeffFn q k) ⦄ := by
   intro r i hi hr hrel
-  rw [cpoly.mlpoly.add_loop]
+  rw [cpoly.cmlpoly.add_loop]
   apply loop.spec_decr_nat (fun s => n.val - s.2.val)
     (fun s => s.2.val ≤ n.val ∧ VecReduced s.1 ∧
       s.1.val.map toExt =
         (List.range s.2.val).map (fun k => coeffFn p k + coeffFn q k))
   · rintro ⟨r1, i1⟩ ⟨hi1, hr1, hrel1⟩
-    simp only [cpoly.mlpoly.add_loop.body]
+    simp only [cpoly.cmlpoly.add_loop.body]
     by_cases hlt : i1 < n
     · rw [if_pos hlt]
       have hip : i1.val < p.val.length := by scalar_tac
@@ -634,16 +639,16 @@ theorem add_loop_spec (p q : alloc.vec.Vec cpoly.Ext4) (n : Std.Usize)
       exact ⟨hr1, by simpa [heq] using hrel1⟩
   · exact ⟨hi, hr, hrel⟩
 
-/-- `cpoly::mlpoly::add` ↔ `CMlPolynomial.add` (equivalently
+/-- `cpoly::cmlpoly::add` ↔ `CMlPolynomial.add` (equivalently
 `CMlPolynomialEval.add`; both are `Vector.zipWith (· + ·)`). -/
-theorem add_spec (n : ℕ) (v w : alloc.vec.Vec cpoly.Ext4)
+theorem add_spec (n : ℕ) (v w : alloc.vec.Vec cpoly.field.Ext4)
     (hv : VecReduced v) (hw : VecReduced w)
     (hvl : v.val.length = 2 ^ n) (hwl : w.val.length = 2 ^ n) :
-    cpoly.mlpoly.add v w ⦃ z => VecReduced z ∧ z.val.length = 2 ^ n ∧
+    cpoly.cmlpoly.add v w ⦃ z => VecReduced z ∧ z.val.length = 2 ^ n ∧
       toMl n z = CMlPolynomial.add (toMl n v) (toMl n w) ⦄ := by
-  rw [cpoly.mlpoly.add]
+  rw [cpoly.cmlpoly.add]
   apply spec_mono (add_loop_spec v w (alloc.vec.Vec.len v) hv hw (by simp)
-    (by omega) (alloc.vec.Vec.new cpoly.Ext4) 0#usize (by simp)
+    (by omega) (alloc.vec.Vec.new cpoly.field.Ext4) 0#usize (by simp)
     (by intro u hu; simp at hu) (by simp))
   rintro z ⟨hz, hmap⟩
   have hlen : z.val.length = 2 ^ n := by
@@ -664,13 +669,13 @@ theorem add_spec (n : ℕ) (v w : alloc.vec.Vec cpoly.Ext4)
 /-! ## Negation and scalar multiplication
 
 Coefficient-wise negation and scaling do not depend on how the index is read,
-so the multilinear layer reuses the univariate `cpoly::neg` / `cpoly::smul`
+so the multilinear layer reuses the univariate `cpoly::cpoly::neg` / `cpoly::cpoly::smul`
 unchanged; only the *statement* changes basis. -/
 
-/-- `cpoly::neg` ↔ `CMlPolynomial.neg`. -/
-theorem neg_spec (n : ℕ) (v : alloc.vec.Vec cpoly.Ext4) (hv : VecReduced v)
+/-- `cpoly::cpoly::neg` ↔ `CMlPolynomial.neg`. -/
+theorem neg_spec (n : ℕ) (v : alloc.vec.Vec cpoly.field.Ext4) (hv : VecReduced v)
     (hvl : v.val.length = 2 ^ n) :
-    cpoly.neg v ⦃ z => VecReduced z ∧ z.val.length = 2 ^ n ∧
+    cpoly.cpoly.neg v ⦃ z => VecReduced z ∧ z.val.length = 2 ^ n ∧
       toMl n z = CMlPolynomial.neg (toMl n v) ⦄ := by
   apply spec_mono (CPolyEquiv.neg_spec v hv)
   rintro z ⟨hz, heq⟩
@@ -686,10 +691,10 @@ theorem neg_spec (n : ℕ) (v : alloc.vec.Vec cpoly.Ext4) (hv : VecReduced v)
     show toRaw z = CPolynomial.Raw.neg (toRaw v) from heq,
     CPolynomial.Raw.neg_coeff]
 
-/-- `cpoly::smul` ↔ `CMlPolynomial.smul`. -/
-theorem smul_spec (n : ℕ) (r : cpoly.Ext4) (v : alloc.vec.Vec cpoly.Ext4)
+/-- `cpoly::cpoly::smul` ↔ `CMlPolynomial.smul`. -/
+theorem smul_spec (n : ℕ) (r : cpoly.field.Ext4) (v : alloc.vec.Vec cpoly.field.Ext4)
     (hr : Reduced r) (hv : VecReduced v) (hvl : v.val.length = 2 ^ n) :
-    cpoly.smul r v ⦃ z => VecReduced z ∧ z.val.length = 2 ^ n ∧
+    cpoly.cpoly.smul r v ⦃ z => VecReduced z ∧ z.val.length = 2 ^ n ∧
       toMl n z = CMlPolynomial.smul (toExt r) (toMl n v) ⦄ := by
   apply spec_mono (CPolyEquiv.smul_spec r v hr hv)
   rintro z ⟨hz, heq⟩
@@ -706,21 +711,21 @@ theorem smul_spec (n : ℕ) (r : cpoly.Ext4) (v : alloc.vec.Vec cpoly.Ext4)
 
 /-! ## `monomial_basis` -/
 
-theorem monomial_basis_inner_spec (w : alloc.vec.Vec cpoly.Ext4) (nn : Std.Usize) (idx : ℕ)
+theorem monomial_basis_inner_spec (w : alloc.vec.Vec cpoly.field.Ext4) (nn : Std.Usize) (idx : ℕ)
     (hw : VecReduced w) (hnn : nn.val = w.val.length) :
-    ∀ (acc : cpoly.Ext4) (m j : Std.Usize),
+    ∀ (acc : cpoly.field.Ext4) (m j : Std.Usize),
       j.val ≤ nn.val → Reduced acc → m.val = idx / 2 ^ j.val →
       toExt acc = monoProd j.val idx (pointFn w 0) →
-      cpoly.mlpoly.monomial_basis_loop0_loop0 w nn acc m j ⦃ z => Reduced z ∧
+      cpoly.cmlpoly.monomial_basis_loop0_loop0 w nn acc m j ⦃ z => Reduced z ∧
         toExt z = monoProd nn.val idx (pointFn w 0) ⦄ := by
   intro acc m j hj hacc hm hval
-  rw [cpoly.mlpoly.monomial_basis_loop0_loop0]
+  rw [cpoly.cmlpoly.monomial_basis_loop0_loop0]
   apply loop.spec_decr_nat (fun s => nn.val - s.2.2.val)
     (fun s => s.2.2.val ≤ nn.val ∧ Reduced s.1 ∧ s.2.1.val = idx / 2 ^ s.2.2.val ∧
       toExt s.1 = monoProd s.2.2.val idx (pointFn w 0))
   · rintro ⟨a, q, k⟩ ⟨hk, ha, hq, hv⟩
     simp only [Prod.fst, Prod.snd] at hk ha hq hv
-    simp only [cpoly.mlpoly.monomial_basis_loop0_loop0.body]
+    simp only [cpoly.cmlpoly.monomial_basis_loop0_loop0.body]
     by_cases hlt : k < nn
     · rw [if_pos hlt]
       step as ⟨bit, hbit⟩
@@ -790,26 +795,27 @@ theorem monomial_basis_inner_spec (w : alloc.vec.Vec cpoly.Ext4) (nn : Std.Usize
       exact ⟨ha, by simpa [heq] using hv⟩
   · exact ⟨hj, hacc, hm, hval⟩
 
-theorem monomial_basis_loop_spec (w : alloc.vec.Vec cpoly.Ext4) (nn sz : Std.Usize)
+theorem monomial_basis_loop_spec (w : alloc.vec.Vec cpoly.field.Ext4) (nn sz : Std.Usize)
     (hw : VecReduced w) (hnn : nn.val = w.val.length) :
-    ∀ (basis : alloc.vec.Vec cpoly.Ext4) (i : Std.Usize), i.val ≤ sz.val → VecReduced basis →
+    ∀ (basis : alloc.vec.Vec cpoly.field.Ext4) (i : Std.Usize),
+      i.val ≤ sz.val → VecReduced basis →
       basis.val.map toExt
         = (List.range i.val).map (fun k => monoProd nn.val k (pointFn w 0)) →
-      cpoly.mlpoly.monomial_basis_loop0 w nn sz basis i ⦃ z => VecReduced z ∧
+      cpoly.cmlpoly.monomial_basis_loop0 w nn sz basis i ⦃ z => VecReduced z ∧
         z.val.map toExt
           = (List.range sz.val).map (fun k => monoProd nn.val k (pointFn w 0)) ⦄ := by
   intro basis i hi hb hrel
-  rw [cpoly.mlpoly.monomial_basis_loop0]
+  rw [cpoly.cmlpoly.monomial_basis_loop0]
   apply loop.spec_decr_nat (fun s => sz.val - s.2.val)
     (fun s => s.2.val ≤ sz.val ∧ VecReduced s.1 ∧
       s.1.val.map toExt = (List.range s.2.val).map (fun k => monoProd nn.val k (pointFn w 0)))
   · rintro ⟨b, k⟩ ⟨hk, hb1, hrel1⟩
-    simp only [cpoly.mlpoly.monomial_basis_loop0.body]
+    simp only [cpoly.cmlpoly.monomial_basis_loop0.body]
     by_cases hlt : k < sz
     · rw [if_pos hlt]
       have hblen : b.val.length = k.val := by
         have h := congrArg List.length hrel1; simpa using h
-      apply spec_bind (monomial_basis_inner_spec w nn k.val hw hnn cpoly.EONE k 0#usize
+      apply spec_bind (monomial_basis_inner_spec w nn k.val hw hnn cpoly.field.EONE k 0#usize
         (by simp) reduced_EONE (by simp) (by simp))
       rintro acc ⟨haccR, haccF⟩
       step as ⟨b2, hb2⟩
@@ -828,16 +834,16 @@ theorem monomial_basis_loop_spec (w : alloc.vec.Vec cpoly.Ext4) (nn sz : Std.Usi
       exact ⟨hb1, by simpa [heq] using hrel1⟩
   · exact ⟨hi, hb, hrel⟩
 
-/-- `cpoly::mlpoly::monomial_basis` ↔ `CMlPolynomial.monomialBasis`. -/
-theorem monomial_basis_spec (n : ℕ) (w : alloc.vec.Vec cpoly.Ext4)
+/-- `cpoly::cmlpoly::monomial_basis` ↔ `CMlPolynomial.monomialBasis`. -/
+theorem monomial_basis_spec (n : ℕ) (w : alloc.vec.Vec cpoly.field.Ext4)
     (hw : VecReduced w) (hwl : w.val.length = n) (hsz : 2 ^ n ≤ Std.Usize.max) :
-    cpoly.mlpoly.monomial_basis w ⦃ z => VecReduced z ∧ z.val.length = 2 ^ n ∧
+    cpoly.cmlpoly.monomial_basis w ⦃ z => VecReduced z ∧ z.val.length = 2 ^ n ∧
       toMl n z = CMlPolynomial.monomialBasis (toPoint n w) ⦄ := by
-  rw [cpoly.mlpoly.monomial_basis]
+  rw [cpoly.cmlpoly.monomial_basis]
   apply spec_bind (pow2_spec (alloc.vec.Vec.len w) (by simpa [hwl] using hsz))
   intro sz hsz'
   apply spec_mono (monomial_basis_loop_spec w w.len sz hw (by simp)
-    (alloc.vec.Vec.new cpoly.Ext4) 0#usize (by simp) (by intro u hu; simp at hu) (by simp))
+    (alloc.vec.Vec.new cpoly.field.Ext4) 0#usize (by simp) (by intro u hu; simp at hu) (by simp))
   rintro z ⟨hz, hmap⟩
   have hszn : sz.val = 2 ^ n := by simpa [hwl] using hsz'
   have hlen : z.val.length = 2 ^ n := by
@@ -856,21 +862,21 @@ theorem monomial_basis_spec (n : ℕ) (w : alloc.vec.Vec cpoly.Ext4)
 
 /-! ## `lagrange_basis` -/
 
-theorem lagrange_basis_inner_spec (w : alloc.vec.Vec cpoly.Ext4) (nn : Std.Usize) (idx : ℕ)
+theorem lagrange_basis_inner_spec (w : alloc.vec.Vec cpoly.field.Ext4) (nn : Std.Usize) (idx : ℕ)
     (hw : VecReduced w) (hnn : nn.val = w.val.length) :
-    ∀ (acc : cpoly.Ext4) (m j : Std.Usize),
+    ∀ (acc : cpoly.field.Ext4) (m j : Std.Usize),
       j.val ≤ nn.val → Reduced acc → m.val = idx / 2 ^ j.val →
       toExt acc = lagProd j.val idx (pointFn w 0) →
-      cpoly.mlpoly.lagrange_basis_loop0_loop0 w nn acc m j ⦃ z => Reduced z ∧
+      cpoly.cmlpoly.lagrange_basis_loop0_loop0 w nn acc m j ⦃ z => Reduced z ∧
         toExt z = lagProd nn.val idx (pointFn w 0) ⦄ := by
   intro acc m j hj hacc hm hval
-  rw [cpoly.mlpoly.lagrange_basis_loop0_loop0]
+  rw [cpoly.cmlpoly.lagrange_basis_loop0_loop0]
   apply loop.spec_decr_nat (fun s => nn.val - s.2.2.val)
     (fun s => s.2.2.val ≤ nn.val ∧ Reduced s.1 ∧ s.2.1.val = idx / 2 ^ s.2.2.val ∧
       toExt s.1 = lagProd s.2.2.val idx (pointFn w 0))
   · rintro ⟨a, q, k⟩ ⟨hk, ha, hq, hv⟩
     simp only [Prod.fst, Prod.snd] at hk ha hq hv
-    simp only [cpoly.mlpoly.lagrange_basis_loop0_loop0.body]
+    simp only [cpoly.cmlpoly.lagrange_basis_loop0_loop0.body]
     by_cases hlt : k < nn
     · rw [if_pos hlt]
       step as ⟨bit, hbit⟩
@@ -914,7 +920,7 @@ theorem lagrange_basis_inner_spec (w : alloc.vec.Vec cpoly.Ext4) (nn : Std.Usize
       · rw [if_neg hb]
         step as ⟨x, hxw⟩
         have hxR : Reduced x := hxw ▸ hw _ (List.getElem_mem hkw)
-        have hone : Reduced cpoly.EONE := reduced_EONE
+        have hone : Reduced cpoly.field.EONE := reduced_EONE
         step as ⟨oneMinus, homR, homF⟩
         step as ⟨a2, ha2R, ha2F⟩
         step as ⟨q2, hq2⟩
@@ -947,26 +953,27 @@ theorem lagrange_basis_inner_spec (w : alloc.vec.Vec cpoly.Ext4) (nn : Std.Usize
       exact ⟨ha, by simpa [heq] using hv⟩
   · exact ⟨hj, hacc, hm, hval⟩
 
-theorem lagrange_basis_loop_spec (w : alloc.vec.Vec cpoly.Ext4) (nn sz : Std.Usize)
+theorem lagrange_basis_loop_spec (w : alloc.vec.Vec cpoly.field.Ext4) (nn sz : Std.Usize)
     (hw : VecReduced w) (hnn : nn.val = w.val.length) :
-    ∀ (basis : alloc.vec.Vec cpoly.Ext4) (i : Std.Usize), i.val ≤ sz.val → VecReduced basis →
+    ∀ (basis : alloc.vec.Vec cpoly.field.Ext4) (i : Std.Usize),
+      i.val ≤ sz.val → VecReduced basis →
       basis.val.map toExt
         = (List.range i.val).map (fun k => lagProd nn.val k (pointFn w 0)) →
-      cpoly.mlpoly.lagrange_basis_loop0 w nn sz basis i ⦃ z => VecReduced z ∧
+      cpoly.cmlpoly.lagrange_basis_loop0 w nn sz basis i ⦃ z => VecReduced z ∧
         z.val.map toExt
           = (List.range sz.val).map (fun k => lagProd nn.val k (pointFn w 0)) ⦄ := by
   intro basis i hi hb hrel
-  rw [cpoly.mlpoly.lagrange_basis_loop0]
+  rw [cpoly.cmlpoly.lagrange_basis_loop0]
   apply loop.spec_decr_nat (fun s => sz.val - s.2.val)
     (fun s => s.2.val ≤ sz.val ∧ VecReduced s.1 ∧
       s.1.val.map toExt = (List.range s.2.val).map (fun k => lagProd nn.val k (pointFn w 0)))
   · rintro ⟨b, k⟩ ⟨hk, hb1, hrel1⟩
-    simp only [cpoly.mlpoly.lagrange_basis_loop0.body]
+    simp only [cpoly.cmlpoly.lagrange_basis_loop0.body]
     by_cases hlt : k < sz
     · rw [if_pos hlt]
       have hblen : b.val.length = k.val := by
         have h := congrArg List.length hrel1; simpa using h
-      apply spec_bind (lagrange_basis_inner_spec w nn k.val hw hnn cpoly.EONE k 0#usize
+      apply spec_bind (lagrange_basis_inner_spec w nn k.val hw hnn cpoly.field.EONE k 0#usize
         (by simp) reduced_EONE (by simp) (by simp))
       rintro acc ⟨haccR, haccF⟩
       step as ⟨b2, hb2⟩
@@ -985,16 +992,16 @@ theorem lagrange_basis_loop_spec (w : alloc.vec.Vec cpoly.Ext4) (nn sz : Std.Usi
       exact ⟨hb1, by simpa [heq] using hrel1⟩
   · exact ⟨hi, hb, hrel⟩
 
-/-- `cpoly::mlpoly::lagrange_basis` ↔ `CMlPolynomialEval.lagrangeBasis`. -/
-theorem lagrange_basis_spec (n : ℕ) (w : alloc.vec.Vec cpoly.Ext4)
+/-- `cpoly::cmlpoly::lagrange_basis` ↔ `CMlPolynomialEval.lagrangeBasis`. -/
+theorem lagrange_basis_spec (n : ℕ) (w : alloc.vec.Vec cpoly.field.Ext4)
     (hw : VecReduced w) (hwl : w.val.length = n) (hsz : 2 ^ n ≤ Std.Usize.max) :
-    cpoly.mlpoly.lagrange_basis w ⦃ z => VecReduced z ∧ z.val.length = 2 ^ n ∧
+    cpoly.cmlpoly.lagrange_basis w ⦃ z => VecReduced z ∧ z.val.length = 2 ^ n ∧
       toMlEval n z = CMlPolynomialEval.lagrangeBasis (toPoint n w) ⦄ := by
-  rw [cpoly.mlpoly.lagrange_basis]
+  rw [cpoly.cmlpoly.lagrange_basis]
   apply spec_bind (pow2_spec (alloc.vec.Vec.len w) (by simpa [hwl] using hsz))
   intro sz hsz'
   apply spec_mono (lagrange_basis_loop_spec w w.len sz hw (by simp)
-    (alloc.vec.Vec.new cpoly.Ext4) 0#usize (by simp) (by intro u hu; simp at hu) (by simp))
+    (alloc.vec.Vec.new cpoly.field.Ext4) 0#usize (by simp) (by intro u hu; simp at hu) (by simp))
   rintro z ⟨hz, hmap⟩
   have hszn : sz.val = 2 ^ n := by simpa [hwl] using hsz'
   have hlen : z.val.length = 2 ^ n := by
@@ -1013,20 +1020,20 @@ theorem lagrange_basis_spec (n : ℕ) (w : alloc.vec.Vec cpoly.Ext4)
 
 /-! ## `dot` -/
 
-theorem dot_loop_spec (a b : alloc.vec.Vec cpoly.Ext4) (n : Std.Usize)
+theorem dot_loop_spec (a b : alloc.vec.Vec cpoly.field.Ext4) (n : Std.Usize)
     (ha : VecReduced a) (hb : VecReduced b) :
-    ∀ (acc : cpoly.Ext4) (i : Std.Usize), i.val ≤ n.val → Reduced acc →
+    ∀ (acc : cpoly.field.Ext4) (i : Std.Usize), i.val ≤ n.val → Reduced acc →
       n.val ≤ a.val.length → n.val ≤ b.val.length →
       toExt acc = ∑ k ∈ Finset.range i.val, coeffFn a k * coeffFn b k →
-      cpoly.mlpoly.dot_loop a b n acc i ⦃ z => Reduced z ∧
+      cpoly.cmlpoly.dot_loop a b n acc i ⦃ z => Reduced z ∧
         toExt z = ∑ k ∈ Finset.range n.val, coeffFn a k * coeffFn b k ⦄ := by
   intro acc i hi hacc han hbn heq
-  rw [cpoly.mlpoly.dot_loop]
+  rw [cpoly.cmlpoly.dot_loop]
   apply loop.spec_decr_nat (fun s => n.val - s.2.val)
     (fun s => s.2.val ≤ n.val ∧ Reduced s.1 ∧
       toExt s.1 = ∑ k ∈ Finset.range s.2.val, coeffFn a k * coeffFn b k)
   · rintro ⟨acc1, i1⟩ ⟨hi1, ha1, heq1⟩
-    simp only [cpoly.mlpoly.dot_loop.body]
+    simp only [cpoly.cmlpoly.dot_loop.body]
     by_cases hlt : i1 < n
     · rw [if_pos hlt]
       have hia : i1.val < a.val.length := by scalar_tac
@@ -1050,14 +1057,14 @@ theorem dot_loop_spec (a b : alloc.vec.Vec cpoly.Ext4) (n : Std.Usize)
       rw [heq1, this]
   · exact ⟨hi, hacc, heq⟩
 
-/-- `cpoly::mlpoly::dot` ↔ `Vector.dotProduct`, as a `Finset.range` sum. -/
-theorem dot_spec (a b : alloc.vec.Vec cpoly.Ext4) (n : Std.Usize)
+/-- `cpoly::cmlpoly::dot` ↔ `Vector.dotProduct`, as a `Finset.range` sum. -/
+theorem dot_spec (a b : alloc.vec.Vec cpoly.field.Ext4) (n : Std.Usize)
     (ha : VecReduced a) (hb : VecReduced b)
     (han : n.val ≤ a.val.length) (hbn : n.val ≤ b.val.length) :
-    cpoly.mlpoly.dot a b n ⦃ z => Reduced z ∧
+    cpoly.cmlpoly.dot a b n ⦃ z => Reduced z ∧
       toExt z = ∑ k ∈ Finset.range n.val, coeffFn a k * coeffFn b k ⦄ := by
-  rw [cpoly.mlpoly.dot]
-  apply dot_loop_spec a b n ha hb cpoly.EZERO 0#usize
+  rw [cpoly.cmlpoly.dot]
+  apply dot_loop_spec a b n ha hb cpoly.field.EZERO 0#usize
   · simp
   · exact reduced_EZERO
   · exact han
@@ -1066,13 +1073,13 @@ theorem dot_spec (a b : alloc.vec.Vec cpoly.Ext4) (n : Std.Usize)
 
 /-! ## `eval`, `eval_lagrange`, `eq_tilde` -/
 
-/-- `cpoly::mlpoly::eval` ↔ `CMlPolynomial.eval`. -/
-theorem eval_spec (n : ℕ) (p w : alloc.vec.Vec cpoly.Ext4)
+/-- `cpoly::cmlpoly::eval` ↔ `CMlPolynomial.eval`. -/
+theorem eval_spec (n : ℕ) (p w : alloc.vec.Vec cpoly.field.Ext4)
     (hp : VecReduced p) (hw : VecReduced w)
     (hpl : p.val.length = 2 ^ n) (hwl : w.val.length = n) :
-    cpoly.mlpoly.eval p w ⦃ z => Reduced z ∧
+    cpoly.cmlpoly.eval p w ⦃ z => Reduced z ∧
       toExt z = CMlPolynomial.eval (toMl n p) (toPoint n w) ⦄ := by
-  rw [cpoly.mlpoly.eval]
+  rw [cpoly.cmlpoly.eval]
   apply spec_bind (monomial_basis_spec n w hw hwl (pow2_le_usize_max hpl))
   intro basis hb
   apply spec_mono (dot_spec p basis (alloc.vec.Vec.len basis) hp hb.1
@@ -1088,13 +1095,13 @@ theorem eval_spec (n : ℕ) (p w : alloc.vec.Vec cpoly.Ext4)
   congr 1
   rw [← toMl_getElem n basis k hk, hb.2.2, monomialBasis_getElem']
 
-/-- `cpoly::mlpoly::eval_lagrange` ↔ `CMlPolynomialEval.eval`. -/
-theorem eval_lagrange_spec (n : ℕ) (p w : alloc.vec.Vec cpoly.Ext4)
+/-- `cpoly::cmlpoly::eval_lagrange` ↔ `CMlPolynomialEval.eval`. -/
+theorem eval_lagrange_spec (n : ℕ) (p w : alloc.vec.Vec cpoly.field.Ext4)
     (hp : VecReduced p) (hw : VecReduced w)
     (hpl : p.val.length = 2 ^ n) (hwl : w.val.length = n) :
-    cpoly.mlpoly.eval_lagrange p w ⦃ z => Reduced z ∧
+    cpoly.cmlpoly.eval_lagrange p w ⦃ z => Reduced z ∧
       toExt z = CMlPolynomialEval.eval (toMlEval n p) (toPoint n w) ⦄ := by
-  rw [cpoly.mlpoly.eval_lagrange]
+  rw [cpoly.cmlpoly.eval_lagrange]
   apply spec_bind (lagrange_basis_spec n w hw hwl (pow2_le_usize_max hpl))
   intro basis hb
   apply spec_mono (dot_spec p basis (alloc.vec.Vec.len basis) hp hb.1
@@ -1112,14 +1119,14 @@ theorem eval_lagrange_spec (n : ℕ) (p w : alloc.vec.Vec cpoly.Ext4)
   change (toMlEval n basis)[k] = _
   rw [hb.2.2, lagrangeBasis_getElem']
 
-/-- `cpoly::mlpoly::eq_tilde` ↔ `CMlPolynomialEval.eqTilde`. -/
-theorem eq_tilde_spec (n : ℕ) (w x : alloc.vec.Vec cpoly.Ext4)
+/-- `cpoly::cmlpoly::eq_tilde` ↔ `CMlPolynomialEval.eqTilde`. -/
+theorem eq_tilde_spec (n : ℕ) (w x : alloc.vec.Vec cpoly.field.Ext4)
     (hw : VecReduced w) (hx : VecReduced x)
     (hwl : w.val.length = n) (hxl : x.val.length = n)
     (hsz : 2 ^ n ≤ Std.Usize.max) :
-    cpoly.mlpoly.eq_tilde w x ⦃ z => Reduced z ∧
+    cpoly.cmlpoly.eq_tilde w x ⦃ z => Reduced z ∧
       toExt z = CMlPolynomialEval.eqTilde (toPoint n w) (toPoint n x) ⦄ := by
-  rw [cpoly.mlpoly.eq_tilde]
+  rw [cpoly.cmlpoly.eq_tilde]
   apply spec_bind (lagrange_basis_spec n w hw hwl hsz)
   intro b hb
   apply spec_mono (eval_lagrange_spec n b x hb.1 hx hb.2.1 hxl)
@@ -1130,23 +1137,24 @@ theorem eq_tilde_spec (n : ℕ) (w x : alloc.vec.Vec cpoly.Ext4)
 
 /-! ## `eval_horner` -/
 
-theorem eval_horner_layer_loop_spec (c : alloc.vec.Vec cpoly.Ext4) (x0 : cpoly.Ext4)
+theorem eval_horner_layer_loop_spec (c : alloc.vec.Vec cpoly.field.Ext4) (x0 : cpoly.field.Ext4)
     (half : Std.Usize) (hc : VecReduced c) (hx : Reduced x0)
     (hhalf : 2 * half.val ≤ c.val.length) :
-    ∀ (out : alloc.vec.Vec cpoly.Ext4) (j : Std.Usize), j.val ≤ half.val → VecReduced out →
+    ∀ (out : alloc.vec.Vec cpoly.field.Ext4) (j : Std.Usize),
+      j.val ≤ half.val → VecReduced out →
       out.val.map toExt = (List.range j.val).map
         (fun k => coeffFn c (2 * k) + toExt x0 * coeffFn c (2 * k + 1)) →
-      cpoly.mlpoly.eval_horner_layer_loop c x0 half out j ⦃ z => VecReduced z ∧
+      cpoly.cmlpoly.eval_horner_layer_loop c x0 half out j ⦃ z => VecReduced z ∧
         z.val.map toExt = (List.range half.val).map
           (fun k => coeffFn c (2 * k) + toExt x0 * coeffFn c (2 * k + 1)) ⦄ := by
   intro out j hj hout hrel
-  rw [cpoly.mlpoly.eval_horner_layer_loop]
+  rw [cpoly.cmlpoly.eval_horner_layer_loop]
   apply loop.spec_decr_nat (fun s => half.val - s.2.val)
     (fun s => s.2.val ≤ half.val ∧ VecReduced s.1 ∧
       s.1.val.map toExt = (List.range s.2.val).map
         (fun k => coeffFn c (2 * k) + toExt x0 * coeffFn c (2 * k + 1)))
   · rintro ⟨out1, j1⟩ ⟨hj1, hout1, hrel1⟩
-    simp only [cpoly.mlpoly.eval_horner_layer_loop.body]
+    simp only [cpoly.cmlpoly.eval_horner_layer_loop.body]
     by_cases hlt : j1 < half
     · rw [if_pos hlt]
       have hlo : 2 * j1.val < c.val.length := by scalar_tac
@@ -1181,12 +1189,13 @@ theorem eval_horner_layer_loop_spec (c : alloc.vec.Vec cpoly.Ext4) (x0 : cpoly.E
   · exact ⟨hj, hout, hrel⟩
 
 /-- One extracted Horner layer halves the table and folds in `x0`. -/
-theorem eval_horner_layer_spec (n : ℕ) (c : alloc.vec.Vec cpoly.Ext4) (x0 : cpoly.Ext4)
+theorem eval_horner_layer_spec (n : ℕ) (c : alloc.vec.Vec cpoly.field.Ext4)
+    (x0 : cpoly.field.Ext4)
     (hc : VecReduced c) (hx : Reduced x0) (hcl : c.val.length = 2 ^ (n + 1)) :
-    cpoly.mlpoly.eval_horner_layer c x0 ⦃ z => VecReduced z ∧ z.val.length = 2 ^ n ∧
+    cpoly.cmlpoly.eval_horner_layer c x0 ⦃ z => VecReduced z ∧ z.val.length = 2 ^ n ∧
       ∀ k, coeffFn z k
         = if k < 2 ^ n then coeffFn c (2 * k) + toExt x0 * coeffFn c (2 * k + 1) else 0 ⦄ := by
-  rw [cpoly.mlpoly.eval_horner_layer]
+  rw [cpoly.cmlpoly.eval_horner_layer]
   step as ⟨half, hhalf⟩
   have hclen : c.len.val = 2 ^ (n + 1) := by simpa using hcl
   have hhalfval : half.val = 2 ^ n := by
@@ -1194,8 +1203,9 @@ theorem eval_horner_layer_spec (n : ℕ) (c : alloc.vec.Vec cpoly.Ext4) (x0 : cp
       half.val = c.len.val / 2 := hhalf
       _ = 2 ^ (n + 1) / 2 := by rw [hclen]
       _ = 2 ^ n := by rw [pow_succ]; omega
-  apply spec_mono (eval_horner_layer_loop_spec c x0 half hc hx (by rw [hhalfval, hcl, pow_succ]; omega)
-    (alloc.vec.Vec.new cpoly.Ext4) 0#usize (by simp) (by intro u hu; simp at hu) (by simp))
+  apply spec_mono (eval_horner_layer_loop_spec c x0 half hc hx
+    (by rw [hhalfval, hcl, pow_succ]; omega)
+    (alloc.vec.Vec.new cpoly.field.Ext4) 0#usize (by simp) (by intro u hu; simp at hu) (by simp))
   rintro z ⟨hz, hmap⟩
   have hlen : z.val.length = 2 ^ n := by
     have h := congrArg List.length hmap
@@ -1209,18 +1219,19 @@ theorem eval_horner_layer_spec (n : ℕ) (c : alloc.vec.Vec cpoly.Ext4) (x0 : cp
     exact hm
   · rw [if_neg hk, coeffFn_of_ge z (by omega)]
 
-theorem eval_horner_loop0_spec (p : alloc.vec.Vec cpoly.Ext4) (sz : Std.Usize)
+theorem eval_horner_loop0_spec (p : alloc.vec.Vec cpoly.field.Ext4) (sz : Std.Usize)
     (hp : VecReduced p) (hsz : sz.val ≤ p.val.length) :
-    ∀ (cur : alloc.vec.Vec cpoly.Ext4) (i : Std.Usize), i.val ≤ sz.val → VecReduced cur →
+    ∀ (cur : alloc.vec.Vec cpoly.field.Ext4) (i : Std.Usize),
+      i.val ≤ sz.val → VecReduced cur →
       cur.val = p.val.take i.val →
-      cpoly.mlpoly.eval_horner_loop0 p sz cur i ⦃ z => VecReduced z ∧
+      cpoly.cmlpoly.eval_horner_loop0 p sz cur i ⦃ z => VecReduced z ∧
         z.val = p.val.take sz.val ⦄ := by
   intro cur i hi hc heq
-  rw [cpoly.mlpoly.eval_horner_loop0]
+  rw [cpoly.cmlpoly.eval_horner_loop0]
   apply loop.spec_decr_nat (fun s => sz.val - s.2.val)
     (fun s => s.2.val ≤ sz.val ∧ VecReduced s.1 ∧ s.1.val = p.val.take s.2.val)
   · rintro ⟨cur1, i1⟩ ⟨hi1, hc1, heq1⟩
-    simp only [cpoly.mlpoly.eval_horner_loop0.body]
+    simp only [cpoly.cmlpoly.eval_horner_loop0.body]
     by_cases hlt : i1 < sz
     · rw [if_pos hlt]
       have hip : i1.val < p.val.length := by scalar_tac
@@ -1247,22 +1258,22 @@ theorem eval_horner_loop0_spec (p : alloc.vec.Vec cpoly.Ext4) (sz : Std.Usize)
       exact ⟨hc1, by rw [heq1, this]⟩
   · exact ⟨hi, hc, heq⟩
 
-theorem eval_horner_loop1_spec (n : ℕ) (w : alloc.vec.Vec cpoly.Ext4) (nn : Std.Usize)
+theorem eval_horner_loop1_spec (n : ℕ) (w : alloc.vec.Vec cpoly.field.Ext4) (nn : Std.Usize)
     (t : F) (hw : VecReduced w) (hwl : w.val.length = n) (hnn : nn.val = n) :
-    ∀ (cur : alloc.vec.Vec cpoly.Ext4) (j : Std.Usize),
+    ∀ (cur : alloc.vec.Vec cpoly.field.Ext4) (j : Std.Usize),
       j.val ≤ n → VecReduced cur → cur.val.length = 2 ^ (n - j.val) →
       mlVal (n - j.val) (coeffFn cur) (pointFn w j.val) = t →
-      cpoly.mlpoly.eval_horner_loop1 w nn cur j ⦃ z => VecReduced z ∧
+      cpoly.cmlpoly.eval_horner_loop1 w nn cur j ⦃ z => VecReduced z ∧
         z.val.length = 1 ∧ coeffFn z 0 = t ⦄ := by
   intro cur j hj hcur hcurlen hval
-  rw [cpoly.mlpoly.eval_horner_loop1]
+  rw [cpoly.cmlpoly.eval_horner_loop1]
   apply loop.spec_decr_nat (fun s => n - s.2.val)
     (fun s => s.2.val ≤ n ∧ VecReduced s.1 ∧
       s.1.val.length = 2 ^ (n - s.2.val) ∧
       mlVal (n - s.2.val) (coeffFn s.1) (pointFn w s.2.val) = t)
   · rintro ⟨cur1, j1⟩ ⟨hj1, hcur1, hlen1, hval1⟩
     simp only [Prod.fst, Prod.snd] at hj1 hcur1 hlen1 hval1
-    simp only [cpoly.mlpoly.eval_horner_loop1.body]
+    simp only [cpoly.cmlpoly.eval_horner_loop1.body]
     by_cases hlt : j1 < nn
     · rw [if_pos hlt]
       have hjn : j1.val < n := by scalar_tac
@@ -1311,25 +1322,25 @@ theorem eval_horner_loop1_spec (n : ℕ) (w : alloc.vec.Vec cpoly.Ext4) (nn : St
       · simpa [heq] using hval1
   · exact ⟨hj, hcur, hcurlen, hval⟩
 
-/-- `cpoly::mlpoly::eval_horner` ↔ `CMlPolynomial.evalHorner`.
+/-- `cpoly::cmlpoly::eval_horner` ↔ `CMlPolynomial.evalHorner`.
 
 The extracted code is the `O(2^n)` layered algorithm; the reference
 `CMlPolynomial.evalHorner` is CompPoly's structurally-recursive version of the
 same, and `CompPoly.CMlPolynomial.eval_horner_eq_eval` identifies both with the
 `O(n · 2^n)` dot-product semantics. -/
-theorem eval_horner_spec (n : ℕ) (p w : alloc.vec.Vec cpoly.Ext4)
+theorem eval_horner_spec (n : ℕ) (p w : alloc.vec.Vec cpoly.field.Ext4)
     (hp : VecReduced p) (hw : VecReduced w)
     (hpl : p.val.length = 2 ^ n) (hwl : w.val.length = n) :
-    cpoly.mlpoly.eval_horner p w ⦃ z => Reduced z ∧
+    cpoly.cmlpoly.eval_horner p w ⦃ z => Reduced z ∧
       toExt z = CMlPolynomial.evalHorner (toMl n p) (toPoint n w) ⦄ := by
-  rw [cpoly.mlpoly.eval_horner]
+  rw [cpoly.cmlpoly.eval_horner]
   have hlen : w.len.val = n := by simpa using hwl
   have hpw : 2 ^ w.len.val ≤ Std.Usize.max := hlen ▸ pow2_le_usize_max hpl
   apply spec_bind (pow2_spec w.len hpw)
   intro sz hsz
   have hszeq : sz.val = p.val.length := by rw [hsz, hlen, hpl]
   apply spec_bind (eval_horner_loop0_spec p sz hp (by omega)
-    (alloc.vec.Vec.new cpoly.Ext4) 0#usize (by simp) (by intro u hu; simp at hu) (by simp))
+    (alloc.vec.Vec.new cpoly.field.Ext4) 0#usize (by simp) (by intro u hu; simp at hu) (by simp))
   intro cur hc
   have htake : p.val.take sz.val = p.val := by rw [hszeq, List.take_length]
   have hcur : cur.val = p.val := hc.2.trans htake
@@ -1348,23 +1359,25 @@ theorem eval_horner_spec (n : ℕ) (p w : alloc.vec.Vec cpoly.Ext4)
 
 /-! ## `eval_mle` -/
 
-theorem eval_mle_layer_loop_spec (c : alloc.vec.Vec cpoly.Ext4) (x0 one_minus : cpoly.Ext4)
+theorem eval_mle_layer_loop_spec (c : alloc.vec.Vec cpoly.field.Ext4)
+    (x0 one_minus : cpoly.field.Ext4)
     (half : Std.Usize) (hc : VecReduced c) (hx : Reduced x0) (hom : Reduced one_minus)
     (homF : toExt one_minus = 1 - toExt x0) (hhalf : 2 * half.val ≤ c.val.length) :
-    ∀ (out : alloc.vec.Vec cpoly.Ext4) (j : Std.Usize), j.val ≤ half.val → VecReduced out →
+    ∀ (out : alloc.vec.Vec cpoly.field.Ext4) (j : Std.Usize),
+      j.val ≤ half.val → VecReduced out →
       out.val.map toExt = (List.range j.val).map
         (fun k => (1 - toExt x0) * coeffFn c (2 * k) + toExt x0 * coeffFn c (2 * k + 1)) →
-      cpoly.mlpoly.eval_mle_layer_loop c x0 half one_minus out j ⦃ z => VecReduced z ∧
+      cpoly.cmlpoly.eval_mle_layer_loop c x0 half one_minus out j ⦃ z => VecReduced z ∧
         z.val.map toExt = (List.range half.val).map
           (fun k => (1 - toExt x0) * coeffFn c (2 * k) + toExt x0 * coeffFn c (2 * k + 1)) ⦄ := by
   intro out j hj hout hrel
-  rw [cpoly.mlpoly.eval_mle_layer_loop]
+  rw [cpoly.cmlpoly.eval_mle_layer_loop]
   apply loop.spec_decr_nat (fun s => half.val - s.2.val)
     (fun s => s.2.val ≤ half.val ∧ VecReduced s.1 ∧
       s.1.val.map toExt = (List.range s.2.val).map
         (fun k => (1 - toExt x0) * coeffFn c (2 * k) + toExt x0 * coeffFn c (2 * k + 1)))
   · rintro ⟨out1, j1⟩ ⟨hj1, hout1, hrel1⟩
-    simp only [cpoly.mlpoly.eval_mle_layer_loop.body]
+    simp only [cpoly.cmlpoly.eval_mle_layer_loop.body]
     by_cases hlt : j1 < half
     · rw [if_pos hlt]
       have hlo : 2 * j1.val < c.val.length := by scalar_tac
@@ -1400,16 +1413,16 @@ theorem eval_mle_layer_loop_spec (c : alloc.vec.Vec cpoly.Ext4) (x0 one_minus : 
   · exact ⟨hj, hout, hrel⟩
 
 /-- One extracted multilinear-extension layer halves the table and folds in `x0`. -/
-theorem eval_mle_layer_spec (n : ℕ) (c : alloc.vec.Vec cpoly.Ext4) (x0 : cpoly.Ext4)
+theorem eval_mle_layer_spec (n : ℕ) (c : alloc.vec.Vec cpoly.field.Ext4) (x0 : cpoly.field.Ext4)
     (hc : VecReduced c) (hx : Reduced x0) (hcl : c.val.length = 2 ^ (n + 1)) :
-    cpoly.mlpoly.eval_mle_layer c x0 ⦃ z => VecReduced z ∧ z.val.length = 2 ^ n ∧
+    cpoly.cmlpoly.eval_mle_layer c x0 ⦃ z => VecReduced z ∧ z.val.length = 2 ^ n ∧
       ∀ k, coeffFn z k
         = if k < 2 ^ n
             then (1 - toExt x0) * coeffFn c (2 * k) + toExt x0 * coeffFn c (2 * k + 1)
             else 0 ⦄ := by
-  rw [cpoly.mlpoly.eval_mle_layer]
+  rw [cpoly.cmlpoly.eval_mle_layer]
   step as ⟨half, hhalf⟩
-  have hone : Reduced cpoly.EONE := reduced_EONE
+  have hone : Reduced cpoly.field.EONE := reduced_EONE
   step as ⟨one_minus, hom, homF⟩
   have hclen : c.len.val = 2 ^ (n + 1) := by simpa using hcl
   have hhalfval : half.val = 2 ^ n := by
@@ -1419,7 +1432,7 @@ theorem eval_mle_layer_spec (n : ℕ) (c : alloc.vec.Vec cpoly.Ext4) (x0 : cpoly
       _ = 2 ^ n := by rw [pow_succ]; omega
   apply spec_mono (eval_mle_layer_loop_spec c x0 one_minus half hc hx hom
     (by simpa using homF) (by rw [hhalfval, hcl, pow_succ]; omega)
-    (alloc.vec.Vec.new cpoly.Ext4) 0#usize (by simp) (by intro u hu; simp at hu) (by simp))
+    (alloc.vec.Vec.new cpoly.field.Ext4) 0#usize (by simp) (by intro u hu; simp at hu) (by simp))
   rintro z ⟨hz, hmap⟩
   have hlen : z.val.length = 2 ^ n := by
     have h := congrArg List.length hmap
@@ -1433,30 +1446,31 @@ theorem eval_mle_layer_spec (n : ℕ) (c : alloc.vec.Vec cpoly.Ext4) (x0 : cpoly
     exact hm
   · rw [if_neg hk, coeffFn_of_ge z (by omega)]
 
-theorem eval_mle_loop0_spec (values : alloc.vec.Vec cpoly.Ext4) (sz : Std.Usize)
+theorem eval_mle_loop0_spec (values : alloc.vec.Vec cpoly.field.Ext4) (sz : Std.Usize)
     (hv : VecReduced values) (hsz : sz.val ≤ values.val.length) :
-    ∀ (cur : alloc.vec.Vec cpoly.Ext4) (i : Std.Usize), i.val ≤ sz.val → VecReduced cur →
+    ∀ (cur : alloc.vec.Vec cpoly.field.Ext4) (i : Std.Usize),
+      i.val ≤ sz.val → VecReduced cur →
       cur.val = values.val.take i.val →
-      cpoly.mlpoly.eval_mle_loop0 values sz cur i ⦃ z => VecReduced z ∧
+      cpoly.cmlpoly.eval_mle_loop0 values sz cur i ⦃ z => VecReduced z ∧
         z.val = values.val.take sz.val ⦄ := by
   exact eval_horner_loop0_spec values sz hv hsz
 
-theorem eval_mle_loop1_spec (n : ℕ) (w : alloc.vec.Vec cpoly.Ext4) (nn : Std.Usize)
+theorem eval_mle_loop1_spec (n : ℕ) (w : alloc.vec.Vec cpoly.field.Ext4) (nn : Std.Usize)
     (t : F) (hw : VecReduced w) (hwl : w.val.length = n) (hnn : nn.val = n) :
-    ∀ (cur : alloc.vec.Vec cpoly.Ext4) (j : Std.Usize),
+    ∀ (cur : alloc.vec.Vec cpoly.field.Ext4) (j : Std.Usize),
       j.val ≤ n → VecReduced cur → cur.val.length = 2 ^ (n - j.val) →
       mlValL (n - j.val) (coeffFn cur) (pointFn w j.val) = t →
-      cpoly.mlpoly.eval_mle_loop1 w nn cur j ⦃ z => VecReduced z ∧
+      cpoly.cmlpoly.eval_mle_loop1 w nn cur j ⦃ z => VecReduced z ∧
         z.val.length = 1 ∧ coeffFn z 0 = t ⦄ := by
   intro cur j hj hcur hcurlen hval
-  rw [cpoly.mlpoly.eval_mle_loop1]
+  rw [cpoly.cmlpoly.eval_mle_loop1]
   apply loop.spec_decr_nat (fun s => n - s.2.val)
     (fun s => s.2.val ≤ n ∧ VecReduced s.1 ∧
       s.1.val.length = 2 ^ (n - s.2.val) ∧
       mlValL (n - s.2.val) (coeffFn s.1) (pointFn w s.2.val) = t)
   · rintro ⟨cur1, j1⟩ ⟨hj1, hcur1, hlen1, hval1⟩
     simp only [Prod.fst, Prod.snd] at hj1 hcur1 hlen1 hval1
-    simp only [cpoly.mlpoly.eval_mle_loop1.body]
+    simp only [cpoly.cmlpoly.eval_mle_loop1.body]
     by_cases hlt : j1 < nn
     · rw [if_pos hlt]
       have hjn : j1.val < n := by scalar_tac
@@ -1505,20 +1519,20 @@ theorem eval_mle_loop1_spec (n : ℕ) (w : alloc.vec.Vec cpoly.Ext4) (nn : Std.U
       · simpa [heq] using hval1
   · exact ⟨hj, hcur, hcurlen, hval⟩
 
-/-- `cpoly::mlpoly::eval_mle` ↔ `CMlPolynomialEval.evalMle`. -/
-theorem eval_mle_spec (n : ℕ) (p w : alloc.vec.Vec cpoly.Ext4)
+/-- `cpoly::cmlpoly::eval_mle` ↔ `CMlPolynomialEval.evalMle`. -/
+theorem eval_mle_spec (n : ℕ) (p w : alloc.vec.Vec cpoly.field.Ext4)
     (hp : VecReduced p) (hw : VecReduced w)
     (hpl : p.val.length = 2 ^ n) (hwl : w.val.length = n) :
-    cpoly.mlpoly.eval_mle p w ⦃ z => Reduced z ∧
+    cpoly.cmlpoly.eval_mle p w ⦃ z => Reduced z ∧
       toExt z = CMlPolynomialEval.evalMle (toMlEval n p) (toPoint n w) ⦄ := by
-  rw [cpoly.mlpoly.eval_mle]
+  rw [cpoly.cmlpoly.eval_mle]
   have hlen : w.len.val = n := by simpa using hwl
   have hpw : 2 ^ w.len.val ≤ Std.Usize.max := hlen ▸ pow2_le_usize_max hpl
   apply spec_bind (pow2_spec w.len hpw)
   intro sz hsz
   have hszeq : sz.val = p.val.length := by rw [hsz, hlen, hpl]
   apply spec_bind (eval_mle_loop0_spec p sz hp (by omega)
-    (alloc.vec.Vec.new cpoly.Ext4) 0#usize (by simp) (by intro u hu; simp at hu) (by simp))
+    (alloc.vec.Vec.new cpoly.field.Ext4) 0#usize (by simp) (by intro u hu; simp at hu) (by simp))
   intro cur hc
   have htake : p.val.take sz.val = p.val := by rw [hszeq, List.take_length]
   have hcur : cur.val = p.val := hc.2.trans htake
@@ -1602,19 +1616,19 @@ theorem lagrangeToMonoLevel_getElem (n : ℕ) (j : Fin n) (v : CMlPolynomial F n
 
 /-! ### `mono_to_lagrange` -/
 
-theorem mono_to_lagrange_level_loop_spec (v : alloc.vec.Vec cpoly.Ext4)
+theorem mono_to_lagrange_level_loop_spec (v : alloc.vec.Vec cpoly.field.Ext4)
     (n stride : Std.Usize) (jv : ℕ) (hv : VecReduced v) (hn : n.val = v.val.length)
     (hstride : stride.val = 2 ^ jv) :
-    ∀ (r : alloc.vec.Vec cpoly.Ext4) (i : Std.Usize), i.val ≤ n.val → VecReduced r →
+    ∀ (r : alloc.vec.Vec cpoly.field.Ext4) (i : Std.Usize), i.val ≤ n.val → VecReduced r →
       r.val.map toExt = (List.range i.val).map
         (fun k => if Nat.testBit k jv then coeffFn v k + coeffFn v (k - 2 ^ jv)
                   else coeffFn v k) →
-      cpoly.mlpoly.mono_to_lagrange_level_loop v n stride r i ⦃ z => VecReduced z ∧
+      cpoly.cmlpoly.mono_to_lagrange_level_loop v n stride r i ⦃ z => VecReduced z ∧
         z.val.map toExt = (List.range n.val).map
           (fun k => if Nat.testBit k jv then coeffFn v k + coeffFn v (k - 2 ^ jv)
                     else coeffFn v k) ⦄ := by
   intro r i hi hr hrel
-  rw [cpoly.mlpoly.mono_to_lagrange_level_loop]
+  rw [cpoly.cmlpoly.mono_to_lagrange_level_loop]
   apply loop.spec_decr_nat (fun s => n.val - s.2.val)
     (fun s => s.2.val ≤ n.val ∧ VecReduced s.1 ∧
       s.1.val.map toExt = (List.range s.2.val).map
@@ -1622,7 +1636,7 @@ theorem mono_to_lagrange_level_loop_spec (v : alloc.vec.Vec cpoly.Ext4)
                   else coeffFn v k))
   · rintro ⟨r1, i1⟩ ⟨hi1, hr1, hrel1⟩
     simp only [Prod.fst, Prod.snd] at hi1 hr1 hrel1
-    simp only [cpoly.mlpoly.mono_to_lagrange_level_loop.body]
+    simp only [cpoly.cmlpoly.mono_to_lagrange_level_loop.body]
     by_cases hlt : i1 < n
     · rw [if_pos hlt]
       have hiv : i1.val < v.val.length := by scalar_tac
@@ -1696,18 +1710,18 @@ theorem mono_to_lagrange_level_loop_spec (v : alloc.vec.Vec cpoly.Ext4)
       exact ⟨hr1, by simpa [heq] using hrel1⟩
   · exact ⟨hi, hr, hrel⟩
 
-/-- `cpoly::mlpoly::mono_to_lagrange_level` ↔ `CMlPolynomial.monoToLagrangeLevel`. -/
-theorem mono_to_lagrange_level_spec (n : ℕ) (v : alloc.vec.Vec cpoly.Ext4) (j : Std.Usize)
+/-- `cpoly::cmlpoly::mono_to_lagrange_level` ↔ `CMlPolynomial.monoToLagrangeLevel`. -/
+theorem mono_to_lagrange_level_spec (n : ℕ) (v : alloc.vec.Vec cpoly.field.Ext4) (j : Std.Usize)
     (hv : VecReduced v) (hvl : v.val.length = 2 ^ n) (hj : j.val < n) :
-    cpoly.mlpoly.mono_to_lagrange_level v j ⦃ z => VecReduced z ∧
+    cpoly.cmlpoly.mono_to_lagrange_level v j ⦃ z => VecReduced z ∧
       z.val.length = 2 ^ n ∧
       toMl n z = CMlPolynomial.monoToLagrangeLevel ⟨j.val, hj⟩ (toMl n v) ⦄ := by
-  rw [cpoly.mlpoly.mono_to_lagrange_level]
+  rw [cpoly.cmlpoly.mono_to_lagrange_level]
   have hpw : 2 ^ j.val ≤ Std.Usize.max := pow_le_of_lt hj (pow2_le_usize_max hvl)
   apply spec_bind (pow2_spec j hpw)
   intro stride hstride
   apply spec_mono (mono_to_lagrange_level_loop_spec v v.len stride j.val hv (by simp) hstride
-    (alloc.vec.Vec.new cpoly.Ext4) 0#usize (by simp) (by intro u hu; simp at hu) (by simp))
+    (alloc.vec.Vec.new cpoly.field.Ext4) 0#usize (by simp) (by intro u hu; simp at hu) (by simp))
   rintro z ⟨hz, hmap⟩
   have hlen : z.val.length = 2 ^ n := by
     have h := congrArg List.length hmap
@@ -1725,19 +1739,19 @@ theorem mono_to_lagrange_level_spec (n : ℕ) (v : alloc.vec.Vec cpoly.Ext4) (j 
 
 theorem mono_to_lagrange_loop_spec (n : ℕ) (nn : Std.Usize) (hnn : nn.val = n)
     (t : CMlPolynomial F n) :
-    ∀ (cur : alloc.vec.Vec cpoly.Ext4) (j : Std.Usize),
+    ∀ (cur : alloc.vec.Vec cpoly.field.Ext4) (j : Std.Usize),
       j.val ≤ n → VecReduced cur → cur.val.length = 2 ^ n →
       toMl n cur = zetaUpTo n j.val t →
-      cpoly.mlpoly.mono_to_lagrange_loop nn cur j ⦃ z => VecReduced z ∧
+      cpoly.cmlpoly.mono_to_lagrange_loop nn cur j ⦃ z => VecReduced z ∧
         z.val.length = 2 ^ n ∧ toMl n z = CMlPolynomial.monoToLagrange n t ⦄ := by
   intro cur j hj hcur hlen hval
-  rw [cpoly.mlpoly.mono_to_lagrange_loop]
+  rw [cpoly.cmlpoly.mono_to_lagrange_loop]
   apply loop.spec_decr_nat (fun s => n - s.2.val)
     (fun s => s.2.val ≤ n ∧ VecReduced s.1 ∧ s.1.val.length = 2 ^ n ∧
       toMl n s.1 = zetaUpTo n s.2.val t)
   · rintro ⟨cur1, j1⟩ ⟨hj1, hcur1, hlen1, hval1⟩
     simp only [Prod.fst, Prod.snd] at hj1 hcur1 hlen1 hval1
-    simp only [cpoly.mlpoly.mono_to_lagrange_loop.body]
+    simp only [cpoly.cmlpoly.mono_to_lagrange_loop.body]
     by_cases hlt : j1 < nn
     · rw [if_pos hlt]
       have hjn : j1.val < n := by scalar_tac
@@ -1753,12 +1767,12 @@ theorem mono_to_lagrange_loop_spec (n : ℕ) (nn : Std.Usize) (hnn : nn.val = n)
       exact ⟨hcur1, hlen1, by rw [hval1, heq, zetaUpTo_full]⟩
   · exact ⟨hj, hcur, hlen, hval⟩
 
-/-- `cpoly::mlpoly::mono_to_lagrange` ↔ `CMlPolynomial.monoToLagrange`. -/
-theorem mono_to_lagrange_spec (n : ℕ) (v : alloc.vec.Vec cpoly.Ext4) (nn : Std.Usize)
+/-- `cpoly::cmlpoly::mono_to_lagrange` ↔ `CMlPolynomial.monoToLagrange`. -/
+theorem mono_to_lagrange_spec (n : ℕ) (v : alloc.vec.Vec cpoly.field.Ext4) (nn : Std.Usize)
     (hv : VecReduced v) (hvl : v.val.length = 2 ^ n) (hnn : nn.val = n) :
-    cpoly.mlpoly.mono_to_lagrange v nn ⦃ z => VecReduced z ∧ z.val.length = 2 ^ n ∧
+    cpoly.cmlpoly.mono_to_lagrange v nn ⦃ z => VecReduced z ∧ z.val.length = 2 ^ n ∧
       toMlEval n z = CMlPolynomial.monoToLagrange n (toMl n v) ⦄ := by
-  rw [cpoly.mlpoly.mono_to_lagrange]
+  rw [cpoly.cmlpoly.mono_to_lagrange]
   apply mono_to_lagrange_loop_spec n nn hnn (toMl n v) v 0#usize
   · simp
   · exact hv
@@ -1767,19 +1781,19 @@ theorem mono_to_lagrange_spec (n : ℕ) (v : alloc.vec.Vec cpoly.Ext4) (nn : Std
 
 /-! ### `lagrange_to_mono` -/
 
-theorem lagrange_to_mono_level_loop_spec (v : alloc.vec.Vec cpoly.Ext4)
+theorem lagrange_to_mono_level_loop_spec (v : alloc.vec.Vec cpoly.field.Ext4)
     (n stride : Std.Usize) (jv : ℕ) (hv : VecReduced v) (hn : n.val = v.val.length)
     (hstride : stride.val = 2 ^ jv) :
-    ∀ (r : alloc.vec.Vec cpoly.Ext4) (i : Std.Usize), i.val ≤ n.val → VecReduced r →
+    ∀ (r : alloc.vec.Vec cpoly.field.Ext4) (i : Std.Usize), i.val ≤ n.val → VecReduced r →
       r.val.map toExt = (List.range i.val).map
         (fun k => if Nat.testBit k jv then coeffFn v k - coeffFn v (k - 2 ^ jv)
                   else coeffFn v k) →
-      cpoly.mlpoly.lagrange_to_mono_level_loop v n stride r i ⦃ z => VecReduced z ∧
+      cpoly.cmlpoly.lagrange_to_mono_level_loop v n stride r i ⦃ z => VecReduced z ∧
         z.val.map toExt = (List.range n.val).map
           (fun k => if Nat.testBit k jv then coeffFn v k - coeffFn v (k - 2 ^ jv)
                     else coeffFn v k) ⦄ := by
   intro r i hi hr hrel
-  rw [cpoly.mlpoly.lagrange_to_mono_level_loop]
+  rw [cpoly.cmlpoly.lagrange_to_mono_level_loop]
   apply loop.spec_decr_nat (fun s => n.val - s.2.val)
     (fun s => s.2.val ≤ n.val ∧ VecReduced s.1 ∧
       s.1.val.map toExt = (List.range s.2.val).map
@@ -1787,7 +1801,7 @@ theorem lagrange_to_mono_level_loop_spec (v : alloc.vec.Vec cpoly.Ext4)
                   else coeffFn v k))
   · rintro ⟨r1, i1⟩ ⟨hi1, hr1, hrel1⟩
     simp only [Prod.fst, Prod.snd] at hi1 hr1 hrel1
-    simp only [cpoly.mlpoly.lagrange_to_mono_level_loop.body]
+    simp only [cpoly.cmlpoly.lagrange_to_mono_level_loop.body]
     by_cases hlt : i1 < n
     · rw [if_pos hlt]
       have hiv : i1.val < v.val.length := by scalar_tac
@@ -1861,18 +1875,18 @@ theorem lagrange_to_mono_level_loop_spec (v : alloc.vec.Vec cpoly.Ext4)
       exact ⟨hr1, by simpa [heq] using hrel1⟩
   · exact ⟨hi, hr, hrel⟩
 
-/-- `cpoly::mlpoly::lagrange_to_mono_level` ↔ `CMlPolynomial.lagrangeToMonoLevel`. -/
-theorem lagrange_to_mono_level_spec (n : ℕ) (v : alloc.vec.Vec cpoly.Ext4) (j : Std.Usize)
+/-- `cpoly::cmlpoly::lagrange_to_mono_level` ↔ `CMlPolynomial.lagrangeToMonoLevel`. -/
+theorem lagrange_to_mono_level_spec (n : ℕ) (v : alloc.vec.Vec cpoly.field.Ext4) (j : Std.Usize)
     (hv : VecReduced v) (hvl : v.val.length = 2 ^ n) (hj : j.val < n) :
-    cpoly.mlpoly.lagrange_to_mono_level v j ⦃ z => VecReduced z ∧
+    cpoly.cmlpoly.lagrange_to_mono_level v j ⦃ z => VecReduced z ∧
       z.val.length = 2 ^ n ∧
       toMl n z = CMlPolynomial.lagrangeToMonoLevel ⟨j.val, hj⟩ (toMl n v) ⦄ := by
-  rw [cpoly.mlpoly.lagrange_to_mono_level]
+  rw [cpoly.cmlpoly.lagrange_to_mono_level]
   have hpw : 2 ^ j.val ≤ Std.Usize.max := pow_le_of_lt hj (pow2_le_usize_max hvl)
   apply spec_bind (pow2_spec j hpw)
   intro stride hstride
   apply spec_mono (lagrange_to_mono_level_loop_spec v v.len stride j.val hv (by simp) hstride
-    (alloc.vec.Vec.new cpoly.Ext4) 0#usize (by simp) (by intro u hu; simp at hu) (by simp))
+    (alloc.vec.Vec.new cpoly.field.Ext4) 0#usize (by simp) (by intro u hu; simp at hu) (by simp))
   rintro z ⟨hz, hmap⟩
   have hlen : z.val.length = 2 ^ n := by
     have h := congrArg List.length hmap
@@ -1889,19 +1903,19 @@ theorem lagrange_to_mono_level_spec (n : ℕ) (v : alloc.vec.Vec cpoly.Ext4) (j 
   exact hm
 
 theorem lagrange_to_mono_loop_spec (n : ℕ) (t : CMlPolynomial F n) :
-    ∀ (cur : alloc.vec.Vec cpoly.Ext4) (j : Std.Usize),
+    ∀ (cur : alloc.vec.Vec cpoly.field.Ext4) (j : Std.Usize),
       j.val ≤ n → VecReduced cur → cur.val.length = 2 ^ n →
       toMl n cur = mobiusFrom n j.val t →
-      cpoly.mlpoly.lagrange_to_mono_loop cur j ⦃ z => VecReduced z ∧
+      cpoly.cmlpoly.lagrange_to_mono_loop cur j ⦃ z => VecReduced z ∧
         z.val.length = 2 ^ n ∧ toMl n z = CMlPolynomial.lagrangeToMono n t ⦄ := by
   intro cur j hj hcur hlen hval
-  rw [cpoly.mlpoly.lagrange_to_mono_loop]
+  rw [cpoly.cmlpoly.lagrange_to_mono_loop]
   apply loop.spec_decr_nat (fun s => s.2.val)
     (fun s => s.2.val ≤ n ∧ VecReduced s.1 ∧ s.1.val.length = 2 ^ n ∧
       toMl n s.1 = mobiusFrom n s.2.val t)
   · rintro ⟨cur1, j1⟩ ⟨hj1, hcur1, hlen1, hval1⟩
     simp only [Prod.fst, Prod.snd] at hj1 hcur1 hlen1 hval1
-    simp only [cpoly.mlpoly.lagrange_to_mono_loop.body]
+    simp only [cpoly.cmlpoly.lagrange_to_mono_loop.body]
     by_cases hpos : j1 > 0#usize
     · rw [if_pos hpos]
       step as ⟨j2, hj2⟩
@@ -1919,12 +1933,12 @@ theorem lagrange_to_mono_loop_spec (n : ℕ) (t : CMlPolynomial F n) :
       exact ⟨hcur1, hlen1, by rw [hval1, heq, mobiusFrom_zero]⟩
   · exact ⟨hj, hcur, hlen, hval⟩
 
-/-- `cpoly::mlpoly::lagrange_to_mono` ↔ `CMlPolynomial.lagrangeToMono`. -/
-theorem lagrange_to_mono_spec (n : ℕ) (v : alloc.vec.Vec cpoly.Ext4) (nn : Std.Usize)
+/-- `cpoly::cmlpoly::lagrange_to_mono` ↔ `CMlPolynomial.lagrangeToMono`. -/
+theorem lagrange_to_mono_spec (n : ℕ) (v : alloc.vec.Vec cpoly.field.Ext4) (nn : Std.Usize)
     (hv : VecReduced v) (hvl : v.val.length = 2 ^ n) (hnn : nn.val = n) :
-    cpoly.mlpoly.lagrange_to_mono v nn ⦃ z => VecReduced z ∧ z.val.length = 2 ^ n ∧
+    cpoly.cmlpoly.lagrange_to_mono v nn ⦃ z => VecReduced z ∧ z.val.length = 2 ^ n ∧
       toMl n z = CMlPolynomial.lagrangeToMono n (toMlEval n v) ⦄ := by
-  rw [cpoly.mlpoly.lagrange_to_mono]
+  rw [cpoly.cmlpoly.lagrange_to_mono]
   apply lagrange_to_mono_loop_spec n (toMlEval n v) v nn
   · simp [hnn]
   · exact hv

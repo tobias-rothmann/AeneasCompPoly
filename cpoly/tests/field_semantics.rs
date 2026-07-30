@@ -1,7 +1,7 @@
-//! Semantic validation of the `Ext4` field layer of `cpoly`, run *before* the
-//! Lean equivalence proofs are attempted.
+//! Semantic validation of `cpoly::field` — the base field `F_P` and the quartic
+//! extension `Ext4` — run *before* the Lean equivalence proofs are attempted.
 //!
-//! The references here are written independently of `src/lib.rs`: base-field
+//! The references here are written independently of `src/field.rs`: base-field
 //! arithmetic goes through `u128` (so a `u64` overflow in the real code would
 //! show up as a mismatch rather than being reproduced), and the extension
 //! product is computed as an honest degree-6 polynomial multiplication followed
@@ -13,8 +13,13 @@
 //! * `W = 2` is a non-square mod `P` (Euler's criterion);
 //! * every nonzero element is invertible, i.e. `x^(P^4 - 1) = 1`, which is what
 //!   irreducibility of `Y^4 - 2` buys.
+//!
+//! The polynomial layers get their own files, `tests/cpoly_semantics.rs` and
+//! `tests/cmlpoly_semantics.rs`, each with its own independently written
+//! references — the duplication is deliberate, so that a mistake shared with
+//! this file is unlikely.
 
-use cpoly::*;
+use cpoly::field::*;
 
 /// The independent representation of an extension element: little-endian
 /// coefficients of `Y^0 .. Y^3`.
@@ -352,172 +357,10 @@ fn nonzero_elements_are_invertible() {
     }
 }
 
-// ---------------------------------------------------------------
-// The univariate polynomial layer.
-// ---------------------------------------------------------------
-
-fn ofv(v: &[Ext4]) -> Vec<E> {
-    v.iter().map(|&a| of(a)).collect()
-}
-
-fn tov(v: &[E]) -> Vec<Ext4> {
-    v.iter().map(|&a| to(a)).collect()
-}
-
-/// Coefficient `k` of `p * q`, straight from the convolution definition.
-fn ref_mul(p: &[E], q: &[E]) -> Vec<E> {
-    if p.is_empty() || q.is_empty() {
-        return Vec::new();
-    }
-    let mut r = vec![[0u64; 4]; p.len() + q.len() - 1];
-    for i in 0..p.len() {
-        for j in 0..q.len() {
-            r[i + j] = eradd(r[i + j], ermul(p[i], q[j]));
-        }
-    }
-    while let Some(last) = r.last() {
-        if *last == [0, 0, 0, 0] {
-            r.pop();
-        } else {
-            break;
-        }
-    }
-    r
-}
-
-/// `p(xv)` by the definition `Σ_i p[i] xv^i`, not by Horner.
-fn ref_eval(p: &[E], xv: E) -> E {
-    let mut acc = [0u64; 4];
-    let mut pw: E = [1 % P, 0, 0, 0];
-    for &c in p {
-        acc = eradd(acc, ermul(c, pw));
-        pw = ermul(pw, xv);
-    }
-    acc
-}
-
+/// The `Y`-direction (extension) conventions, pinned by hand.  The `X`-direction
+/// counterpart lives in `tests/cpoly_semantics.rs`.
 #[test]
-fn univariate_constructors() {
-    let r = sample_ext(41, 1)[0];
-    assert_eq!(ofv(&c(to(r))), vec![r]);
-    assert_eq!(ofv(&x()), vec![[0, 0, 0, 0], [1 % P, 0, 0, 0]]);
-}
-
-#[test]
-fn trim_drops_exactly_the_trailing_zeros() {
-    let a = sample_ext(43, 3);
-    let z: E = [0, 0, 0, 0];
-    assert_eq!(ofv(&trim(tov(&[]))), Vec::<E>::new());
-    assert_eq!(ofv(&trim(tov(&[z, z, z]))), Vec::<E>::new());
-    assert_eq!(ofv(&trim(tov(&[a[0], z, a[1], z, z]))), vec![a[0], z, a[1]]);
-    assert_eq!(ofv(&trim(tov(&a))), a.to_vec());
-    // A coefficient that is zero in only three of four coordinates must survive.
-    for k in 0..4 {
-        let mut e = [0u64; 4];
-        e[k] = 5;
-        assert_eq!(ofv(&trim(tov(&[z, e]))), vec![z, e], "coord {k}");
-    }
-}
-
-#[test]
-fn univariate_ops_match_reference() {
-    for n in 0..6usize {
-        for m in 0..6usize {
-            let p = sample_ext(50 + n as u64, n);
-            let q = sample_ext(70 + m as u64, m);
-            let pr = tov(&p);
-            let qr = tov(&q);
-
-            // add_raw is zero-padded and untrimmed.
-            let want_raw: Vec<E> = (0..n.max(m))
-                .map(|i| {
-                    eradd(
-                        *p.get(i).unwrap_or(&[0; 4]),
-                        *q.get(i).unwrap_or(&[0; 4]),
-                    )
-                })
-                .collect();
-            assert_eq!(ofv(&add_raw(&pr, &qr)), want_raw, "add_raw {n}x{m}");
-
-            let mut want = want_raw.clone();
-            while let Some(last) = want.last() {
-                if *last == [0, 0, 0, 0] {
-                    want.pop();
-                } else {
-                    break;
-                }
-            }
-            assert_eq!(ofv(&add(&pr, &qr)), want, "add {n}x{m}");
-
-            let want_neg: Vec<E> = p.iter().map(|&a| erneg(a)).collect();
-            assert_eq!(ofv(&neg(&pr)), want_neg, "neg {n}");
-
-            let want_sub = {
-                let mut v: Vec<E> = (0..n.max(m))
-                    .map(|i| {
-                        ersub(
-                            *p.get(i).unwrap_or(&[0; 4]),
-                            *q.get(i).unwrap_or(&[0; 4]),
-                        )
-                    })
-                    .collect();
-                while let Some(last) = v.last() {
-                    if *last == [0, 0, 0, 0] {
-                        v.pop();
-                    } else {
-                        break;
-                    }
-                }
-                v
-            };
-            assert_eq!(ofv(&sub(&pr, &qr)), want_sub, "sub {n}x{m}");
-
-            assert_eq!(ofv(&mul(&pr, &qr)), ref_mul(&p, &q), "mul {n}x{m}");
-
-            let s = sample_ext(90 + n as u64, 1)[0];
-            let want_smul: Vec<E> = p.iter().map(|&a| ermul(s, a)).collect();
-            assert_eq!(ofv(&smul(to(s), &pr)), want_smul, "smul {n}");
-
-            let pt = sample_ext(110 + n as u64, 1)[0];
-            assert_eq!(of(eval(&pr, to(pt))), ref_eval(&p, pt), "eval {n}");
-        }
-    }
-}
-
-/// `eval` is a ring homomorphism in the polynomial argument — the property the
-/// Lean side ultimately cares about.
-#[test]
-fn eval_respects_add_and_mul() {
-    for n in 1..5usize {
-        let p = tov(&sample_ext(130 + n as u64, n));
-        let q = tov(&sample_ext(150 + n as u64, n));
-        let pt = to(sample_ext(170 + n as u64, 1)[0]);
-        assert_eq!(
-            of(eval(&add(&p, &q), pt)),
-            eradd(of(eval(&p, pt)), of(eval(&q, pt))),
-            "additive n={n}"
-        );
-        assert_eq!(
-            of(eval(&mul(&p, &q), pt)),
-            ermul(of(eval(&p, pt)), of(eval(&q, pt))),
-            "multiplicative n={n}"
-        );
-    }
-}
-
-/// A hand-computed case, to pin the little-endian conventions in both `X`
-/// (polynomial) and `Y` (extension) directions.
-#[test]
-fn conventions_pinned() {
-    // (1 + 2X) * (3 + 4X) = 3 + 10X + 8X^2, all coefficients in the base field.
-    let p = tov(&[[1, 0, 0, 0], [2, 0, 0, 0]]);
-    let q = tov(&[[3, 0, 0, 0], [4, 0, 0, 0]]);
-    assert_eq!(
-        ofv(&mul(&p, &q)),
-        vec![[3, 0, 0, 0], [10, 0, 0, 0], [8, 0, 0, 0]]
-    );
-    // Evaluating 1 + 2X at Y gives 1 + 2Y.
-    assert_eq!(of(eval(&p, EGEN)), [1, 2, 0, 0]);
+fn extension_conventions_pinned() {
     // (Y^3) * (Y^2) = Y^5 = W * Y = 2Y.
     let y2: E = [0, 0, 1, 0];
     let y3: E = [0, 0, 0, 1];

@@ -1,6 +1,6 @@
 //! Computable **multilinear** polynomials over the same concrete field as the
 //! univariate layer — the degree-4 extension `Ext4` of the Hachi prime field
-//! (see the crate root) — written to be translated to Lean by Aeneas/Charon and
+//! (see [`crate::field`]) — written to be translated to Lean by Aeneas/Charon and
 //! proved equivalent to `CompPoly.CMlPolynomial` and
 //! `CompPoly.CMlPolynomialEval` (see Verified-zkEVM/CompPoly,
 //! `CompPoly/Multilinear/Basic.lean`).
@@ -21,17 +21,17 @@
 //!
 //! ## Field arithmetic
 //!
-//! All coefficient arithmetic goes through the crate-root extension helpers
+//! All coefficient arithmetic goes through [`crate::field`]'s extension helpers
 //! `eadd`, `esub`, `emul`, which in turn use the base-field `fadd`/`fsub`/`fmul`
 //! on reduced representatives in `[0, P)`.  Since `P < 2^32`, no intermediate
 //! `u64` overflows, which is what keeps Aeneas's checked-arithmetic `Result`
-//! trivially `ok` (see the crate-root docs).
+//! trivially `ok` (see the [`crate::field`] docs).
 //!
 //! Coefficient-wise negation and scalar multiplication are *literally* the
-//! univariate `crate::neg` / `crate::smul`: nothing about them depends on how
-//! the index is interpreted, so they are not duplicated here — the Lean
-//! development states their multilinear specs directly about `cpoly::neg` and
-//! `cpoly::smul`.
+//! univariate [`crate::cpoly::neg`] / [`crate::cpoly::smul`]: nothing about them
+//! depends on how the index is interpreted, so they are not duplicated here —
+//! the Lean development states their multilinear specs directly about
+//! `cpoly::cpoly::neg` and `cpoly::cpoly::smul`.
 //!
 //! ## Style notes (for clean Aeneas output)
 //!
@@ -39,7 +39,7 @@
 //! `Vec`s built with `push`, and bit tests written with `/` and `%` rather than
 //! `>>` / `&` so that the extracted model stays in plain `Usize` arithmetic.
 
-use crate::{eadd, emul, esub, Ext4, EONE, EZERO};
+use crate::field::{eadd, emul, esub, Ext4, EONE, EZERO};
 
 // ------------------------------------------------------------------
 // Sizes and bit tests.

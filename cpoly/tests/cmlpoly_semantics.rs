@@ -1,4 +1,4 @@
-//! Semantic validation of `cpoly::mlpoly` against independent brute-force
+//! Semantic validation of `cpoly::cmlpoly` against independent brute-force
 //! references, run *before* the Lean equivalence proofs are attempted.
 //!
 //! Each test states the mathematical property that the corresponding
@@ -7,10 +7,10 @@
 //! deterministic pseudo-random data.  The references here are written
 //! independently (`u128` base-field arithmetic, a differently-shaped extension
 //! product, explicit bit tests, `O(4^n)` sums) so that a shared mistake is
-//! unlikely.  See `tests/ext4_semantics.rs` for the field layer these build on.
+//! unlikely.  See `tests/field_semantics.rs` for the field layer these build on.
 
-use cpoly::mlpoly::*;
-use cpoly::{Ext4, EGEN, P, W};
+use cpoly::cmlpoly::*;
+use cpoly::field::{Ext4, EGEN, P, W};
 
 /// The independent representation of an extension element: little-endian
 /// coefficients of `Y^0 .. Y^3`.
@@ -433,7 +433,8 @@ fn eq_tilde_matches_product_form() {
 }
 
 /// Negation and scalar multiplication are the univariate ones, reused: the Lean
-/// development states their multilinear specs about `cpoly::neg` / `cpoly::smul`.
+/// development states their multilinear specs about `cpoly::cpoly::neg` /
+/// `cpoly::cpoly::smul`.
 #[test]
 fn neg_and_smul_are_coefficientwise() {
     for n in 0..6 {
@@ -441,12 +442,12 @@ fn neg_and_smul_are_coefficientwise() {
         let p = sample(n as u64 + 181, sz);
         let s = sample(n as u64 + 191, 1)[0];
         assert_eq!(
-            ofv(&cpoly::neg(&tov(&p))),
+            ofv(&cpoly::cpoly::neg(&tov(&p))),
             p.iter().map(|&a| rneg(a)).collect::<Vec<E>>(),
             "neg n={n}"
         );
         assert_eq!(
-            ofv(&cpoly::smul(to(s), &tov(&p))),
+            ofv(&cpoly::cpoly::smul(to(s), &tov(&p))),
             p.iter().map(|&a| rmul(s, a)).collect::<Vec<E>>(),
             "smul n={n}"
         );

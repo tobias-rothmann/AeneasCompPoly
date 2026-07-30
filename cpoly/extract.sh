@@ -3,14 +3,29 @@
 #
 #   ./extract.sh
 #
-# Pipeline:  cargo/charon -> cpoly.llbc -> aeneas -> lean-gen/Cpoly.lean
-# and then installs the result as CPolyEquiv/CPolyEquiv/Generated.lean, which is
-# what CPolyEquiv/CPolyEquiv/{Equiv,EquivMl}.lean prove things about.
+# Pipeline:  cargo/charon -> generated.llbc -> aeneas -> lean/Generated.lean
+#
+# That last path is *inside* the Lean library (see `lakefile.lean`), so there is
+# no copy of the model to keep in sync: aeneas writes the very file that
+# lean/{Field,CPoly,CMlPoly}.lean import.
+#
+# Aeneas names its output after the basename of the .llbc, capitalised, which is
+# the only reason the intermediate is called `generated.llbc`: it is what makes
+# the Lean module come out as `Generated`, i.e. what `import Generated` finds.
+# The module is top-level because `lean/` is the library's srcDir and has no
+# subdirectory -- rename the .llbc and you rename the module.
 #
 # `Generated.lean` is DERIVED OUTPUT: never hand-edit it, run this instead.
 #
+# Naming: the whole crate lands in the Lean namespace `cpoly` (the crate name),
+# and each item keeps its Rust module path. So `src/field.rs` gives
+# `cpoly.field.*`, `src/cmlpoly.rs` gives `cpoly.cmlpoly.*`, and `src/cpoly.rs`
+# -- a module whose name repeats the crate's -- gives `cpoly.cpoly.*`. Renaming
+# or adding a module in `src/` therefore renames Lean definitions and requires
+# updating lean/{Field,CPoly,CMlPoly,Check}.lean to match.
+#
 # Toolchain: charon and aeneas must match each other and the Aeneas Lean backend
-# that CPolyEquiv builds against. That backend is ../aeneas-432/backends/lean --
+# that this library builds against. That backend is ../aeneas-432/backends/lean --
 # a git worktree of ../aeneas at commit 3a8586f (nightly-2026.07.26-3a8586f) on
 # branch `lean-4.32.0`, carrying only Lean v4.32.0 API-drift fixes; the
 # extraction contract is unchanged from that commit, so these binaries still
@@ -46,18 +61,26 @@ cd "$here"
 # `--preset=aeneas` is mandatory: aeneas rejects an llbc emitted without it.
 # `-- --lib` keeps cargo off the test targets, which are not part of the model.
 echo "==> charon"
-"$CHARON" cargo --preset=aeneas --dest-file cpoly.llbc -- --lib
+"$CHARON" cargo --preset=aeneas --dest-file generated.llbc -- --lib
+
+# The library's srcDir. Aeneas drops `Generated.lean` straight in beside the
+# hand-written modules; it writes nothing else here.
+dest="lean"
+
+# Keep a copy of the previous model outside the source tree, only so that the
+# script can report whether anything actually moved.
+before="$(mktemp -t cpoly-generated)"
+trap 'rm -f "$before"' EXIT
+[ -f "$dest/Generated.lean" ] && cp "$dest/Generated.lean" "$before"
 
 echo "==> aeneas"
-"$AENEAS" -backend lean -dest lean-gen cpoly.llbc
+"$AENEAS" -backend lean -dest "$dest" generated.llbc
 
-dest="$root/CPolyEquiv/CPolyEquiv/Generated.lean"
-if [ -f "$dest" ] && cmp -s lean-gen/Cpoly.lean "$dest"; then
-  echo "==> $dest already up to date"
+if [ -s "$before" ] && cmp -s "$before" "$dest/Generated.lean"; then
+  echo "==> $dest/Generated.lean unchanged"
 else
-  cp lean-gen/Cpoly.lean "$dest"
-  echo "==> installed $dest"
+  echo "==> regenerated $dest/Generated.lean"
 fi
 
 echo
-echo "Now re-check the proofs:  (cd $root/CPolyEquiv && lake build)"
+echo "Now re-check the proofs:  (cd $here && lake build)"

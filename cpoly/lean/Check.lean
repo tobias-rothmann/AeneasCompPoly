@@ -1,9 +1,18 @@
-import CPolyEquiv.Equiv
-import CPolyEquiv.EquivMl
+import CPoly
+import CMlPoly
 
 /-!
 Audit file: not part of the development, only a machine-checked review of what
-the specs in `Equiv.lean` / `EquivMl.lean` actually claim.
+the specs in `Field.lean` / `CPoly.lean` / `CMlPoly.lean` actually claim.
+
+Nothing imports this file and nothing here is used by a proof; it is a root of
+the library in its own right (see `lakefile.lean`), which is what gets it
+checked by `lake build`.  It exists to catch the failure mode that a `_spec`
+theorem is *true but vacuous*: that the field is degenerate, that `toExt`
+collapses distinct words, that `Reduced` is secretly `True`, or that a triple is
+weaker than total correctness.  It also prints the axiom dependencies of the
+headline specs, which is how a reader confirms there is no `sorryAx` hiding
+under a `_spec`.
 -/
 
 open Aeneas Aeneas.Std Aeneas.Std.WP Result
@@ -21,7 +30,7 @@ example : Field F := inferInstance
 example : Irreducible Hachi.ext4Params.poly := Hachi.ext4Params_poly_irreducible
 
 -- 2. `toExt` is injective, so the representation cannot collapse.
-example : ∀ a b : cpoly.Ext4, Reduced a → Reduced b → toExt a = toExt b → a = b := by
+example : ∀ a b : cpoly.field.Ext4, Reduced a → Reduced b → toExt a = toExt b → a = b := by
   have key : ∀ u v : Std.U64, Red u → Red v → toK u = toK v → u = v := by
     intro u v hu hv huv
     unfold Red at hu hv
@@ -31,11 +40,11 @@ example : ∀ a b : cpoly.Ext4, Reduced a → Reduced b → toExt a = toExt b �
   rintro ⟨a0, a1, a2, a3⟩ ⟨b0, b1, b2, b3⟩ ⟨ha0, ha1, ha2, ha3⟩ ⟨hb0, hb1, hb2, hb3⟩ h
   rw [toExt_eq_iff] at h
   obtain ⟨h0, h1, h2, h3⟩ := h
-  simp only [cpoly.Ext4.mk.injEq]
+  simp only [cpoly.field.Ext4.mk.injEq]
   exact ⟨key _ _ ha0 hb0 h0, key _ _ ha1 hb1 h1, key _ _ ha2 hb2 h2, key _ _ ha3 hb3 h3⟩
 
 -- 3. `toExt` really does hit non-base-field elements: the basis is faithful.
-example : toExt cpoly.EGEN = Hachi.ext4Gen := toExt_EGEN
+example : toExt cpoly.field.EGEN = Hachi.ext4Gen := toExt_EGEN
 example : Hachi.ext4Gen ^ 4 = Ext.ofBase (2 : K) := Hachi.ext4Gen_pow_four
 example : Hachi.ext4Gen ≠ 0 := by
   intro h
@@ -47,17 +56,17 @@ example : Hachi.ext4Gen ≠ 0 := by
 -- 4. `Reduced` is a real constraint (not `True`) and `toExt` is not constant.
 example : ¬ Reduced ⟨4294967197#u64, 0#u64, 0#u64, 0#u64⟩ := by
   rintro ⟨h, -, -, -⟩; unfold Red at h; exact absurd h (by decide)
-example : toExt cpoly.EZERO ≠ toExt cpoly.EONE := by
+example : toExt cpoly.field.EZERO ≠ toExt cpoly.field.EONE := by
   rw [toExt_EZERO, toExt_EONE]; exact zero_ne_one
 
 -- 5. The triples are total-correctness statements: `spec m Q` gives `m = ok r`.
-example (a b : cpoly.Ext4) (ha : Reduced a) (hb : Reduced b) :
-    ∃ c, cpoly.emul a b = ok c ∧ Reduced c ∧ toExt c = toExt a * toExt b :=
+example (a b : cpoly.field.Ext4) (ha : Reduced a) (hb : Reduced b) :
+    ∃ c, cpoly.field.emul a b = ok c ∧ Reduced c ∧ toExt c = toExt a * toExt b :=
   spec_imp_exists (emul_spec a b ha hb)
 
-example (v w : alloc.vec.Vec cpoly.Ext4) (hv : VecReduced v) (hw : VecReduced w)
+example (v w : alloc.vec.Vec cpoly.field.Ext4) (hv : VecReduced v) (hw : VecReduced w)
     (hlen : v.val.length + w.val.length ≤ Std.Usize.max) :
-    ∃ z, cpoly.mul v w = ok z ∧ VecReduced z ∧
+    ∃ z, cpoly.cpoly.mul v w = ok z ∧ VecReduced z ∧
       toRaw z = CPolynomial.Raw.mul (toRaw v) (toRaw w) ∧
       z.val.length ≤ v.val.length + w.val.length :=
   spec_imp_exists (mul_spec v w hv hw hlen)
