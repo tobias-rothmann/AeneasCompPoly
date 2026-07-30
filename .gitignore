@@ -1,2 +1,59 @@
-# Local Aeneas/Charon toolchain binaries — too large for GitHub (100 MB file limit)
-toolchain/
+# This repository holds exactly two things: the `cpoly` Rust crate and the Lean
+# proofs about its Aeneas-extracted model. Everything else in this directory --
+# the Aeneas checkouts, the CompPoly clone, the extraction binaries, and every
+# build tree -- is either third-party, machine-local, or derived, and is listed
+# below. See ./README.md for how to obtain the parts that are not in git.
+
+
+# --- Local checkouts, ~17 GB, deliberately not tracked -----------------------
+#
+# None of these is needed to build the proofs. `cpoly/lakefile.lean` fetches both
+# dependencies from git and Lake keeps its own copies under
+# `cpoly/.lake/packages/`, at the revisions pinned in `cpoly/lake-manifest.json`.
+# They used to be committed as gitlinks with no .gitmodules, which meant a fresh
+# clone got empty directories and no way to populate them.
+
+# The one that still matters, and only for `cpoly/extract.sh`: the charon and
+# aeneas binaries that regenerate `cpoly/lean/Generated.lean`. One of them blows
+# past GitHub's 100 MB file limit. README.md says how to fetch it.
+/toolchain/
+
+# Working checkouts of the Aeneas fork the Lean backend is built from -- useful
+# for preparing the next Lean bump, read by nothing. `aeneas-432` is a git
+# *worktree* of `aeneas` (branch `lean-4.32.0`), not an independent clone, so it
+# could never have been a submodule in the first place.
+/aeneas/
+/aeneas-432/
+
+# Reference clone only, read by nothing: Lake fetches CompPoly itself.
+/CompPoly/
+
+
+# --- Derived output ----------------------------------------------------------
+
+# Rust build tree.
+target/
+
+# Lake build tree, and the dependency sources Lake fetches into it.
+.lake/
+
+# Compiled Lean, in case any lands outside .lake/.
+*.olean
+*.ilean
+
+# Charon's output, the intermediate half of the extraction pipeline: `cargo
+# charon` writes cpoly/generated.llbc, then aeneas turns it into
+# cpoly/lean/Generated.lean. Regenerate both with `cpoly/extract.sh`.
+#
+# `lean/Generated.lean` itself IS tracked, and has to be: reproducing it needs
+# the ../toolchain binaries above, which are not in the repo, so a clone that
+# only has Lean must still be able to build the proofs.
+*.llbc
+
+
+# --- Editor and OS noise -----------------------------------------------------
+.DS_Store
+*.swp
+*~
+.idea/
+.vscode/
