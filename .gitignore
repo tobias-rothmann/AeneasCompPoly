@@ -2,20 +2,20 @@
 # proofs about its Aeneas-extracted model. Everything else in this directory --
 # the Aeneas checkouts, the CompPoly clone, the extraction binaries, and every
 # build tree -- is either third-party, machine-local, or derived, and is listed
-# below. See ./README.md for how to obtain the parts that are not in git.
+# below. `make setup` obtains the parts that are not in git.
 
 
-# --- Local checkouts, ~17 GB, deliberately not tracked -----------------------
+# --- Not tracked, obtained or generated locally ------------------------------
 #
-# None of these is needed to build the proofs. `cpoly/lakefile.lean` fetches both
-# dependencies from git and Lake keeps its own copies under
+# No checkout below is needed to build the proofs. `cpoly/lakefile.lean` fetches
+# both dependencies from git and Lake keeps its own copies under
 # `cpoly/.lake/packages/`, at the revisions pinned in `cpoly/lake-manifest.json`.
 # They used to be committed as gitlinks with no .gitmodules, which meant a fresh
 # clone got empty directories and no way to populate them.
 
-# The one that still matters, and only for `cpoly/extract.sh`: the charon and
-# aeneas binaries that regenerate `cpoly/lean/Generated.lean`. One of them blows
-# past GitHub's 100 MB file limit. README.md says how to fetch it.
+# The one that still matters, and only for `make extract`: the charon and aeneas
+# binaries that regenerate `cpoly/lean/Generated.lean`. One of them blows past
+# GitHub's 100 MB file limit. `make setup` downloads them.
 /toolchain/
 
 # Working checkouts of the Aeneas fork the Lean backend is built from -- useful
@@ -31,6 +31,11 @@
 
 # --- Derived output ----------------------------------------------------------
 
+# `make` bookkeeping: stamps recording what `make setup` has already done, and
+# the `lake build` log that `make build` scans for `sorry`. Deleting it costs
+# nothing but a re-run of `make setup`, which re-checks rather than re-downloads.
+/.make/
+
 # Rust build tree.
 target/
 
@@ -41,12 +46,12 @@ target/
 *.olean
 *.ilean
 
-# Charon's output, the intermediate half of the extraction pipeline: `cargo
-# charon` writes cpoly/generated.llbc, then aeneas turns it into
-# cpoly/lean/Generated.lean. Regenerate both with `cpoly/extract.sh`.
+# Charon's output, the intermediate half of the extraction pipeline: charon
+# writes cpoly/generated.llbc, then aeneas turns it into
+# cpoly/lean/Generated.lean. `make extract` regenerates both.
 #
 # `lean/Generated.lean` itself IS tracked, and has to be: reproducing it needs
-# the ../toolchain binaries above, which are not in the repo, so a clone that
+# the ./toolchain binaries above, which are not in the repo, so a clone that
 # only has Lean must still be able to build the proofs.
 *.llbc
 

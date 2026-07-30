@@ -3,7 +3,7 @@ open Lake DSL
 
 -- This Lake package sits in the *same* directory as the Rust crate it is about:
 -- `src/` is the crate, `lean/` is the proof development, and `../toolchain`
--- turns the former into `lean/Generated.lean` (see `extract.sh`).
+-- turns the former into `lean/Generated.lean` (see `make extract`).
 -- Keeping them together is what lets Aeneas write its output straight into the
 -- library, with no copy of the generated model to keep in sync.
 
@@ -30,9 +30,10 @@ open Lake DSL
 -- the manifest records the resolved commit, which is what makes a clone
 -- reproducible. Move it deliberately with `lake update aeneas`.
 --
--- Either way the extraction binaries (`../toolchain/{charon,aeneas}`, see
--- `./extract.sh`) must stay on the same Aeneas commit as this library:
--- `Generated.lean` is only valid against the Aeneas version that produced it.
+-- Either way the extraction binaries (`../toolchain/{charon,aeneas}`, pinned by
+-- `AENEAS_TAG` in the Makefile) must stay on the same Aeneas commit as this
+-- library: `Generated.lean` is only valid against the Aeneas version that
+-- produced it. `make setup` and `make extract` check that they do.
 require aeneas from git
   "https://github.com/tobias-rothmann/aeneas.git" @ "lean-4.32.0"
     / "backends" / "lean"
