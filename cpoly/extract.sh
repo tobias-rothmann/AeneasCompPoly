@@ -25,17 +25,21 @@
 # updating lean/{Field,CPoly,CMlPoly,Check}.lean to match.
 #
 # Toolchain: charon and aeneas must match each other and the Aeneas Lean backend
-# that this library builds against. That backend is ../aeneas-432/backends/lean --
-# a git worktree of ../aeneas at commit 3a8586f (nightly-2026.07.26-3a8586f) on
-# branch `lean-4.32.0`, carrying only Lean v4.32.0 API-drift fixes; the
-# extraction contract is unchanged from that commit, so these binaries still
-# match. The simplest way to get a matching pair is the release built from that
-# exact commit:
+# that this library builds against. That backend is fetched by Lake from the fork
+# named in `lakefile.lean`, at the commit pinned in `lake-manifest.json`; it is
+# nightly-2026.07.26-3a8586f plus Lean v4.32.0 API-drift fixes, which leave the
+# extraction contract untouched. So the binaries to use are the ones from that
+# upstream release -- the fixes are Lean-side only and do not affect extraction:
 #
-#   cd .. && git -C aeneas describe --tags        # e.g. nightly-2026.07.26-3a8586f
 #   curl -sSL -o t.tar.gz \
-#     https://github.com/AeneasVerif/aeneas/releases/download/<TAG>/aeneas-macos-aarch64.tar.gz
-#   mkdir -p toolchain && tar xzf t.tar.gz -C toolchain
+#     https://github.com/AeneasVerif/aeneas/releases/download/nightly-2026.07.26-3a8586f/aeneas-macos-aarch64.tar.gz
+#   mkdir -p ../toolchain && tar xzf t.tar.gz -C ../toolchain
+#
+# If the pinned backend commit ever moves to a different *upstream* base, these
+# binaries have to move with it: `lean/Generated.lean` is only valid against the
+# Aeneas version that produced it. Check with
+#
+#   python3 -c "import json;print([p for p in json.load(open('lake-manifest.json'))['packages'] if p['name']=='aeneas'][0]['rev'])"
 #
 # charon also needs the rust toolchain named in toolchain/rust-toolchain
 # (with the rustc-dev, llvm-tools-preview and rust-src components).

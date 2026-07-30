@@ -11,21 +11,31 @@ open Lake DSL
 -- development is about -- only exist after CompPoly's Lean v4.32.0 bump, so this
 -- package is on v4.32.0 / Mathlib v4.32.0; see `lean-toolchain`.
 --
--- Upstream Aeneas has no v4.32.0 release yet: its Lean backend hard-`require`s
--- Mathlib v4.31.0. So `aeneas` comes from a local checkout of
--- `nightly-2026.07.26-3a8586f` with the v4.32.0 API drift patched -- branch
--- `lean-4.32.0` of the sibling `aeneas` clone, checked out as a git worktree at
--- `../aeneas-432`. Replace this with
+-- Which is why this is a *fork* and not upstream. Upstream Aeneas has no v4.32.0
+-- release: its Lean backend hard-`require`s Mathlib v4.31.0, and every nightly
+-- up to and including `nightly-2026.07.30-3a8586f` is still on v4.31.0. The
+-- branch below is `nightly-2026.07.26-3a8586f` plus one commit repairing the
+-- v4.32.0 API drift -- API only, no semantic change and no `sorry`.
+--
+-- Replace this with
 --
 --   require aeneas from git
 --     "https://github.com/AeneasVerif/aeneas.git" @ "<a v4.32.0 nightly>"
 --       / "backends" / "lean"
 --
--- as soon as upstream publishes one. Either way the extraction binaries
--- (`../toolchain/{charon,aeneas}`, see `./extract.sh`) must stay on the same
--- Aeneas commit as this library: `Generated.lean` is only valid against the
--- Aeneas version that produced it.
-require aeneas from "../aeneas-432/backends/lean"
+-- as soon as upstream publishes one, and the fork can then be deleted. Until
+-- then the fork has to stay reachable, because this build depends on it.
+--
+-- Read the branch name as a moving target and `lake-manifest.json` as the truth:
+-- the manifest records the resolved commit, which is what makes a clone
+-- reproducible. Move it deliberately with `lake update aeneas`.
+--
+-- Either way the extraction binaries (`../toolchain/{charon,aeneas}`, see
+-- `./extract.sh`) must stay on the same Aeneas commit as this library:
+-- `Generated.lean` is only valid against the Aeneas version that produced it.
+require aeneas from git
+  "https://github.com/tobias-rothmann/aeneas.git" @ "lean-4.32.0"
+    / "backends" / "lean"
 
 -- Fetched from GitHub rather than a sibling checkout. The concrete revision is
 -- pinned in `lake-manifest.json`; bump it deliberately with
