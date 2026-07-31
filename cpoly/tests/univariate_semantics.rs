@@ -1,4 +1,4 @@
-//! Semantic validation of `cpoly::cpoly` — univariate polynomials as dense
+//! Semantic validation of `cpoly::univariate` — univariate polynomials as dense
 //! little-endian coefficient vectors — run *before* the Lean equivalence proofs
 //! are attempted.
 //!
@@ -8,39 +8,57 @@
 //! arithmetic goes through `u128` (so a `u64` overflow in the real code would
 //! show up as a mismatch rather than being reproduced), the extension product is
 //! an honest degree-6 polynomial multiplication with a top-down reduction loop
-//! rather than the unrolled fold in `emul`, `mul` is checked against the plain
+//! rather than the unrolled fold in `Ext4`'s `Mul`, polynomial multiplication is
+//! checked against the plain
 //! convolution and `eval` against `Σ_i p[i] xv^i` rather than Horner.
 //!
 //! The duplication of the field reference with `tests/field_semantics.rs` is
 //! deliberate: a shared helper would let one mistake pass both files.
+// The reference implementations below are deliberately *unlike* the crate: they
+// compute in `u128` so that a `u64` overflow in `src/` shows up as a mismatch
+// instead of being reproduced, and they index with explicit `for i in 0..n`
+// loops because the shape of the loop is part of what is being cross-checked.
+// Clippy's pedantic casting and iterator lints are therefore not wanted here.
+#![allow(
+    clippy::cast_lossless,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    clippy::needless_range_loop,
+    clippy::doc_markdown
+)]
 
-use cpoly::cpoly::*;
-use cpoly::field::{emul, Ext4, EGEN, P, W};
+use cpoly::field::{Ext4, Fp, P, W};
+use cpoly::univariate::Poly;
 
 /// The independent representation of an extension element: little-endian
 /// coefficients of `Y^0 .. Y^3`.
 type E = [u64; 4];
 
 fn of(a: Ext4) -> E {
-    [a.c0, a.c1, a.c2, a.c3]
+    [
+        a.c0.to_u64(),
+        a.c1.to_u64(),
+        a.c2.to_u64(),
+        a.c3.to_u64(),
+    ]
 }
 
 fn to(a: E) -> Ext4 {
-    Ext4 {
-        c0: a[0],
-        c1: a[1],
-        c2: a[2],
-        c3: a[3],
-    }
+    Ext4::new(Fp::new(a[0]), Fp::new(a[1]), Fp::new(a[2]), Fp::new(a[3]))
 }
 
-fn ofv(v: &[Ext4]) -> Vec<E> {
-    v.iter().map(|&a| of(a)).collect()
+/// The coefficients of a [`Poly`], in the independent representation.
+fn ofv(p: &Poly) -> Vec<E> {
+    p.coeffs().iter().map(|&a| of(a)).collect()
 }
 
-fn tov(v: &[E]) -> Vec<Ext4> {
-    v.iter().map(|&a| to(a)).collect()
+/// A [`Poly`] from the independent representation, taken verbatim (no trimming).
+fn tov(v: &[E]) -> Poly {
+    Poly::from_coeffs(v.iter().map(|&a| to(a)).collect())
 }
+
+/// `W` as a raw word, for the reference reduction below.
+const WV: u64 = W.to_u64();
 
 // ---------------------------------------------------------------
 // Independent base field reference (u128, no clever tricks).
@@ -88,7 +106,7 @@ fn erneg(a: E) -> E {
 }
 
 /// `a * b` in `F_P[Y] / (Y^4 - W)`: full degree-6 product, then fold the high
-/// coefficients down one at a time.  Deliberately not the shape `emul` uses.
+/// coefficients down one at a time.  Deliberately not the shape `Ext4`'s `Mul` uses.
 fn ermul(a: E, b: E) -> E {
     let mut r = [0u64; 7];
     for i in 0..4 {
@@ -97,7 +115,7 @@ fn ermul(a: E, b: E) -> E {
         }
     }
     for k in (4..7).rev() {
-        r[k - 4] = radd(r[k - 4], rmul(W, r[k]));
+        r[k - 4] = radd(r[k - 4], rmul(WV, r[k]));
         r[k] = 0;
     }
     [r[0], r[1], r[2], r[3]]
@@ -169,23 +187,23 @@ fn ref_eval(p: &[E], xv: E) -> E {
 #[test]
 fn univariate_constructors() {
     let r = sample_ext(41, 1)[0];
-    assert_eq!(ofv(&c(to(r))), vec![r]);
-    assert_eq!(ofv(&x()), vec![[0, 0, 0, 0], [1 % P, 0, 0, 0]]);
+    assert_eq!(ofv(&Poly::constant(to(r))), vec![r]);
+    assert_eq!(ofv(&Poly::x()), vec![[0, 0, 0, 0], [1 % P, 0, 0, 0]]);
 }
 
 #[test]
 fn trim_drops_exactly_the_trailing_zeros() {
     let a = sample_ext(43, 3);
     let z: E = [0, 0, 0, 0];
-    assert_eq!(ofv(&trim(tov(&[]))), Vec::<E>::new());
-    assert_eq!(ofv(&trim(tov(&[z, z, z]))), Vec::<E>::new());
-    assert_eq!(ofv(&trim(tov(&[a[0], z, a[1], z, z]))), vec![a[0], z, a[1]]);
-    assert_eq!(ofv(&trim(tov(&a))), a.to_vec());
+    assert_eq!(ofv(&tov(&[]).trim()), Vec::<E>::new());
+    assert_eq!(ofv(&tov(&[z, z, z]).trim()), Vec::<E>::new());
+    assert_eq!(ofv(&tov(&[a[0], z, a[1], z, z]).trim()), vec![a[0], z, a[1]]);
+    assert_eq!(ofv(&tov(&a).trim()), a.clone());
     // A coefficient that is zero in only three of four coordinates must survive.
     for k in 0..4 {
         let mut e = [0u64; 4];
         e[k] = 5;
-        assert_eq!(ofv(&trim(tov(&[z, e]))), vec![z, e], "coord {k}");
+        assert_eq!(ofv(&tov(&[z, e]).trim()), vec![z, e], "coord {k}");
     }
 }
 
@@ -207,7 +225,7 @@ fn univariate_ops_match_reference() {
                     )
                 })
                 .collect();
-            assert_eq!(ofv(&add_raw(&pr, &qr)), want_raw, "add_raw {n}x{m}");
+            assert_eq!(ofv(&pr.add_untrimmed(&qr)), want_raw, "add_untrimmed {n}x{m}");
 
             let mut want = want_raw.clone();
             while let Some(last) = want.last() {
@@ -217,10 +235,10 @@ fn univariate_ops_match_reference() {
                     break;
                 }
             }
-            assert_eq!(ofv(&add(&pr, &qr)), want, "add {n}x{m}");
+            assert_eq!(ofv(&(&pr + &qr)), want, "add {n}x{m}");
 
             let want_neg: Vec<E> = p.iter().map(|&a| erneg(a)).collect();
-            assert_eq!(ofv(&neg(&pr)), want_neg, "neg {n}");
+            assert_eq!(ofv(&-&pr), want_neg, "neg {n}");
 
             let want_sub = {
                 let mut v: Vec<E> = (0..n.max(m))
@@ -240,16 +258,16 @@ fn univariate_ops_match_reference() {
                 }
                 v
             };
-            assert_eq!(ofv(&sub(&pr, &qr)), want_sub, "sub {n}x{m}");
+            assert_eq!(ofv(&(&pr - &qr)), want_sub, "sub {n}x{m}");
 
-            assert_eq!(ofv(&mul(&pr, &qr)), ref_mul(&p, &q), "mul {n}x{m}");
+            assert_eq!(ofv(&(&pr * &qr)), ref_mul(&p, &q), "mul {n}x{m}");
 
             let s = sample_ext(90 + n as u64, 1)[0];
             let want_smul: Vec<E> = p.iter().map(|&a| ermul(s, a)).collect();
-            assert_eq!(ofv(&smul(to(s), &pr)), want_smul, "smul {n}");
+            assert_eq!(ofv(&(&pr * to(s))), want_smul, "smul {n}");
 
             let pt = sample_ext(110 + n as u64, 1)[0];
-            assert_eq!(of(eval(&pr, to(pt))), ref_eval(&p, pt), "eval {n}");
+            assert_eq!(of(pr.eval(to(pt))), ref_eval(&p, pt), "eval {n}");
         }
     }
 }
@@ -263,13 +281,13 @@ fn eval_respects_add_and_mul() {
         let q = tov(&sample_ext(150 + n as u64, n));
         let pt = to(sample_ext(170 + n as u64, 1)[0]);
         assert_eq!(
-            of(eval(&add(&p, &q), pt)),
-            eradd(of(eval(&p, pt)), of(eval(&q, pt))),
+            of((&p + &q).eval(pt)),
+            eradd(of(p.eval(pt)), of(q.eval(pt))),
             "additive n={n}"
         );
         assert_eq!(
-            of(eval(&mul(&p, &q), pt)),
-            ermul(of(eval(&p, pt)), of(eval(&q, pt))),
+            of((&p * &q).eval(pt)),
+            ermul(of(p.eval(pt)), of(q.eval(pt))),
             "multiplicative n={n}"
         );
     }
@@ -283,14 +301,76 @@ fn conventions_pinned() {
     let p = tov(&[[1, 0, 0, 0], [2, 0, 0, 0]]);
     let q = tov(&[[3, 0, 0, 0], [4, 0, 0, 0]]);
     assert_eq!(
-        ofv(&mul(&p, &q)),
+        ofv(&(&p * &q)),
         vec![[3, 0, 0, 0], [10, 0, 0, 0], [8, 0, 0, 0]]
     );
     // Evaluating 1 + 2X at Y gives 1 + 2Y.
-    assert_eq!(of(eval(&p, EGEN)), [1, 2, 0, 0]);
+    assert_eq!(of(p.eval(Ext4::GEN)), [1, 2, 0, 0]);
     // X^4 evaluated at Y is Y^4 = W, so the two directions do interact.
     let x4 = tov(&[[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [1, 0, 0, 0]]);
-    assert_eq!(of(eval(&x4, EGEN)), [W, 0, 0, 0]);
-    // And `emul` is the operation `eval` uses for that.
-    assert_eq!(of(emul(EGEN, EGEN)), [0, 0, 1, 0]);
+    assert_eq!(of(x4.eval(Ext4::GEN)), [WV, 0, 0, 0]);
+    // And `Ext4`'s `Mul` is the operation `eval` uses for that.
+    assert_eq!(of(Ext4::GEN * Ext4::GEN), [0, 0, 1, 0]);
+}
+
+// ---------------------------------------------------------------
+// API introduced by the newtype refactor.
+// ---------------------------------------------------------------
+
+/// The coefficient vector goes in and comes back out unchanged, and `coeffs`
+/// agrees with `into_coeffs`.  `Poly` is a newtype, not a normalising
+/// constructor: `from_coeffs` does not trim.
+#[test]
+fn coefficients_round_trip() {
+    for n in 0..6usize {
+        let e = sample_ext(200 + n as u64, n);
+        let p = tov(&e);
+        assert_eq!(p.len(), n);
+        assert_eq!(p.coeffs().len(), n);
+        assert_eq!(ofv(&p), e);
+        let back: Vec<E> = p.clone().into_coeffs().iter().map(|&a| of(a)).collect();
+        assert_eq!(back, e);
+        assert_eq!(Poly::from(p.clone().into_coeffs()), p, "From<Vec<Ext4>>");
+    }
+    // trailing zeros are representable, and survive `from_coeffs`
+    let z: E = [0, 0, 0, 0];
+    assert_eq!(tov(&[z, z]).len(), 2);
+}
+
+#[test]
+fn len_is_empty_and_degree() {
+    assert!(Poly::zero().is_empty());
+    assert_eq!(Poly::zero().len(), 0);
+    assert_eq!(Poly::zero().degree(), None);
+    assert_eq!(Poly::default(), Poly::zero(), "Default is the zero polynomial");
+
+    // `Poly::constant` is untrimmed, so even a zero constant has one coefficient
+    assert!(!Poly::constant(Ext4::ZERO).is_empty());
+    assert_eq!(Poly::constant(Ext4::ZERO).degree(), Some(0));
+    assert_eq!(Poly::x().degree(), Some(1));
+
+    for n in 1..6usize {
+        let p = tov(&sample_ext(220 + n as u64, n));
+        assert!(!p.is_empty());
+        assert_eq!(p.degree(), Some(n - 1));
+    }
+}
+
+/// `Index` reads the same coefficient `coeffs()` does.
+#[test]
+fn indexing_agrees_with_coeffs() {
+    for n in 1..6usize {
+        let e = sample_ext(240 + n as u64, n);
+        let p = tov(&e);
+        for i in 0..n {
+            assert_eq!(of(p[i]), e[i], "p[{i}] at n={n}");
+        }
+    }
+}
+
+#[test]
+#[should_panic(expected = "index out of bounds")]
+fn indexing_past_the_end_panics() {
+    let p = Poly::x();
+    let _ = p[2];
 }

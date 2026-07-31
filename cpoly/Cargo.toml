@@ -2,10 +2,30 @@
 name = "cpoly"
 version = "0.1.0"
 edition = "2021"
+rust-version = "1.74"
 license = "Apache-2.0"
+description = "Computable univariate and multilinear polynomials over the quartic extension of the Hachi prime field, with a machine-checked Lean equivalence proof against Verified-zkEVM/CompPoly"
+repository = "https://github.com/tobias-rothmann/AeneasCompPoly"
+keywords = ["polynomial", "finite-field", "multilinear", "formal-verification"]
+categories = ["cryptography", "mathematics", "no-std"]
 
 [lib]
 name = "cpoly"
 path = "src/lib.rs"
 
 [dependencies]
+
+# Warn rather than deny: `make extract` builds this crate with charon's own
+# rustc, and a lint that is only a style opinion must never be able to stop the
+# extraction. `unsafe_code` and `missing_docs` are the two that do matter, and
+# they are `forbid`/`deny` in src/lib.rs where they travel with the source.
+[lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+# Every index in this crate is a `usize` that a loop bound already constrains,
+# and the extracted model has no casts at all; `cast_possible_truncation` and
+# friends have nothing to say here.
+must_use_candidate = "allow"
+missing_panics_doc = "allow"
+# `1usize << vars` is the point of `table_len`, and the manual bit tests are
+# deliberate (see the style notes in src/lib.rs).
+manual_div_ceil = "allow"

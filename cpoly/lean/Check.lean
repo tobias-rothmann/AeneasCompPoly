@@ -1,9 +1,9 @@
-import CPoly
-import CMlPoly
+import Univariate
+import Multilinear
 
 /-!
 Audit file: not part of the development, only a machine-checked review of what
-the specs in `Field.lean` / `CPoly.lean` / `CMlPoly.lean` actually claim.
+the specs in `Field.lean` / `Univariate.lean` / `Multilinear.lean` actually claim.
 
 Nothing imports this file and nothing here is used by a proof; it is a root of
 the library in its own right (see `lakefile.lean`), which is what gets it
@@ -13,6 +13,10 @@ collapses distinct words, that `Reduced` is secretly `True`, or that a triple is
 weaker than total correctness.  It also prints the axiom dependencies of the
 headline specs, which is how a reader confirms there is no `sorryAx` hiding
 under a `_spec`.
+
+Sections 7-11 are about the newtypes the Rust side gained: that they cost these
+proofs nothing, and -- section 8 -- that the price of that is a real limitation,
+namely that `Coeffs` and `Evals` are indistinguishable here.
 -/
 
 open Aeneas Aeneas.Std Aeneas.Std.WP Result
@@ -44,7 +48,7 @@ example : ∀ a b : cpoly.field.Ext4, Reduced a → Reduced b → toExt a = toEx
   exact ⟨key _ _ ha0 hb0 h0, key _ _ ha1 hb1 h1, key _ _ ha2 hb2 h2, key _ _ ha3 hb3 h3⟩
 
 -- 3. `toExt` really does hit non-base-field elements: the basis is faithful.
-example : toExt cpoly.field.EGEN = Hachi.ext4Gen := toExt_EGEN
+example : toExt cpoly.field.Ext4.GEN = Hachi.ext4Gen := toExt_GEN
 example : Hachi.ext4Gen ^ 4 = Ext.ofBase (2 : K) := Hachi.ext4Gen_pow_four
 example : Hachi.ext4Gen ≠ 0 := by
   intro h
@@ -56,17 +60,17 @@ example : Hachi.ext4Gen ≠ 0 := by
 -- 4. `Reduced` is a real constraint (not `True`) and `toExt` is not constant.
 example : ¬ Reduced ⟨4294967197#u64, 0#u64, 0#u64, 0#u64⟩ := by
   rintro ⟨h, -, -, -⟩; unfold Red at h; exact absurd h (by decide)
-example : toExt cpoly.field.EZERO ≠ toExt cpoly.field.EONE := by
-  rw [toExt_EZERO, toExt_EONE]; exact zero_ne_one
+example : toExt cpoly.field.Ext4.ZERO ≠ toExt cpoly.field.Ext4.ONE := by
+  rw [toExt_ZERO, toExt_ONE]; exact zero_ne_one
 
 -- 5. The triples are total-correctness statements: `spec m Q` gives `m = ok r`.
 example (a b : cpoly.field.Ext4) (ha : Reduced a) (hb : Reduced b) :
-    ∃ c, cpoly.field.emul a b = ok c ∧ Reduced c ∧ toExt c = toExt a * toExt b :=
-  spec_imp_exists (emul_spec a b ha hb)
+    ∃ c, cpoly.field.Ext4.Insts.CoreOpsArithMulExt4Ext4.mul a b = ok c ∧ Reduced c ∧ toExt c = toExt a * toExt b :=
+  spec_imp_exists (ext_mul_spec a b ha hb)
 
 example (v w : alloc.vec.Vec cpoly.field.Ext4) (hv : VecReduced v) (hw : VecReduced w)
     (hlen : v.val.length + w.val.length ≤ Std.Usize.max) :
-    ∃ z, cpoly.cpoly.mul v w = ok z ∧ VecReduced z ∧
+    ∃ z, cpoly.Shared1Poly.Insts.CoreOpsArithMulShared0PolyPoly.mul v w = ok z ∧ VecReduced z ∧
       toRaw z = CPolynomial.Raw.mul (toRaw v) (toRaw w) ∧
       z.val.length ≤ v.val.length + w.val.length :=
   spec_imp_exists (mul_spec v w hv hw hlen)
@@ -75,8 +79,58 @@ example (v w : alloc.vec.Vec cpoly.field.Ext4) (hv : VecReduced v) (hw : VecRedu
 example : CPolynomial.Raw F = _root_.Array F := rfl
 example : CMlPolynomial F 3 = Vector F 8 := by norm_num [CMlPolynomial]
 
--- 7. Print the headline statements for review.
-#print axioms CPolyEquiv.emul_spec
+-- 7. The Rust newtypes really are free on this side: Aeneas extracts a
+--    single-field tuple struct as a `@[reducible]` abbreviation, so each wrapper
+--    *is* its content here and no spec had to change domain to accommodate one.
+example : cpoly.field.Fp = Std.U64 := rfl
+example : cpoly.univariate.Poly = alloc.vec.Vec cpoly.field.Ext4 := rfl
+example : cpoly.multilinear.Coeffs = alloc.vec.Vec cpoly.field.Ext4 := rfl
+example : cpoly.multilinear.Evals = alloc.vec.Vec cpoly.field.Ext4 := rfl
+
+-- 8. ... and the flip side of that, stated plainly because it is a limitation:
+--    `Coeffs` and `Evals` are the *same* type here, so the separation between the
+--    monomial and the Lagrange reading is enforced by rustc and not by these
+--    proofs.  What the proofs do give is that each Rust operation computes the
+--    CompPoly operation for the reading its Rust type names -- `add_spec` is
+--    about `CMlPolynomial.add` and `add_evals_spec` about
+--    `CMlPolynomialEval.add` -- so a Rust caller who mixes the two gets a
+--    compile error, and a caller who does not gets the operation it asked for.
+example : cpoly.multilinear.Coeffs = cpoly.multilinear.Evals := rfl
+
+-- 9. `Fp`'s reducedness is a real constraint, and `Fp::new` establishes it for
+--    an arbitrary word -- which is what makes `Red` an invariant of the Rust type
+--    rather than a precondition callers must respect.
+example : ¬ Red 4294967197#u64 := by
+  intro h; unfold Red at h; exact absurd h (by decide)
+example (v : Std.U64) : ∃ c, cpoly.field.Fp.new v = ok c ∧ Red c ∧ toK c = (v.val : K) :=
+  spec_imp_exists (fp_new_spec v)
+
+-- 10. The operator impls are total-correctness statements too, including the
+--     heterogeneous scalar multiplication and the two `Add` impls of the
+--     multilinear layer.
+example (a : cpoly.field.Fp) (b : cpoly.field.Ext4) (ha : Red a) (hb : Reduced b) :
+    ∃ c, cpoly.field.Fp.Insts.CoreOpsArithMulExt4Ext4.mul a b = ok c ∧
+      Reduced c ∧ toExt c = toK a • toExt b :=
+  spec_imp_exists (ext_smul_spec a b ha hb)
+
+example (n : ℕ) (v w : alloc.vec.Vec cpoly.field.Ext4)
+    (hv : VecReduced v) (hw : VecReduced w)
+    (hvl : v.val.length = 2 ^ n) (hwl : w.val.length = 2 ^ n) :
+    ∃ z, cpoly.Shared1Evals.Insts.CoreOpsArithAddShared0EvalsEvals.add v w = ok z ∧
+      VecReduced z ∧ z.val.length = 2 ^ n ∧
+      Ml.toMlEval n z = CMlPolynomialEval.add (Ml.toMlEval n v) (Ml.toMlEval n w) :=
+  spec_imp_exists (Ml.add_evals_spec n v w hv hw hvl hwl)
+
+-- 11. `table_len` is `1usize << vars`, and its side condition is the one the
+--     previous checked-doubling loop had: the shift fails exactly when `2 ^ vars`
+--     does not fit.  Sanity-check the spec at a concrete arity.
+example : ∃ z, cpoly.multilinear.table_len 10#usize = ok z ∧ z.val = 1024 := by
+  have h := Ml.pow2_spec 10#usize (by scalar_tac)
+  obtain ⟨z, hz, hzv⟩ := spec_imp_exists h
+  exact ⟨z, hz, by simpa using hzv⟩
+
+-- 12. Print the headline statements for review.
+#print axioms CPolyEquiv.ext_mul_spec
 #print axioms CPolyEquiv.mul_spec
 #print axioms CPolyEquiv.eval_spec
 #print axioms CPolyEquiv.trim_spec
@@ -85,5 +139,9 @@ example : CMlPolynomial F 3 = Vector F 8 := by norm_num [CMlPolynomial]
 #print axioms CPolyEquiv.Ml.mono_to_lagrange_spec
 #print axioms CPolyEquiv.Ml.lagrange_to_mono_spec
 #print axioms CPolyEquiv.Ml.eq_tilde_spec
+#print axioms CPolyEquiv.Ml.add_spec
+#print axioms CPolyEquiv.Ml.add_evals_spec
+#print axioms CPolyEquiv.ext_smul_spec
+#print axioms CPolyEquiv.fp_new_spec
 
 end CPolyEquiv.Check
