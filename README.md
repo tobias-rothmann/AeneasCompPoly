@@ -175,7 +175,6 @@ We list the trusted computing base (TBC) here. These are trusted components that
 | **Aeneas extraction** — [charon](https://github.com/AeneasVerif/charon) + [aeneas](https://github.com/AeneasVerif/aeneas), and their hand-written [model of Rust `std`](https://github.com/AeneasVerif/aeneas/blob/main/backends/lean/Aeneas/Std/Vec.lean) | [`Generated.lean`](cpoly/lean/Generated.lean) is asserted to model [`src/`](cpoly/src/), never proved: the paper proof covers a fragment, the OCaml that ran does not | The proofs are about a different program |
 | **Rust to machine code** — rustc, LLVM, linker, libc, OS, CPU | No verified Rust compiler exists; memory safety is inherited from the borrow checker, not proved | The binary betrays a correct proof |
 | **The specs** — [CompPoly](https://github.com/Verified-zkEVM/CompPoly)'s definitions and the `toExt`/`Reduced` relations | They *are* the definition of correct; degenerate ones would make every spec true and empty | True theorems about the wrong thing |
-| **rustc's type checking of the newtypes** — that `Coeffs` and `Evals` cannot be confused | Aeneas erases single-field wrappers, so the Lean side cannot see the distinction ([Check.lean](cpoly/lean/Check.lean) §8) | A caller mixes the two readings; each operation is still proved correct for the reading its Rust type names |
 
 ## License
 
