@@ -20,7 +20,8 @@ of [Verified-zkEVM/CompPoly](https://github.com/Verified-zkEVM/CompPoly).
 ```
 
 Every operation is proved to succeed and to commute with its CompPoly
-counterpart, with no `sorry`. The AI step is never trusted, but proved. 
+counterpart, with no `sorry`. The AI step is never trusted, but proved. What *is*
+trusted is enumerated under [Trusted computing base](#trusted-computing-base).
 
 The goal of this project is not only to do the trivial translation, but to employ AI to heavily optimize the Lean definitions, Rust code, and the Lean-Rust loop. 
 
@@ -97,3 +98,21 @@ since `lean/Generated.lean` is only valid against the version that produced it �
 
 A Lean bump therefore moves the fork first, then `lake-manifest.json`,
 `lean-toolchain` and the Makefile pins together.
+
+## Trusted computing base
+
+We list the trusted computing base (TBC) here. These are trusted components that lie outside of our verification boundary.
+
+| Trusted | Why it cannot be checked away | If it is wrong |
+|---|---|---|
+| **[Lean kernel](https://github.com/leanprover/lean4/tree/v4.32.0/src/kernel)** — ~8k lines of C++, plus `propext`, `Classical.choice`, `Quot.sound` | No machine-checked proof of it exists; its C fast path for `Nat` carries every `decide` in [Field.lean](cpoly/lean/Field.lean) | A false theorem, with no diagnostic |
+| **Aeneas extraction** — [charon](https://github.com/AeneasVerif/charon) + [aeneas](https://github.com/AeneasVerif/aeneas), and their hand-written [model of Rust `std`](https://github.com/AeneasVerif/aeneas/blob/main/backends/lean/Aeneas/Std/Vec.lean) | [`Generated.lean`](cpoly/lean/Generated.lean) is asserted to model [`src/`](cpoly/src/), never proved: the paper proof covers a fragment, the OCaml that ran does not | The proofs are about a different program |
+| **Rust to machine code** — rustc, LLVM, linker, libc, OS, CPU | No verified Rust compiler exists; memory safety is inherited from the borrow checker, not proved | The binary betrays a correct proof |
+| **The specs** — [CompPoly](https://github.com/Verified-zkEVM/CompPoly)'s definitions and the `toExt`/`Reduced` relations | They *are* the definition of correct; degenerate ones would make every spec true and empty | True theorems about the wrong thing |
+
+## License
+
+Apache-2.0 — see [LICENSE](LICENSE). The same terms as both dependencies,
+[CompPoly](https://github.com/Verified-zkEVM/CompPoly) and
+[aeneas](https://github.com/AeneasVerif/aeneas), so combining them adds no
+further obligations.
