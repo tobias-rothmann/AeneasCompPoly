@@ -92,55 +92,6 @@ Two things to keep in mind when adding to either side. Adding a module under
 explicitly. Renaming or adding one under `src/` renames extracted Lean
 definitions, so the modules under `lean/` have to be updated to match.
 
-## The Rust side
-
-The crate is written as a Rust library first. `Fp` wraps a private `u64`, so the
-"representative is below `P`" invariant the proofs call `Red` holds of every value
-a caller can build; `Poly`, `Coeffs` and `Evals` are newtypes, and `Coeffs` (a
-coefficient table) versus `Evals` (a table of hypercube values) is now a type
-distinction rather than two meanings of `Vec<Ext4>`. Arithmetic is `Add`, `Sub`,
-`Mul`, `Neg` and the `*Assign` forms, plus `impl Mul<Ext4> for Fp` for scaling and
-`Index<usize>` on the polynomial types. The binary operators on polynomials are
-the by-reference impls (`&p + &q`), as in `num-bigint` and `ark-poly`.
-
-None of that costs the proofs anything structural. Aeneas extracts a single-field
-tuple struct as a `@[reducible]` abbreviation, so `cpoly.field.Fp` *is* `Std.U64`
-and `cpoly.univariate.Poly` *is* `alloc.vec.Vec cpoly.field.Ext4` on the Lean
-side; and it extracts a trait impl as an ordinary definition whose body is what
-the corresponding free function's was. The move from free functions to operators
-was a rename in the proofs. `Check.lean` §7-§11 verify that, and §8 records the
-limitation that comes with it: because the wrappers are erased, `Coeffs` and
-`Evals` are the *same* Lean type, so their separation is enforced by rustc and not
-by the proofs.
-
-Three habits in `src/` *are* for the extraction rather than the reader, and
-`src/lib.rs` says so at the point of use:
-
-* **Index-based `while` loops, and no iterator adaptors.** `.map`, `.zip`,
-  `.fold` and `.collect` have no model in the Aeneas Lean backend. `for i in 0..n`
-  *does*, but it replaces a `usize` counter with a `Range<usize>` iterator in every
-  loop invariant, and `Generated.lean` is read by people here.
-* **Bit tests as `/` and `%`, not `>>` and `&`**, so the model stays in `Usize`
-  arithmetic that `scalar_tac` and `omega` see through.
-* **Three `std` calls avoided**: `Vec::is_empty`, `Vec::truncate` and
-  `#[derive(Default)]` on a `Vec`-holding struct, each of which would put an
-  `axiom` into `Generated.lean`. It currently has none, which is worth keeping:
-  grep for `axiom` after every `make extract`.
-
-What is still missing, in rough order of value:
-
-* `Coeffs`/`Evals` do not store their arity, so `p.len() == table_len(vars)` is a
-  caller obligation and `vars` is passed to `eval`, `to_evals` and `to_coeffs`
-  separately. Making it a field would turn that into an invariant, at the cost of
-  the Lean representation function moving from the vector to a `.table` field.
-* No inversion, hence no `Div` and no `Field`-style trait. `Ext4` *is* a field
-  (`tests/field_semantics.rs` checks `x^(P^4-1) = 1`), so this is a gap in the API
-  rather than in the mathematics.
-* By-value operator impls (`p + q` as well as `&p + &q`) would each need their own
-  one-line spec to keep the "every public operation is proved" property.
-* `Display`, and `Debug` that prints the value rather than the derived
-  `Fp(1234)`, both of which need `core::fmt` plumbing in the extracted model.
-
 ## Dependencies and pins
 
 Lake fetches both Lean dependencies itself and records the exact revision of
