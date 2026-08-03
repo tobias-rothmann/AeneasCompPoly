@@ -352,8 +352,8 @@ def Reduced (a : cpoly.field.Ext4) : Prop :=
 
 /-- Representation invariant for a polynomial: every coefficient is reduced.
 
-Stated about `alloc.vec.Vec`, which is what `cpoly.univariate.Poly`,
-`cpoly.multilinear.Coeffs` and `cpoly.multilinear.Evals` all reduce to. -/
+Stated about `alloc.vec.Vec`, which is what `cpoly.univariate.UnivariatePoly`,
+`cpoly.multilinear.MultilinearPoly` and `cpoly.multilinear.MultilinearEvals` all reduce to. -/
 def VecReduced (v : alloc.vec.Vec cpoly.field.Ext4) : Prop := ∀ a ∈ v.val, Reduced a
 
 /-- The same, for a `&[Ext4]` parameter — the evaluation points of the

@@ -16,9 +16,10 @@
 //!   no-overflow argument the whole crate rests on.
 //! * [`univariate`] — [`UnivariatePoly`], dense little-endian coefficient
 //!   vectors, mirroring `CompPoly.CPolynomial.Raw` at `R = Hachi.Ext4`.
-//! * [`multilinear`] — [`MultilinearCoeffs`] and [`MultilinearEvals`], the
+//! * [`multilinear`] — [`MultilinearPoly`] and [`MultilinearEvals`], the
 //!   monomial and the Lagrange reading of a `2^vars`-entry table, mirroring
-//!   `CompPoly.CMlPolynomial` and `CompPoly.CMlPolynomialEval`.
+//!   `CompPoly.CMlPolynomial` and `CompPoly.CMlPolynomialEval`.  The unmarked
+//!   name is the coefficient form, as it is on the `CompPoly` side.
 //!
 //! The dependency order is `field` ← `univariate`, `field` ← `multilinear`; the
 //! two polynomial modules are independent of each other.
@@ -26,7 +27,7 @@
 //! # Types, not aliases
 //!
 //! Every layer wraps its representation in a newtype rather than passing
-//! `Vec<Ext4>` around.  That is not decoration: [`MultilinearCoeffs`] and
+//! `Vec<Ext4>` around.  That is not decoration: [`MultilinearPoly`] and
 //! [`MultilinearEvals`] are *the same bytes* under two different readings, and
 //! before they were separate types nothing stopped a caller evaluating one as if
 //! it were the other.  Likewise [`Fp`] hides its `u64`, so the reducedness
@@ -56,8 +57,9 @@
 //!   `.zip`, `.fold` and `.collect` have no model in the Aeneas Lean backend —
 //!   using them puts unknown definitions in the extracted file.  `for i in 0..n`
 //!   *is* modelled, but it turns every loop's state from a `usize` counter into a
-//!   `Range<usize>` iterator, and `lean/Generated.lean` is an artefact people
-//!   read here.  The counter loops stay.
+//!   `Range<usize>` iterator, and that state is what each of the ~20 loop
+//!   invariants in `lean/Univariate.lean` and `lean/Multilinear.lean` is written
+//!   about — those files are the ones people read, so the counter loops stay.
 //! * **Bit tests written with `/` and `%`** rather than `>>` and `&`, so the
 //!   extracted model stays in plain `Usize` arithmetic that `scalar_tac` and
 //!   `omega` can see through.
@@ -81,5 +83,5 @@ pub mod multilinear;
 pub mod univariate;
 
 pub use field::{Ext4, Fp};
-pub use multilinear::{Coeffs as MultilinearCoeffs, Evals as MultilinearEvals};
-pub use univariate::Poly as UnivariatePoly;
+pub use multilinear::{MultilinearEvals, MultilinearPoly};
+pub use univariate::UnivariatePoly;

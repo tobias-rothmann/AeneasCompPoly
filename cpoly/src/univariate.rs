@@ -6,14 +6,14 @@
 //!
 //! ## Representation
 //!
-//! [`Poly`] wraps a `Vec<Ext4>` of coefficients, little-endian in `X`:
-//! `Poly::from_coeffs(vec![a, b, c])` is `a + b*X + c*X^2`.  This mirrors
+//! [`UnivariatePoly`] wraps a `Vec<Ext4>` of coefficients, little-endian in `X`:
+//! `UnivariatePoly::from_coeffs(vec![a, b, c])` is `a + b*X + c*X^2`.  This mirrors
 //! `CompPoly.CPolynomial.Raw R = Array R` at `R = Hachi.Ext4`.
 //!
-//! The canonical form has no trailing zero coefficient; [`Poly::trim`]
+//! The canonical form has no trailing zero coefficient; [`UnivariatePoly::trim`]
 //! establishes it and the [`Add`], [`Sub`] and [`Mul`] impls preserve it.
 //! Trailing zeros are *representable* — nothing here rejects them — which is why
-//! [`Poly`] is a newtype and not a type alias: it is the thing the trimming
+//! [`UnivariatePoly`] is a newtype and not a type alias: it is the thing the trimming
 //! discipline is about.
 //!
 //! ## Operators
@@ -54,45 +54,45 @@ use crate::field::Ext4;
 ///
 /// Mirrors `CompPoly.CPolynomial.Raw Hachi.Ext4`.
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub struct Poly(Vec<Ext4>);
+pub struct UnivariatePoly(Vec<Ext4>);
 
 // ------------------------------------------------------------------
 // Construction and observation.
 // ------------------------------------------------------------------
 
-impl Poly {
+impl UnivariatePoly {
     /// The zero polynomial: no coefficients at all.
-    pub fn zero() -> Poly {
-        Poly(Vec::new())
+    pub fn zero() -> UnivariatePoly {
+        UnivariatePoly(Vec::new())
     }
 
     /// The constant polynomial `c`.  Mirrors `CPolynomial.Raw.C`.
     ///
-    /// Not trimmed, so `Poly::constant(Ext4::ZERO)` has one (zero) coefficient
+    /// Not trimmed, so `UnivariatePoly::constant(Ext4::ZERO)` has one (zero) coefficient
     /// rather than none — matching `Raw.C`, whose result is always `#[c]`.
     // `vec![c]` would read better, but the list form of `vec!` goes through a
     // stack array and `Slice::into_vec`, which drags `core::mem::MaybeUninit`
     // into `lean/Generated.lean` as an `axiom`. (The *repeat* form, `vec![x; n]`,
-    // is `alloc::vec::from_elem` and is fully modelled — see `Poly::mul`.)
+    // is `alloc::vec::from_elem` and is fully modelled — see `UnivariatePoly::mul`.)
     #[allow(clippy::vec_init_then_push)]
-    pub fn constant(c: Ext4) -> Poly {
+    pub fn constant(c: Ext4) -> UnivariatePoly {
         let mut coeffs: Vec<Ext4> = Vec::new();
         coeffs.push(c);
-        Poly(coeffs)
+        UnivariatePoly(coeffs)
     }
 
     /// The variable `X`.  Mirrors `CPolynomial.Raw.X`.
-    #[allow(clippy::vec_init_then_push)] // see `Poly::constant`
-    pub fn x() -> Poly {
+    #[allow(clippy::vec_init_then_push)] // see `UnivariatePoly::constant`
+    pub fn x() -> UnivariatePoly {
         let mut coeffs: Vec<Ext4> = Vec::new();
         coeffs.push(Ext4::ZERO);
         coeffs.push(Ext4::ONE);
-        Poly(coeffs)
+        UnivariatePoly(coeffs)
     }
 
     /// Take a coefficient vector as it stands, little-endian in `X`.
-    pub fn from_coeffs(coeffs: Vec<Ext4>) -> Poly {
-        Poly(coeffs)
+    pub fn from_coeffs(coeffs: Vec<Ext4>) -> UnivariatePoly {
+        UnivariatePoly(coeffs)
     }
 
     /// The coefficients, little-endian in `X`.
@@ -123,7 +123,7 @@ impl Poly {
     /// The degree, or `None` for a polynomial with no coefficients.
     ///
     /// This reads the *representation*: it is the degree of the polynomial only
-    /// when there is no trailing zero coefficient, i.e. after [`Poly::trim`].
+    /// when there is no trailing zero coefficient, i.e. after [`UnivariatePoly::trim`].
     pub fn degree(&self) -> Option<usize> {
         let n = self.len();
         if n == 0 {
@@ -134,24 +134,24 @@ impl Poly {
     }
 }
 
-impl Default for Poly {
-    fn default() -> Poly {
-        Poly::zero()
+impl Default for UnivariatePoly {
+    fn default() -> UnivariatePoly {
+        UnivariatePoly::zero()
     }
 }
 
-impl From<Vec<Ext4>> for Poly {
-    fn from(coeffs: Vec<Ext4>) -> Poly {
-        Poly::from_coeffs(coeffs)
+impl From<Vec<Ext4>> for UnivariatePoly {
+    fn from(coeffs: Vec<Ext4>) -> UnivariatePoly {
+        UnivariatePoly::from_coeffs(coeffs)
     }
 }
 
-impl Index<usize> for Poly {
+impl Index<usize> for UnivariatePoly {
     type Output = Ext4;
 
     /// # Panics
     ///
-    /// If `i` is at or past [`Poly::len`].  Out-of-range coefficients of a
+    /// If `i` is at or past [`UnivariatePoly::len`].  Out-of-range coefficients of a
     /// polynomial are mathematically zero, but this is the `Index` contract, and
     /// silently reading zero would hide length bugs in callers.
     fn index(&self, i: usize) -> &Ext4 {
@@ -163,7 +163,7 @@ impl Index<usize> for Poly {
 // Canonicalization.
 // ------------------------------------------------------------------
 
-impl Poly {
+impl UnivariatePoly {
     /// Drop trailing zero coefficients.  Mirrors `CPolynomial.Raw.trim`.
     ///
     /// Takes `self` by value and shrinks in place, so this is `O(1)` after the
@@ -172,7 +172,7 @@ impl Poly {
     /// `truncate`; for `n <= len` the two agree (std: "If `new_len` is less than
     /// `len`, the `Vec` is simply truncated"), and the fill value is never used.
     #[must_use]
-    pub fn trim(mut self) -> Poly {
+    pub fn trim(mut self) -> UnivariatePoly {
         let mut n: usize = self.0.len();
         while n > 0 {
             if !self.0[n - 1].is_zero() {
@@ -189,7 +189,7 @@ impl Poly {
 // Evaluation.
 // ------------------------------------------------------------------
 
-impl Poly {
+impl UnivariatePoly {
     /// Evaluate at `x` by Horner's method.  Mirrors `CPolynomial.Raw.eval`.
     pub fn eval(&self, x: Ext4) -> Ext4 {
         let mut acc: Ext4 = Ext4::ZERO;
@@ -206,7 +206,7 @@ impl Poly {
 // Algebraic operations.
 // ------------------------------------------------------------------
 
-impl Poly {
+impl UnivariatePoly {
     /// Zero-padded pointwise addition, *without* trimming.  Mirrors
     /// `CPolynomial.Raw.addRaw`.
     ///
@@ -214,7 +214,7 @@ impl Poly {
     /// `CPolynomial.Raw` names it too: the result has
     /// `max(self.len(), rhs.len())` coefficients even if the top ones cancel.
     #[must_use]
-    pub fn add_untrimmed(&self, rhs: &Poly) -> Poly {
+    pub fn add_untrimmed(&self, rhs: &UnivariatePoly) -> UnivariatePoly {
         let np: usize = self.0.len();
         let nq: usize = rhs.0.len();
         let n: usize = if np >= nq { np } else { nq };
@@ -226,27 +226,27 @@ impl Poly {
             out.push(a + b);
             i += 1;
         }
-        Poly(out)
+        UnivariatePoly(out)
     }
 }
 
-impl Add<&Poly> for &Poly {
-    type Output = Poly;
+impl Add<&UnivariatePoly> for &UnivariatePoly {
+    type Output = UnivariatePoly;
 
     /// Trimmed pointwise addition.  Mirrors `CPolynomial.Raw.add`.
-    fn add(self, rhs: &Poly) -> Poly {
+    fn add(self, rhs: &UnivariatePoly) -> UnivariatePoly {
         self.add_untrimmed(rhs).trim()
     }
 }
 
-impl Neg for &Poly {
-    type Output = Poly;
+impl Neg for &UnivariatePoly {
+    type Output = UnivariatePoly;
 
     /// Coefficient-wise negation.  Mirrors `CPolynomial.Raw.neg`.
     ///
     /// No trim is needed: `-0 = 0`, so negation cannot create a trailing zero
     /// that was not already there.
-    fn neg(self) -> Poly {
+    fn neg(self) -> UnivariatePoly {
         let n: usize = self.0.len();
         let mut out: Vec<Ext4> = Vec::new();
         let mut i: usize = 0;
@@ -254,25 +254,25 @@ impl Neg for &Poly {
             out.push(-self.0[i]);
             i += 1;
         }
-        Poly(out)
+        UnivariatePoly(out)
     }
 }
 
-impl Sub<&Poly> for &Poly {
-    type Output = Poly;
+impl Sub<&UnivariatePoly> for &UnivariatePoly {
+    type Output = UnivariatePoly;
 
     /// Mirrors `CPolynomial.Raw.sub`, which is `p.add q.neg`.
-    fn sub(self, rhs: &Poly) -> Poly {
-        let negated: Poly = -rhs;
+    fn sub(self, rhs: &UnivariatePoly) -> UnivariatePoly {
+        let negated: UnivariatePoly = -rhs;
         self + &negated
     }
 }
 
-impl Mul<Ext4> for &Poly {
-    type Output = Poly;
+impl Mul<Ext4> for &UnivariatePoly {
+    type Output = UnivariatePoly;
 
     /// Scale every coefficient.  Mirrors `CPolynomial.Raw.smul`.
-    fn mul(self, scalar: Ext4) -> Poly {
+    fn mul(self, scalar: Ext4) -> UnivariatePoly {
         let n: usize = self.0.len();
         let mut out: Vec<Ext4> = Vec::new();
         let mut i: usize = 0;
@@ -280,12 +280,12 @@ impl Mul<Ext4> for &Poly {
             out.push(scalar * self.0[i]);
             i += 1;
         }
-        Poly(out)
+        UnivariatePoly(out)
     }
 }
 
-impl Mul<&Poly> for &Poly {
-    type Output = Poly;
+impl Mul<&UnivariatePoly> for &UnivariatePoly {
+    type Output = UnivariatePoly;
 
     /// Trimmed schoolbook multiplication.  Mirrors `CPolynomial.Raw.mul`, i.e.
     /// `mulRaw |> trim`.
@@ -295,11 +295,11 @@ impl Mul<&Poly> for &Poly {
     /// hypothesis `np + nq <= usize::MAX`.  It is unreachable for real `Vec`s,
     /// whose capacity is bounded by `isize::MAX` *bytes*, but the model does not
     /// know that.
-    fn mul(self, rhs: &Poly) -> Poly {
+    fn mul(self, rhs: &UnivariatePoly) -> UnivariatePoly {
         let np: usize = self.0.len();
         let nq: usize = rhs.0.len();
         if np == 0 || nq == 0 {
-            return Poly::zero();
+            return UnivariatePoly::zero();
         }
         let mut out: Vec<Ext4> = vec![Ext4::ZERO; np + nq - 1];
         // Convolution: out[i + j] += self[i] * rhs[j].
@@ -320,6 +320,6 @@ impl Mul<&Poly> for &Poly {
             }
             i += 1;
         }
-        Poly(out).trim()
+        UnivariatePoly(out).trim()
     }
 }

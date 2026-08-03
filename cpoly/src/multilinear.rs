@@ -12,33 +12,59 @@
 //! There are two *different* things that table can mean, and this module gives
 //! each of them its own type:
 //!
-//! * [`Coeffs`] — the **monomial** reading. Entry `i` is the coefficient of
-//!   `∏_{j : bit j of i is set} X_j`. So for `vars = 2`, `[c0, c1, c2, c3]` is
-//!   `c0 + c1*X0 + c2*X1 + c3*X0*X1`. Mirrors `CompPoly.CMlPolynomial R vars`.
-//! * [`Evals`] — the **Lagrange** (Boolean-hypercube) reading. Entry `i` is the
-//!   value of the polynomial at the point whose `j`-th coordinate is bit `j` of
-//!   `i`. Mirrors `CompPoly.CMlPolynomialEval R vars`.
+//! * [`MultilinearPoly`] — the **monomial** reading.  Entry `i` is the
+//!   coefficient of `∏_{j : bit j of i is set} X_j`, so for `vars = 2`,
+//!   `[c0, c1, c2, c3]` is `c0 + c1*X0 + c2*X1 + c3*X0*X1`.  Mirrors
+//!   `CompPoly.CMlPolynomial R vars`.
+//! * [`MultilinearEvals`] — the **Lagrange** (Boolean-hypercube) reading.  Entry
+//!   `i` is the value of the polynomial at the point whose `j`-th coordinate is
+//!   bit `j` of `i`.  Mirrors `CompPoly.CMlPolynomialEval R vars`.
+//!
+//! `MultilinearPoly` is the unmarked name and `MultilinearEvals` the marked one,
+//! matching `CompPoly`, where the coefficient form is `CMlPolynomial` and the
+//! evaluation form is `CMlPolynomialEval`.
 //!
 //! These are the same `2^vars` words in memory, and the previous version of this
 //! crate used `Vec<Ext4>` for both — which meant nothing stopped a caller
 //! evaluating a hypercube table as if it were a coefficient table. That is now a
-//! type error. The two are related by the zeta and Möbius transforms,
-//! [`Coeffs::to_evals`] and [`Evals::to_coeffs`], which are the only way across.
+//! type error.  The two are related by the zeta and Möbius transforms,
+//! [`MultilinearPoly::to_evals`] and [`MultilinearEvals::to_coeffs`], and those are
+//! the only operations that *convert* one reading into the other.  You can of
+//! course still go out through [`MultilinearPoly::into_coeffs`] and back in through
+//! [`MultilinearEvals::from_values`] — but that reinterprets the same words under
+//! the other reading rather than transforming them, and the types make you write
+//! it out, which is the point.
 //!
 //! Both wrappers cost the Lean side nothing: Aeneas extracts a single-field
 //! tuple struct as a `@[reducible]` abbreviation of its content, so
-//! `cpoly.multilinear.Coeffs` *is* `alloc.vec.Vec cpoly.field.Ext4` to the proofs.
+//! `cpoly.multilinear.MultilinearPoly` *is* `alloc.vec.Vec cpoly.field.Ext4` to
+//! the proofs.
 //!
 //! ```
-//! use cpoly::{Ext4, Fp, MultilinearCoeffs};
+//! use cpoly::{Ext4, MultilinearEvals, MultilinearPoly};
 //!
 //! // 1 + X0*X1, in two variables
-//! let p = MultilinearCoeffs::from_coeffs(
+//! let p = MultilinearPoly::from_coeffs(
 //!     vec![Ext4::ONE, Ext4::ZERO, Ext4::ZERO, Ext4::ONE], 2);
+//!
 //! let point = [Ext4::from(3u64), Ext4::from(5u64)];
-//! assert_eq!(p.eval(&point), Ext4::from(16u64));   // 1 + 3*5
-//! assert_eq!(p.eval_horner(&point), p.eval(&point)); // the fast path agrees
-//! let _ = Fp::ONE;
+//! assert_eq!(p.eval(&point), Ext4::from(16u64));      // 1 + 3*5
+//! assert_eq!(p.eval_horner(&point), p.eval(&point));  // the fast path agrees
+//!
+//! // The same polynomial as its table of hypercube values, in the
+//! // little-endian index order: p(0,0), p(1,0), p(0,1), p(1,1) = 1, 1, 1, 2.
+//! let e: MultilinearEvals = p.clone().to_evals(2);
+//! assert_eq!(
+//!     e.values(),
+//!     &[Ext4::ONE, Ext4::ONE, Ext4::ONE, Ext4::from(2u64)]
+//! );
+//!
+//! // The two readings describe the same function off the hypercube too, but you
+//! // have to say which one you have: `p.eval` dots against the monomial basis
+//! // and `e.eval_mle` folds the hypercube, and passing one where the other is
+//! // expected does not compile.
+//! assert_eq!(e.eval_mle(&point), Ext4::from(16u64));
+//! assert_eq!(e.to_coeffs(2), p);
 //! ```
 //!
 //! ## Arity
@@ -46,8 +72,8 @@
 //! `vars` is passed explicitly wherever it is needed, mirroring the `n` of the
 //! `CompPoly` definitions; it is not stored in the types, so
 //! `p.len() == table_len(vars)` is a caller obligation rather than an invariant
-//! of [`Coeffs`].  Making it a field instead is the first item under "what is
-//! still missing" in the README.
+//! of [`MultilinearPoly`].  Making it a field instead is the first item under
+//! "what is still missing" in the README.
 //!
 //! ## Field arithmetic
 //!
@@ -64,7 +90,7 @@
 
 use alloc::vec;
 use alloc::vec::Vec;
-use core::ops::{Add, Index};
+use core::ops::{Add, Index, Mul, Neg};
 
 use crate::field::Ext4;
 
@@ -110,9 +136,9 @@ pub fn dot(a: &[Ext4], b: &[Ext4]) -> Ext4 {
 /// The monomial basis at `point`: entry `i` is `∏_{j : bit j of i is set}
 /// point[j]`.  Mirrors `CMlPolynomial.monomialBasis`.
 ///
-/// This is the vector [`Coeffs::eval`] dots a coefficient table against. The inner
-/// loop walks the bits of `i` from least to most significant, keeping
-/// `m = i / 2^j` so that `m % 2` is bit `j`.
+/// This is the vector [`MultilinearPoly::eval`] dots a coefficient table
+/// against.  The inner loop walks the bits of `i` from least to most
+/// significant, keeping `m = i / 2^j` so that `m % 2` is bit `j`.
 pub fn monomial_basis(point: &[Ext4]) -> Vec<Ext4> {
     let vars: usize = point.len();
     let sz: usize = table_len(vars);
@@ -139,10 +165,10 @@ pub fn monomial_basis(point: &[Ext4]) -> Vec<Ext4> {
 /// `∏_j (if bit j of i is set then point[j] else 1 - point[j])`.
 /// Mirrors `CMlPolynomialEval.lagrangeBasis`.
 ///
-/// The result is returned as [`Evals`] because that is what it is: the
-/// hypercube table of the equality kernel `eq~(point, ·)`, which is why
-/// [`eq_tilde`] is just this followed by [`Evals::eval`].
-pub fn lagrange_basis(point: &[Ext4]) -> Evals {
+/// The result is returned as [`MultilinearEvals`] because that is what it is:
+/// the hypercube table of the equality kernel `eq~(point, ·)`, which is why
+/// [`eq_tilde`] is just this followed by [`MultilinearEvals::eval`].
+pub fn lagrange_basis(point: &[Ext4]) -> MultilinearEvals {
     let vars: usize = point.len();
     let sz: usize = table_len(vars);
     let mut basis: Vec<Ext4> = Vec::new();
@@ -163,15 +189,15 @@ pub fn lagrange_basis(point: &[Ext4]) -> Evals {
         basis.push(acc);
         i += 1;
     }
-    Evals(basis)
+    MultilinearEvals(basis)
 }
 
 /// Pointwise sum of two equal-length tables.
 ///
-/// Shared by the [`Coeffs`] and [`Evals`] [`Add`] impls: adding entry by entry
-/// does not care which basis the index is read in, so there is one loop here
-/// rather than one in each.  Mirrors `CMlPolynomial.add` and
-/// `CMlPolynomialEval.add`, which are both `Vector.zipWith (· + ·)`.
+/// Shared by the [`MultilinearPoly`] and [`MultilinearEvals`] [`Add`] impls:
+/// adding entry by entry does not care which basis the index is read in, so
+/// there is one loop here rather than one in each.  Mirrors `CMlPolynomial.add`
+/// and `CMlPolynomialEval.add`, which are both `Vector.zipWith (· + ·)`.
 ///
 /// # Panics
 ///
@@ -182,6 +208,38 @@ pub fn add_pointwise(a: &[Ext4], b: &[Ext4]) -> Vec<Ext4> {
     let mut i: usize = 0;
     while i < n {
         out.push(a[i] + b[i]);
+        i += 1;
+    }
+    out
+}
+
+/// Coefficient-wise negation of a table.
+///
+/// Shared by the [`MultilinearPoly`] and [`MultilinearEvals`] [`Neg`] impls, for
+/// the same reason as [`add_pointwise`]: negating an entry does not care which
+/// basis the index is read in.  Mirrors `CMlPolynomial.neg` and
+/// `CMlPolynomialEval.neg`.
+pub fn neg_pointwise(v: &[Ext4]) -> Vec<Ext4> {
+    let n: usize = v.len();
+    let mut out: Vec<Ext4> = Vec::new();
+    let mut i: usize = 0;
+    while i < n {
+        out.push(-v[i]);
+        i += 1;
+    }
+    out
+}
+
+/// Scale every entry of a table by `scalar`.
+///
+/// Shared by the two [`Mul<Ext4>`](Mul) impls.  Mirrors `CMlPolynomial.smul` and
+/// `CMlPolynomialEval.smul`.
+pub fn scale_pointwise(v: &[Ext4], scalar: Ext4) -> Vec<Ext4> {
+    let n: usize = v.len();
+    let mut out: Vec<Ext4> = Vec::new();
+    let mut i: usize = 0;
+    while i < n {
+        out.push(scalar * v[i]);
         i += 1;
     }
     out
@@ -289,12 +347,12 @@ pub fn lagrange_to_mono_level(v: &[Ext4], j: usize) -> Vec<Ext4> {
 ///
 /// Mirrors `CompPoly.CMlPolynomial Hachi.Ext4 vars`.
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub struct Coeffs(Vec<Ext4>);
+pub struct MultilinearPoly(Vec<Ext4>);
 
-impl Coeffs {
+impl MultilinearPoly {
     /// The zero polynomial in `vars` variables.  Mirrors `CMlPolynomial.zero`.
-    pub fn zeros(vars: usize) -> Coeffs {
-        Coeffs(vec![Ext4::ZERO; table_len(vars)])
+    pub fn zeros(vars: usize) -> MultilinearPoly {
+        MultilinearPoly(vec![Ext4::ZERO; table_len(vars)])
     }
 
     /// Conform a coefficient list to `vars` variables, zero-padding it or
@@ -302,9 +360,9 @@ impl Coeffs {
     ///
     /// One `Vec::resize` does both halves of that: it pads with `ZERO` when the
     /// list is short and truncates when it is long.
-    pub fn from_coeffs(mut coeffs: Vec<Ext4>, vars: usize) -> Coeffs {
+    pub fn from_coeffs(mut coeffs: Vec<Ext4>, vars: usize) -> MultilinearPoly {
         coeffs.resize(table_len(vars), Ext4::ZERO);
-        Coeffs(coeffs)
+        MultilinearPoly(coeffs)
     }
 
     /// The coefficient table.
@@ -322,7 +380,11 @@ impl Coeffs {
         self.0.len()
     }
 
-    /// Is the table empty?  (It is not, for any `vars`: `2^0 = 1`.)
+    /// Is the table empty?
+    ///
+    /// A well-formed table never is, since `2^vars >= 1` — but the type does not
+    /// enforce well-formedness (see "Arity" above), and an empty one is reachable
+    /// through [`MultilinearEvals::from_values`], so this is a real question.
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
@@ -330,7 +392,7 @@ impl Coeffs {
     /// Evaluate at `point` by dotting against the monomial basis: `O(vars·2^vars)`
     /// field operations.  Mirrors `CMlPolynomial.eval`.
     ///
-    /// [`Coeffs::eval_horner`] computes the same thing in `O(2^vars)`.
+    /// [`MultilinearPoly::eval_horner`] computes the same thing in `O(2^vars)`.
     pub fn eval(&self, point: &[Ext4]) -> Ext4 {
         let basis: Vec<Ext4> = monomial_basis(point);
         dot(&self.0, &basis)
@@ -358,18 +420,18 @@ impl Coeffs {
     /// that order.  Mirrors `CMlPolynomial.monoToLagrange`.
     ///
     /// Consumes `self`, so no defensive copy of the table is needed.
-    pub fn to_evals(self, vars: usize) -> Evals {
+    pub fn to_evals(self, vars: usize) -> MultilinearEvals {
         let mut cur: Vec<Ext4> = self.0;
         let mut j: usize = 0;
         while j < vars {
             cur = mono_to_lagrange_level(&cur, j);
             j += 1;
         }
-        Evals(cur)
+        MultilinearEvals(cur)
     }
 }
 
-impl Index<usize> for Coeffs {
+impl Index<usize> for MultilinearPoly {
     type Output = Ext4;
 
     /// # Panics
@@ -380,8 +442,26 @@ impl Index<usize> for Coeffs {
     }
 }
 
-impl Add<&Coeffs> for &Coeffs {
-    type Output = Coeffs;
+impl Neg for &MultilinearPoly {
+    type Output = MultilinearPoly;
+
+    /// Coefficient-wise.  Mirrors `CMlPolynomial.neg`.
+    fn neg(self) -> MultilinearPoly {
+        MultilinearPoly(neg_pointwise(&self.0))
+    }
+}
+
+impl Mul<Ext4> for &MultilinearPoly {
+    type Output = MultilinearPoly;
+
+    /// Scale every coefficient.  Mirrors `CMlPolynomial.smul`.
+    fn mul(self, scalar: Ext4) -> MultilinearPoly {
+        MultilinearPoly(scale_pointwise(&self.0, scalar))
+    }
+}
+
+impl Add<&MultilinearPoly> for &MultilinearPoly {
+    type Output = MultilinearPoly;
 
     /// Coefficient-wise.  Mirrors `CMlPolynomial.add`
     /// (`Vector.zipWith (· + ·)`).
@@ -389,10 +469,10 @@ impl Add<&Coeffs> for &Coeffs {
     /// # Panics
     ///
     /// If `rhs` is shorter than `self`. Unlike the univariate
-    /// [`crate::univariate::Poly`], there is no zero-padding here: two
+    /// [`crate::univariate::UnivariatePoly`], there is no zero-padding here: two
     /// multilinear polynomials are only added when they have the same arity.
-    fn add(self, rhs: &Coeffs) -> Coeffs {
-        Coeffs(add_pointwise(&self.0, &rhs.0))
+    fn add(self, rhs: &MultilinearPoly) -> MultilinearPoly {
+        MultilinearPoly(add_pointwise(&self.0, &rhs.0))
     }
 }
 
@@ -406,12 +486,23 @@ impl Add<&Coeffs> for &Coeffs {
 ///
 /// Mirrors `CompPoly.CMlPolynomialEval Hachi.Ext4 vars`.
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub struct Evals(Vec<Ext4>);
+pub struct MultilinearEvals(Vec<Ext4>);
 
-impl Evals {
+impl MultilinearEvals {
+    /// The zero polynomial in `vars` variables: zero at every point of the
+    /// hypercube.  Mirrors `CMlPolynomialEval.zero`.
+    pub fn zeros(vars: usize) -> MultilinearEvals {
+        MultilinearEvals(vec![Ext4::ZERO; table_len(vars)])
+    }
+
     /// Take a table of hypercube values as it stands.
-    pub fn from_values(values: Vec<Ext4>) -> Evals {
-        Evals(values)
+    ///
+    /// Unlike [`MultilinearPoly::from_coeffs`] this does not conform the length:
+    /// a value table comes from measuring or transforming a polynomial, so its
+    /// length is already what it is, and silently padding it with zeros would
+    /// assert that the polynomial vanishes on points nobody supplied.
+    pub fn from_values(values: Vec<Ext4>) -> MultilinearEvals {
+        MultilinearEvals(values)
     }
 
     /// The hypercube values.
@@ -429,7 +520,7 @@ impl Evals {
         self.0.len()
     }
 
-    /// Is the table empty?
+    /// Is the table empty?  See [`MultilinearPoly::is_empty`].
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
@@ -438,9 +529,9 @@ impl Evals {
     /// Lagrange basis: `O(vars·2^vars)` field operations.  Mirrors
     /// `CMlPolynomialEval.eval`.
     ///
-    /// [`Evals::eval_mle`] computes the same thing in `O(2^vars)`.
+    /// [`MultilinearEvals::eval_mle`] computes the same thing in `O(2^vars)`.
     pub fn eval(&self, point: &[Ext4]) -> Ext4 {
-        let basis: Evals = lagrange_basis(point);
+        let basis: MultilinearEvals = lagrange_basis(point);
         dot(&self.0, &basis.0)
     }
 
@@ -461,19 +552,19 @@ impl Evals {
     /// table, by applying levels `vars-1, vars-2, …, 0` in that order.  Mirrors
     /// `CMlPolynomial.lagrangeToMono`.
     ///
-    /// Consumes `self`; the exact inverse of [`Coeffs::to_evals`].
-    pub fn to_coeffs(self, vars: usize) -> Coeffs {
+    /// Consumes `self`; the exact inverse of [`MultilinearPoly::to_evals`].
+    pub fn to_coeffs(self, vars: usize) -> MultilinearPoly {
         let mut cur: Vec<Ext4> = self.0;
         let mut j: usize = vars;
         while j > 0 {
             j -= 1;
             cur = lagrange_to_mono_level(&cur, j);
         }
-        Coeffs(cur)
+        MultilinearPoly(cur)
     }
 }
 
-impl Index<usize> for Evals {
+impl Index<usize> for MultilinearEvals {
     type Output = Ext4;
 
     /// # Panics
@@ -484,15 +575,33 @@ impl Index<usize> for Evals {
     }
 }
 
-impl Add<&Evals> for &Evals {
-    type Output = Evals;
+impl Neg for &MultilinearEvals {
+    type Output = MultilinearEvals;
+
+    /// Pointwise on the hypercube.  Mirrors `CMlPolynomialEval.neg`.
+    fn neg(self) -> MultilinearEvals {
+        MultilinearEvals(neg_pointwise(&self.0))
+    }
+}
+
+impl Mul<Ext4> for &MultilinearEvals {
+    type Output = MultilinearEvals;
+
+    /// Pointwise on the hypercube.  Mirrors `CMlPolynomialEval.smul`.
+    fn mul(self, scalar: Ext4) -> MultilinearEvals {
+        MultilinearEvals(scale_pointwise(&self.0, scalar))
+    }
+}
+
+impl Add<&MultilinearEvals> for &MultilinearEvals {
+    type Output = MultilinearEvals;
 
     /// Pointwise on the hypercube.  Mirrors `CMlPolynomialEval.add`.
     ///
     /// # Panics
     ///
     /// If `rhs` is shorter than `self`.
-    fn add(self, rhs: &Evals) -> Evals {
-        Evals(add_pointwise(&self.0, &rhs.0))
+    fn add(self, rhs: &MultilinearEvals) -> MultilinearEvals {
+        MultilinearEvals(add_pointwise(&self.0, &rhs.0))
     }
 }

@@ -1,19 +1,23 @@
 /-
 The **univariate polynomial layer** of the equivalence between the
-(`cpoly.univariate.*`, see `Generated.lean`)
-and CompPoly's reference univariate polynomials (`CompPoly.CPolynomial.Raw`, see
+Aeneas-extracted Rust model (`cpoly.univariate.*`, see `Generated.lean`) and
+CompPoly's reference univariate polynomials (`CompPoly.CPolynomial.Raw`, see
 CompPoly/Univariate/Raw/Ops.lean).
 
-The generated names carry the Rust module they come from, hence the doubled
-`cpoly.cpoly`: the crate `cpoly` has a module `cpoly` (`src/cpoly.rs`).  The
-field layer this builds on is `Field.lean` (`src/field.rs`), and the
-multilinear sibling is `CMlPoly.lean` (`src/cmlpoly.rs`).
+The generated names carry the Rust module they come from, so `src/univariate.rs`
+gives `cpoly.univariate.*`.  Operator impls are the exception: Aeneas mangles them
+from the impl header, and for an `impl Trait for &T` the prefix it builds is *not*
+module-qualified -- `impl Add<&Poly> for &Poly` becomes
+`Poly.add`.  The field layer this
+builds on is `Field.lean` (`src/field.rs`), and the multilinear sibling is
+`Multilinear.lean` (`src/multilinear.rs`).
 
 A `Vec Ext4` whose entries are all `Reduced` represents the
 `CPolynomial.Raw Hachi.Ext4` obtained by mapping `toExt` over its coefficients
-(`toRaw`).  Each `cpoly.cpoly` operation is shown to succeed, to preserve the
-invariant, and to commute with the matching `CPolynomial.Raw` operation:
-`c`, `x`, `trim`, `eval`, `add_raw`, `add`, `neg`, `sub`, `smul` and `mul`.
+(`toRaw`).  Each operation of `cpoly::univariate::UnivariatePoly` is shown to succeed, to
+preserve the invariant, and to commute with the matching `CPolynomial.Raw`
+operation: `constant`, `x`, `trim`, `eval`, `add_untrimmed`, and the `Add`, `Neg`,
+`Sub`, `Mul<Ext4>` and `Mul` impls.
 
 One caveat: `mul_spec` needs the extra hypothesis
 `v.val.length + w.val.length ≤ Usize.max`, because the generated code sizes its
@@ -31,6 +35,52 @@ open Aeneas Aeneas.Std Aeneas.Std.WP Result
 open CompPoly CompPoly.CPolynomial CompPoly.Extension
 
 namespace CPolyEquiv
+
+/-! ## Readable names for the operator impls
+
+Aeneas builds the name of a trait impl from the impl header, and for an
+`impl Trait for &T` the prefix it builds is `Shared<n><T>` — so
+`impl Add<&UnivariatePoly> for &UnivariatePoly` comes out as
+`cpoly.Shared1UnivariatePoly.Insts.CoreOpsArithAddShared0UnivariatePolyUnivariatePoly.add`.
+That is unreadable in a statement, so each one gets an `abbrev` below.
+
+An `abbrev` is `@[reducible]`, so a theorem stated about `Poly.add` *is* a theorem
+about the extracted definition — this is an abbreviation, not a wrapper, and there
+is nothing extra to trust.  `Check.lean` pins every alias to its generated name
+with `rfl` so that a rename upstream cannot silently repoint one.  Each proof
+opens by unfolding the alias and then the definition, which is also where a reader
+can see which generated name is meant. -/
+
+namespace Poly
+
+/-- `impl Add<&UnivariatePoly> for &UnivariatePoly`. -/
+abbrev add := cpoly.Shared1UnivariatePoly.Insts.CoreOpsArithAddShared0UnivariatePolyUnivariatePoly.add
+
+/-- `impl Sub<&UnivariatePoly> for &UnivariatePoly`. -/
+abbrev sub := cpoly.Shared1UnivariatePoly.Insts.CoreOpsArithSubShared0UnivariatePolyUnivariatePoly.sub
+
+/-- the inner convolution loop of `Mul`. -/
+abbrev mulInnerLoop := cpoly.Shared1UnivariatePoly.Insts.CoreOpsArithMulShared0UnivariatePolyUnivariatePoly.mul_loop0_loop0
+
+/-- the outer convolution loop of `Mul`. -/
+abbrev mulLoop := cpoly.Shared1UnivariatePoly.Insts.CoreOpsArithMulShared0UnivariatePolyUnivariatePoly.mul_loop0
+
+/-- `impl Mul<&UnivariatePoly> for &UnivariatePoly`. -/
+abbrev mul := cpoly.Shared1UnivariatePoly.Insts.CoreOpsArithMulShared0UnivariatePolyUnivariatePoly.mul
+
+/-- the loop of `Neg`. -/
+abbrev negLoop := cpoly.Shared0UnivariatePoly.Insts.CoreOpsArithNegUnivariatePoly.neg_loop
+
+/-- `impl Neg for &UnivariatePoly`. -/
+abbrev neg := cpoly.Shared0UnivariatePoly.Insts.CoreOpsArithNegUnivariatePoly.neg
+
+/-- the loop of `Mul<Ext4>`. -/
+abbrev smulLoop := cpoly.Shared0UnivariatePoly.Insts.CoreOpsArithMulExt4UnivariatePoly.mul_loop
+
+/-- `impl Mul<Ext4> for &UnivariatePoly`. -/
+abbrev smul := cpoly.Shared0UnivariatePoly.Insts.CoreOpsArithMulExt4UnivariatePoly.mul
+
+end Poly
 
 /-! ## The representation
 
@@ -84,10 +134,10 @@ theorem padded_read_spec (p : alloc.vec.Vec cpoly.field.Ext4) (np i : Std.Usize)
     rw [toRaw_coeff, List.getD_eq_default _ _ (by simp; scalar_tac)]
     simp
 
-/-- `cpoly.univariate.Poly.constant r` ↔ `CPolynomial.Raw.C`. -/
+/-- `cpoly.univariate.UnivariatePoly.constant r` ↔ `CPolynomial.Raw.C`. -/
 theorem c_spec (r : cpoly.field.Ext4) (hr : Reduced r) :
-    cpoly.univariate.Poly.constant r ⦃ v => VecReduced v ∧ toRaw v = CPolynomial.Raw.C (toExt r) ⦄ := by
-  rw [cpoly.univariate.Poly.constant]
+    cpoly.univariate.UnivariatePoly.constant r ⦃ v => VecReduced v ∧ toRaw v = CPolynomial.Raw.C (toExt r) ⦄ := by
+  rw [cpoly.univariate.UnivariatePoly.constant]
   simp only [bind_ok_id]
   step as ⟨v, hv⟩
   refine ⟨?_, ?_⟩
@@ -96,10 +146,10 @@ theorem c_spec (r : cpoly.field.Ext4) (hr : Reduced r) :
   · simp only [toRaw, hv, CPolynomial.Raw.C]
     simp
 
-/-- `cpoly.univariate.Poly.x` ↔ `CPolynomial.Raw.X`. -/
+/-- `cpoly.univariate.UnivariatePoly.x` ↔ `CPolynomial.Raw.X`. -/
 theorem x_spec :
-    cpoly.univariate.Poly.x ⦃ v => VecReduced v ∧ toRaw v = CPolynomial.Raw.X ⦄ := by
-  rw [cpoly.univariate.Poly.x]
+    cpoly.univariate.UnivariatePoly.x ⦃ v => VecReduced v ∧ toRaw v = CPolynomial.Raw.X ⦄ := by
+  rw [cpoly.univariate.UnivariatePoly.x]
   simp only [bind_ok_id]
   step as ⟨p, hp⟩
   step as ⟨v, hv⟩
@@ -112,19 +162,122 @@ theorem x_spec :
   · simp only [toRaw, hv, hp, CPolynomial.Raw.X]
     simp
 
-/-- `Poly::trim`'s scan loop runs from `m` downward and returns the canonical length `n1`:
+/-! ## Construction, observation and indexing
+
+These are the items that only move the representation around or read it: they say
+nothing new about `CPolynomial.Raw`, but they are public Rust API, so each gets a
+triple. `Index` is the one with a precondition — it panics out of range, so its
+spec is conditional on `i` being in bounds. -/
+
+/-- `UnivariatePoly::zero` is the empty coefficient vector, i.e. the zero polynomial. -/
+@[step]
+theorem zero_spec :
+    cpoly.univariate.UnivariatePoly.zero ⦃ z => VecReduced z ∧ toRaw z = (0 : CPolynomial.Raw F) ⦄ := by
+  rw [cpoly.univariate.UnivariatePoly.zero]
+  simp only [spec_ok]
+  exact ⟨by intro u hu; simp at hu, by simp [toRaw]⟩
+
+/-- `impl Default for UnivariatePoly` is `UnivariatePoly::zero`. -/
+@[step]
+theorem default_spec :
+    cpoly.univariate.UnivariatePoly.Insts.CoreDefaultDefault.default
+      ⦃ z => VecReduced z ∧ toRaw z = (0 : CPolynomial.Raw F) ⦄ := by
+  rw [cpoly.univariate.UnivariatePoly.Insts.CoreDefaultDefault.default]; exact zero_spec
+
+/-- `UnivariatePoly::from_coeffs` takes the vector as it stands: no trimming, so a trailing
+zero survives.  This is what makes `Poly` a representation and not a normal form. -/
+@[step]
+theorem from_coeffs_spec (v : alloc.vec.Vec cpoly.field.Ext4) (hv : VecReduced v) :
+    cpoly.univariate.UnivariatePoly.from_coeffs v ⦃ z => VecReduced z ∧ toRaw z = toRaw v ⦄ := by
+  rw [cpoly.univariate.UnivariatePoly.from_coeffs]
+  simp only [spec_ok]
+  exact ⟨hv, trivial⟩
+
+/-- `impl From<Vec<Ext4>> for Poly` is `UnivariatePoly::from_coeffs`. -/
+@[step]
+theorem from_vec_spec (v : alloc.vec.Vec cpoly.field.Ext4) (hv : VecReduced v) :
+    cpoly.univariate.UnivariatePoly.Insts.CoreConvertFromVecExt4.from v
+      ⦃ z => VecReduced z ∧ toRaw z = toRaw v ⦄ := by
+  rw [cpoly.univariate.UnivariatePoly.Insts.CoreConvertFromVecExt4.from]; exact from_coeffs_spec v hv
+
+/-- `UnivariatePoly::into_coeffs` gives the vector back unchanged. -/
+@[step]
+theorem into_coeffs_spec (v : alloc.vec.Vec cpoly.field.Ext4) :
+    cpoly.univariate.UnivariatePoly.into_coeffs v ⦃ z => z = v ⦄ := by
+  rw [cpoly.univariate.UnivariatePoly.into_coeffs]; simp only [spec_ok]
+
+/-- `UnivariatePoly::coeffs` views the same words as a slice. -/
+@[step]
+theorem coeffs_spec (v : alloc.vec.Vec cpoly.field.Ext4) :
+    cpoly.univariate.UnivariatePoly.coeffs v ⦃ s => s.val = v.val ⦄ := by
+  rw [cpoly.univariate.UnivariatePoly.coeffs]; simp only [spec_ok]; rfl
+
+/-- `UnivariatePoly::len` is the number of stored coefficients, which is the `size` of the
+`CPolynomial.Raw` it denotes. -/
+@[step]
+theorem len_spec (v : alloc.vec.Vec cpoly.field.Ext4) :
+    cpoly.univariate.UnivariatePoly.len v ⦃ n => n.val = (toRaw v).size ⦄ := by
+  rw [cpoly.univariate.UnivariatePoly.len]; simp only [spec_ok, toRaw_size]; simp
+
+/-- `UnivariatePoly::is_empty` decides whether there are no coefficients at all. -/
+@[step]
+theorem is_empty_spec (v : alloc.vec.Vec cpoly.field.Ext4) :
+    cpoly.univariate.UnivariatePoly.is_empty v ⦃ b => (b = true ↔ (toRaw v).size = 0) ⦄ := by
+  rw [cpoly.univariate.UnivariatePoly.is_empty]
+  apply spec_bind (len_spec v); intro n hn
+  simp only [spec_ok, decide_eq_true_eq]
+  constructor
+  · intro h; rw [← hn, h]; rfl
+  · intro h; rw [← hn] at h; scalar_tac
+
+/-- `UnivariatePoly::degree` reads the *representation*: `none` when there are no
+coefficients, else one less than their number.  It is the degree of the
+polynomial exactly when the representation is trimmed. -/
+@[step]
+theorem degree_spec (v : alloc.vec.Vec cpoly.field.Ext4) :
+    cpoly.univariate.UnivariatePoly.degree v
+      ⦃ d => match d with
+             | none => (toRaw v).size = 0
+             | some k => k.val + 1 = (toRaw v).size ⦄ := by
+  rw [cpoly.univariate.UnivariatePoly.degree]
+  apply spec_bind (len_spec v); intro n hn
+  by_cases h0 : n = 0#usize
+  · rw [if_pos h0]
+    simp only [spec_ok]
+    rw [← hn, h0]; rfl
+  · rw [if_neg h0]
+    have hpos : 0 < n.val := by
+      rcases Nat.eq_zero_or_pos n.val with h | h
+      · exact absurd (by scalar_tac : n = 0#usize) h0
+      · exact h
+    step as ⟨i, hi⟩
+    omega
+
+/-- `impl Index<usize> for UnivariatePoly` reads coefficient `i`, which is
+`(toRaw v).coeff i`.  Conditional on `i` being in range: out of range the Rust
+panics, and the extracted model fails. -/
+@[step]
+theorem index_spec (v : alloc.vec.Vec cpoly.field.Ext4) (i : Std.Usize)
+    (hv : VecReduced v) (hi : i.val < v.val.length) :
+    cpoly.univariate.UnivariatePoly.Insts.CoreOpsIndexIndexUsizeExt4.index v i
+      ⦃ a => Reduced a ∧ toExt a = (toRaw v).coeff i.val ⦄ := by
+  rw [cpoly.univariate.UnivariatePoly.Insts.CoreOpsIndexIndexUsizeExt4.index]
+  step as ⟨e, he⟩
+  exact ⟨he ▸ hv _ (List.getElem_mem hi), by rw [he, toRaw_coeff_of_lt v hi]⟩
+
+/-- `UnivariatePoly::trim`'s scan loop runs from `m` downward and returns the canonical length `n1`:
 all coefficients `≥ n1` are zero, and (if `n1 > 0`) coefficient `n1-1` is
 nonzero. -/
 theorem trim_loop_spec (p : alloc.vec.Vec cpoly.field.Ext4) (m : Std.Usize)
     (hp : VecReduced p) (hm : m.val ≤ p.val.length) :
-    cpoly.univariate.Poly.trim_loop p m ⦃ n1 => n1.val ≤ m.val ∧
+    cpoly.univariate.UnivariatePoly.trim_loop p m ⦃ n1 => n1.val ≤ m.val ∧
       (∀ k, n1.val ≤ k → k < m.val → (toRaw p).coeff k = 0) ∧
       (n1.val = 0 ∨ (toRaw p).coeff (n1.val - 1) ≠ 0) ⦄ := by
-  rw [cpoly.univariate.Poly.trim_loop]
+  rw [cpoly.univariate.UnivariatePoly.trim_loop]
   apply loop.spec_decr_nat (fun s => s.val)
     (fun s => s.val ≤ m.val ∧ ∀ k, s.val ≤ k → k < m.val → (toRaw p).coeff k = 0)
   · intro m' ⟨hm'le, hm'z⟩
-    simp only [cpoly.univariate.Poly.trim_loop.body]
+    simp only [cpoly.univariate.UnivariatePoly.trim_loop.body]
     by_cases hpos : m' > 0#usize
     · rw [if_pos hpos]
       have hb : m'.val - 1 < p.val.length := by scalar_tac
@@ -155,10 +308,10 @@ theorem trim_loop_spec (p : alloc.vec.Vec cpoly.field.Ext4) (m : Std.Usize)
       exact ⟨hm'le, hm'z, Or.inl (by scalar_tac)⟩
   · exact ⟨le_refl _, fun k hk1 hk2 => absurd hk2 (by omega)⟩
 
-/-- `cpoly.univariate.Poly.trim` ↔ `CPolynomial.Raw.trim`. -/
+/-- `cpoly.univariate.UnivariatePoly.trim` ↔ `CPolynomial.Raw.trim`. -/
 theorem trim_spec (v : alloc.vec.Vec cpoly.field.Ext4) (hv : VecReduced v) :
-    cpoly.univariate.Poly.trim v ⦃ w => VecReduced w ∧ toRaw w = (toRaw v).trim ⦄ := by
-  rw [cpoly.univariate.Poly.trim]
+    cpoly.univariate.UnivariatePoly.trim v ⦃ w => VecReduced w ∧ toRaw w = (toRaw v).trim ⦄ := by
+  rw [cpoly.univariate.UnivariatePoly.trim]
   simp only [bind_ok_id]
   apply spec_bind (trim_loop_spec v (alloc.vec.Vec.len v) hv (by simp))
   rintro n1 ⟨hn1le, hn1zero, hn1bound⟩
@@ -216,15 +369,15 @@ theorem eval_loop_spec (p : alloc.vec.Vec cpoly.field.Ext4) (xv : cpoly.field.Ex
     (hp : VecReduced p) (hx : Reduced xv) :
     ∀ (acc : cpoly.field.Ext4) (i : Std.Usize), i.val ≤ p.val.length → Reduced acc →
       toExt acc = ((p.val.drop i.val).map toExt).foldr (fun a b => b * toExt xv + a) 0 →
-      cpoly.univariate.Poly.eval_loop p xv acc i ⦃ r => Reduced r ∧
+      cpoly.univariate.UnivariatePoly.eval_loop p xv acc i ⦃ r => Reduced r ∧
         toExt r = ((p.val).map toExt).foldr (fun a b => b * toExt xv + a) 0 ⦄ := by
   intro acc i hi hacc hrel
-  rw [cpoly.univariate.Poly.eval_loop]
+  rw [cpoly.univariate.UnivariatePoly.eval_loop]
   apply loop.spec_decr_nat (fun s => s.2.val)
     (fun s => s.2.val ≤ p.val.length ∧ Reduced s.1 ∧
        toExt s.1 = ((p.val.drop s.2.val).map toExt).foldr (fun a b => b * toExt xv + a) 0)
   · rintro ⟨acc1, i1⟩ ⟨hi1, haccR, hrel1⟩
-    simp only [cpoly.univariate.Poly.eval_loop.body]
+    simp only [cpoly.univariate.UnivariatePoly.eval_loop.body]
     by_cases hlt : i1 > 0#usize
     · rw [if_pos hlt]
       have hib : i1.val - 1 < p.val.length := by scalar_tac
@@ -245,11 +398,11 @@ theorem eval_loop_spec (p : alloc.vec.Vec cpoly.field.Ext4) (xv : cpoly.field.Ex
       exact ⟨haccR, by rw [hrel1, hz]; simp⟩
   · exact ⟨hi, hacc, hrel⟩
 
-/-- `cpoly.univariate.Poly.eval` ↔ `CPolynomial.Raw.eval` (Horner). -/
+/-- `cpoly.univariate.UnivariatePoly.eval` ↔ `CPolynomial.Raw.eval` (Horner). -/
 theorem eval_spec (v : alloc.vec.Vec cpoly.field.Ext4) (xv : cpoly.field.Ext4)
     (hv : VecReduced v) (hx : Reduced xv) :
-    cpoly.univariate.Poly.eval v xv ⦃ r => Reduced r ∧ toExt r = (toRaw v).eval (toExt xv) ⦄ := by
-  rw [cpoly.univariate.Poly.eval]
+    cpoly.univariate.UnivariatePoly.eval v xv ⦃ r => Reduced r ∧ toExt r = (toRaw v).eval (toExt xv) ⦄ := by
+  rw [cpoly.univariate.UnivariatePoly.eval]
   apply spec_mono (eval_loop_spec v xv hv hx cpoly.field.Ext4.ZERO (alloc.vec.Vec.len v)
     (by simp) reduced_ZERO (by simp))
   rintro r ⟨hrR, hrF⟩
@@ -265,17 +418,17 @@ theorem add_raw_loop_spec (p q : alloc.vec.Vec cpoly.field.Ext4) (np nq n : Std.
     ∀ (r : alloc.vec.Vec cpoly.field.Ext4) (i : Std.Usize), i.val ≤ n.val → VecReduced r →
       r.val.map toExt
         = (List.range i.val).map (fun k => (toRaw p).coeff k + (toRaw q).coeff k) →
-      cpoly.univariate.Poly.add_untrimmed_loop p q np nq n r i ⦃ z => VecReduced z ∧
+      cpoly.univariate.UnivariatePoly.add_untrimmed_loop p q np nq n r i ⦃ z => VecReduced z ∧
         z.val.map toExt
           = (List.range n.val).map (fun k => (toRaw p).coeff k + (toRaw q).coeff k) ⦄ := by
   intro r i hi hr hrel
-  rw [cpoly.univariate.Poly.add_untrimmed_loop]
+  rw [cpoly.univariate.UnivariatePoly.add_untrimmed_loop]
   apply loop.spec_decr_nat (fun s => n.val - s.2.val)
     (fun s => s.2.val ≤ n.val ∧ VecReduced s.1 ∧
       s.1.val.map toExt
         = (List.range s.2.val).map (fun k => (toRaw p).coeff k + (toRaw q).coeff k))
   · rintro ⟨r1, i1⟩ ⟨hi1, hr1, hrel1⟩
-    simp only [cpoly.univariate.Poly.add_untrimmed_loop.body]
+    simp only [cpoly.univariate.UnivariatePoly.add_untrimmed_loop.body]
     by_cases hlt : i1 < n
     · rw [if_pos hlt]
       have hr1len : r1.val.length = i1.val := by
@@ -300,12 +453,12 @@ theorem add_raw_loop_spec (p q : alloc.vec.Vec cpoly.field.Ext4) (np nq n : Std.
       rw [← heq]; simpa using hrel1
   · exact ⟨hi, hr, hrel⟩
 
-/-- `cpoly.univariate.Poly.add_untrimmed` ↔ `CPolynomial.Raw.addRaw` (untrimmed). -/
+/-- `cpoly.univariate.UnivariatePoly.add_untrimmed` ↔ `CPolynomial.Raw.addRaw` (untrimmed). -/
 theorem add_raw_spec (v w : alloc.vec.Vec cpoly.field.Ext4)
     (hv : VecReduced v) (hw : VecReduced w) :
-    cpoly.univariate.Poly.add_untrimmed v w ⦃ z => VecReduced z ∧
+    cpoly.univariate.UnivariatePoly.add_untrimmed v w ⦃ z => VecReduced z ∧
         toRaw z = CPolynomial.Raw.addRaw (toRaw v) (toRaw w) ⦄ := by
-  rw [cpoly.univariate.Poly.add_untrimmed]
+  rw [cpoly.univariate.UnivariatePoly.add_untrimmed]
   simp only [bind_ok_id]
   apply spec_bind (Pₘ := fun nn : Std.Usize => nn.val = max v.val.length w.val.length)
   · by_cases hc : alloc.vec.Vec.len v ≥ alloc.vec.Vec.len w
@@ -329,19 +482,20 @@ theorem add_raw_spec (v w : alloc.vec.Vec cpoly.field.Ext4)
       rw [getElem_of_list_eq hzmap, List.getElem_map, List.getElem_range]
       simp only [toRaw]
 
-/-- `cpoly.Shared1Poly.Insts.CoreOpsArithAddShared0PolyPoly.add` ↔ `CPolynomial.Raw.add`. -/
+/-- `Poly.add` ↔ `CPolynomial.Raw.add`. -/
 theorem add_spec (v w : alloc.vec.Vec cpoly.field.Ext4)
     (hv : VecReduced v) (hw : VecReduced w) :
-    cpoly.Shared1Poly.Insts.CoreOpsArithAddShared0PolyPoly.add v w ⦃ z => VecReduced z ∧
+    Poly.add v w ⦃ z => VecReduced z ∧
         toRaw z = CPolynomial.Raw.add (toRaw v) (toRaw w) ⦄ := by
-  rw [cpoly.Shared1Poly.Insts.CoreOpsArithAddShared0PolyPoly.add]
+  unfold Poly.add
+  rw [cpoly.Shared1UnivariatePoly.Insts.CoreOpsArithAddShared0UnivariatePolyUnivariatePoly.add]
   apply spec_bind (add_raw_spec v w hv hw)
   rintro r ⟨hrred, hrmap⟩
   apply spec_mono (trim_spec r hrred)
   rintro z ⟨hzred, hztrim⟩
   exact ⟨hzred, by rw [hztrim, hrmap]; rfl⟩
 
-/-- `cpoly.Shared0Poly.Insts.CoreOpsArithNegPoly.neg` ↔ `CPolynomial.Raw.neg`.
+/-- `Poly.neg` ↔ `CPolynomial.Raw.neg`.
 
 The shared recipe for all the loop-based operations.  The generated `*_loop`
 functions are `loop (fun s => body s) init`.  Reason about them with
@@ -365,14 +519,15 @@ theorem neg_loop_spec (p : alloc.vec.Vec cpoly.field.Ext4) (n : Std.Usize)
     (hp : VecReduced p) (hn : n.val = p.val.length) (r : alloc.vec.Vec cpoly.field.Ext4)
     (i : Std.Usize) (hi : i.val ≤ n.val) (hr : VecReduced r)
     (hrel : r.val.map toExt = (p.val.take i.val).map (fun u => - toExt u)) :
-    cpoly.Shared0Poly.Insts.CoreOpsArithNegPoly.neg_loop p n r i ⦃ z => VecReduced z ∧
+    Poly.negLoop p n r i ⦃ z => VecReduced z ∧
       z.val.map toExt = p.val.map (fun u => - toExt u) ⦄ := by
-  rw [cpoly.Shared0Poly.Insts.CoreOpsArithNegPoly.neg_loop]
+  unfold Poly.negLoop
+  rw [cpoly.Shared0UnivariatePoly.Insts.CoreOpsArithNegUnivariatePoly.neg_loop]
   apply loop.spec_decr_nat (fun s => n.val - s.2.val)
     (fun s => s.2.val ≤ n.val ∧ VecReduced s.1 ∧
        s.1.val.map toExt = (p.val.take s.2.val).map (fun u => - toExt u))
   · rintro ⟨r1, i1⟩ ⟨hi1, hr1, hrel1⟩
-    simp only [cpoly.Shared0Poly.Insts.CoreOpsArithNegPoly.neg_loop.body]
+    simp only [cpoly.Shared0UnivariatePoly.Insts.CoreOpsArithNegUnivariatePoly.neg_loop.body]
     by_cases hlt : i1 < n
     · rw [if_pos hlt]
       have hlt' : i1.val < p.val.length := by scalar_tac
@@ -405,8 +560,9 @@ theorem neg_loop_spec (p : alloc.vec.Vec cpoly.field.Ext4) (n : Std.Usize)
   · exact ⟨hi, hr, hrel⟩
 
 theorem neg_spec (v : alloc.vec.Vec cpoly.field.Ext4) (hv : VecReduced v) :
-    cpoly.Shared0Poly.Insts.CoreOpsArithNegPoly.neg v ⦃ z => VecReduced z ∧ toRaw z = CPolynomial.Raw.neg (toRaw v) ⦄ := by
-  rw [cpoly.Shared0Poly.Insts.CoreOpsArithNegPoly.neg]
+    Poly.neg v ⦃ z => VecReduced z ∧ toRaw z = CPolynomial.Raw.neg (toRaw v) ⦄ := by
+  unfold Poly.neg
+  rw [cpoly.Shared0UnivariatePoly.Insts.CoreOpsArithNegUnivariatePoly.neg]
   simp only [bind_ok_id]
   apply spec_mono (neg_loop_spec v (alloc.vec.Vec.len v) hv (by simp)
     (alloc.vec.Vec.new cpoly.field.Ext4) 0#usize (by simp) (by intro u hu; simp at hu) (by simp))
@@ -415,12 +571,13 @@ theorem neg_spec (v : alloc.vec.Vec cpoly.field.Ext4) (hv : VecReduced v) :
   simp only [toRaw, hzmap, CPolynomial.Raw.neg, List.map_toArray, List.map_map,
     Function.comp_def]
 
-/-- `cpoly.Shared1Poly.Insts.CoreOpsArithSubShared0PolyPoly.sub` ↔ `CPolynomial.Raw.sub`. -/
+/-- `Poly.sub` ↔ `CPolynomial.Raw.sub`. -/
 theorem sub_spec (v w : alloc.vec.Vec cpoly.field.Ext4)
     (hv : VecReduced v) (hw : VecReduced w) :
-    cpoly.Shared1Poly.Insts.CoreOpsArithSubShared0PolyPoly.sub v w ⦃ z => VecReduced z ∧
+    Poly.sub v w ⦃ z => VecReduced z ∧
         toRaw z = CPolynomial.Raw.sub (toRaw v) (toRaw w) ⦄ := by
-  rw [cpoly.Shared1Poly.Insts.CoreOpsArithSubShared0PolyPoly.sub]
+  unfold Poly.sub
+  rw [cpoly.Shared1UnivariatePoly.Insts.CoreOpsArithSubShared0UnivariatePolyUnivariatePoly.sub]
   apply spec_bind (neg_spec w hw)
   rintro nq ⟨hnqred, hnqmap⟩
   apply spec_mono (add_spec v nq hv hnqred)
@@ -432,15 +589,16 @@ theorem smul_loop_spec (rr : cpoly.field.Ext4) (p : alloc.vec.Vec cpoly.field.Ex
     ∀ (out : alloc.vec.Vec cpoly.field.Ext4) (i : Std.Usize),
       i.val ≤ n.val → VecReduced out →
       out.val.map toExt = (p.val.take i.val).map (fun u => toExt rr * toExt u) →
-      cpoly.Shared0Poly.Insts.CoreOpsArithMulExt4Poly.mul_loop p rr n out i ⦃ z => VecReduced z ∧
+      Poly.smulLoop p rr n out i ⦃ z => VecReduced z ∧
         z.val.map toExt = p.val.map (fun u => toExt rr * toExt u) ⦄ := by
   intro out i hi hout hrel
-  rw [cpoly.Shared0Poly.Insts.CoreOpsArithMulExt4Poly.mul_loop]
+  unfold Poly.smulLoop
+  rw [cpoly.Shared0UnivariatePoly.Insts.CoreOpsArithMulExt4UnivariatePoly.mul_loop]
   apply loop.spec_decr_nat (fun s => n.val - s.2.val)
     (fun s => s.2.val ≤ n.val ∧ VecReduced s.1 ∧
        s.1.val.map toExt = (p.val.take s.2.val).map (fun u => toExt rr * toExt u))
   · rintro ⟨out1, i1⟩ ⟨hi1, hout1, hrel1⟩
-    simp only [cpoly.Shared0Poly.Insts.CoreOpsArithMulExt4Poly.mul_loop.body]
+    simp only [cpoly.Shared0UnivariatePoly.Insts.CoreOpsArithMulExt4UnivariatePoly.mul_loop.body]
     by_cases hlt : i1 < n
     · rw [if_pos hlt]
       have hlt' : i1.val < p.val.length := by scalar_tac
@@ -467,12 +625,13 @@ theorem smul_loop_spec (rr : cpoly.field.Ext4) (p : alloc.vec.Vec cpoly.field.Ex
       rw [hrel1, heq, hn, List.take_length]
   · exact ⟨hi, hout, hrel⟩
 
-/-- `cpoly.Shared0Poly.Insts.CoreOpsArithMulExt4Poly.mul` ↔ `CPolynomial.Raw.smul`. -/
+/-- `Poly.smul` ↔ `CPolynomial.Raw.smul`. -/
 theorem smul_spec (r : cpoly.field.Ext4) (v : alloc.vec.Vec cpoly.field.Ext4)
     (hr : Reduced r) (hv : VecReduced v) :
-    cpoly.Shared0Poly.Insts.CoreOpsArithMulExt4Poly.mul v r ⦃ z => VecReduced z ∧
+    Poly.smul v r ⦃ z => VecReduced z ∧
         toRaw z = CPolynomial.Raw.smul (toExt r) (toRaw v) ⦄ := by
-  rw [cpoly.Shared0Poly.Insts.CoreOpsArithMulExt4Poly.mul]
+  unfold Poly.smul
+  rw [cpoly.Shared0UnivariatePoly.Insts.CoreOpsArithMulExt4UnivariatePoly.mul]
   simp only [bind_ok_id]
   apply spec_mono (smul_loop_spec r v (alloc.vec.Vec.len v) hr hv (by simp)
     (alloc.vec.Vec.new cpoly.field.Ext4) 0#usize (by simp) (by intro u hu; simp at hu) (by simp))
@@ -483,7 +642,7 @@ theorem smul_spec (r : cpoly.field.Ext4) (v : alloc.vec.Vec cpoly.field.Ext4)
 
 /-! ### Multiplication
 
-`cpoly.Shared1Poly.Insts.CoreOpsArithMulShared0PolyPoly.mul` is a schoolbook convolution: it allocates a zero
+`Poly.mul` is a schoolbook convolution: it allocates a zero
 accumulator of length `np + nq - 1` with `vec![Ext4::ZERO; np + nq - 1]`, then for
 each `i < np` and `j < nq` performs `out[i+j] += p[i] * q[j]` (the outer loop
 around the inner one), and finally trims.  The reference `CPolynomial.Raw.mul` instead sums the shifted scalar
@@ -515,13 +674,14 @@ theorem mul_inner_loop_spec (p q : alloc.vec.Vec cpoly.field.Ext4) (nq i : Std.U
     (hip : i.val < p.val.length) :
     ∀ (r : alloc.vec.Vec cpoly.field.Ext4) (j : Std.Usize),
       VecReduced r → j.val ≤ nq.val → i.val + nq.val ≤ r.val.length →
-      cpoly.Shared1Poly.Insts.CoreOpsArithMulShared0PolyPoly.mul_loop0_loop0 p q nq r i j ⦃ z => VecReduced z ∧
+      Poly.mulInnerLoop p q nq r i j ⦃ z => VecReduced z ∧
         z.val.length = r.val.length ∧
         ∀ k, (toRaw z).coeff k = (toRaw r).coeff k +
           (if i.val + j.val ≤ k ∧ k < i.val + nq.val
             then (toRaw p).coeff i.val * (toRaw q).coeff (k - i.val) else 0) ⦄ := by
   intro r j hr hj hbound
-  rw [cpoly.Shared1Poly.Insts.CoreOpsArithMulShared0PolyPoly.mul_loop0_loop0]
+  unfold Poly.mulInnerLoop
+  rw [cpoly.Shared1UnivariatePoly.Insts.CoreOpsArithMulShared0UnivariatePolyUnivariatePoly.mul_loop0_loop0]
   apply loop.spec_decr_nat (fun s => nq.val - s.2.val)
     (fun s => VecReduced s.1 ∧ s.2.val ≤ nq.val ∧ j.val ≤ s.2.val ∧
       s.1.val.length = r.val.length ∧
@@ -536,7 +696,7 @@ theorem mul_inner_loop_spec (p q : alloc.vec.Vec cpoly.field.Ext4) (nq i : Std.U
         (∀ k, (toRaw r1).coeff k = (toRaw r).coeff k +
           (if i.val + j.val ≤ k ∧ k < i.val + j1.val
             then (toRaw p).coeff i.val * (toRaw q).coeff (k - i.val) else 0)) := hinv
-    simp only [cpoly.Shared1Poly.Insts.CoreOpsArithMulShared0PolyPoly.mul_loop0_loop0.body]
+    simp only [cpoly.Shared1UnivariatePoly.Insts.CoreOpsArithMulShared0UnivariatePolyUnivariatePoly.mul_loop0_loop0.body]
     by_cases hlt : j1 < nq
     · rw [if_pos hlt]
       have hjb : j1.val < q.val.length := by scalar_tac
@@ -609,11 +769,12 @@ theorem mul_outer_loop_spec (p q : alloc.vec.Vec cpoly.field.Ext4) (np nq : Std.
     ∀ (r : alloc.vec.Vec cpoly.field.Ext4) (i : Std.Usize),
       VecReduced r → i.val ≤ np.val → np.val + nq.val ≤ r.val.length + 1 →
       (∀ k, (toRaw r).coeff k = convol p q i.val k) →
-      cpoly.Shared1Poly.Insts.CoreOpsArithMulShared0PolyPoly.mul_loop0 p q np nq r i ⦃ z => VecReduced z ∧
+      Poly.mulLoop p q np nq r i ⦃ z => VecReduced z ∧
         z.val.length = r.val.length ∧
         ∀ k, (toRaw z).coeff k = convol p q np.val k ⦄ := by
   intro r i hr hi hbound hcoeff
-  rw [cpoly.Shared1Poly.Insts.CoreOpsArithMulShared0PolyPoly.mul_loop0]
+  unfold Poly.mulLoop
+  rw [cpoly.Shared1UnivariatePoly.Insts.CoreOpsArithMulShared0UnivariatePolyUnivariatePoly.mul_loop0]
   apply loop.spec_decr_nat (fun s => np.val - s.2.val)
     (fun s => VecReduced s.1 ∧ s.2.val ≤ np.val ∧ s.1.val.length = r.val.length ∧
       ∀ k, (toRaw s.1).coeff k = convol p q s.2.val k)
@@ -621,7 +782,7 @@ theorem mul_outer_loop_spec (p q : alloc.vec.Vec cpoly.field.Ext4) (np nq : Std.
     obtain ⟨hr1, hi1, hlen1, hcoeff1⟩ : VecReduced r1 ∧ i1.val ≤ np.val ∧
         r1.val.length = r.val.length ∧
         (∀ k, (toRaw r1).coeff k = convol p q i1.val k) := hinv
-    simp only [cpoly.Shared1Poly.Insts.CoreOpsArithMulShared0PolyPoly.mul_loop0.body]
+    simp only [cpoly.Shared1UnivariatePoly.Insts.CoreOpsArithMulShared0UnivariatePolyUnivariatePoly.mul_loop0.body]
     by_cases hlt : i1 < np
     · rw [if_pos hlt]
       have h1 : i1.val < np.val := by scalar_tac
@@ -677,7 +838,7 @@ theorem convol_eq_sum_range (p q : alloc.vec.Vec cpoly.field.Ext4) (k : ℕ) :
       rw [toRaw_coeff_of_ge p (by omega), zero_mul]
   rw [hL, hR]
 
-/-- `cpoly.Shared1Poly.Insts.CoreOpsArithMulShared0PolyPoly.mul` ↔ `CPolynomial.Raw.mul`.
+/-- `Poly.mul` ↔ `CPolynomial.Raw.mul`.
 
 Unlike every other operation here, this one needs a length hypothesis, and it is
 necessary rather than merely convenient: the generated code sizes its
@@ -690,7 +851,7 @@ that makes the triple true; in particular it cannot be relaxed to
 intermediate sum overflows first.  And it cannot be derived, since
 `alloc.vec.Vec` records only `length ≤ Usize.max` per vector.
 
-Note this is an artifact of that over-approximation, not a bug in `cpoly::cpoly::mul`:
+Note this is an artifact of that over-approximation, not a bug in `cpoly::univariate::UnivariatePoly`'s `Mul`:
 a real `Vec<u64>` is capacity-bounded by `isize::MAX` bytes, so `np + nq` cannot
 overflow a `usize` in practice.
 
@@ -700,16 +861,17 @@ itself (e.g. for `(v * w) * u`), since the caller then has a route to dischargin
 theorem mul_spec (v w : alloc.vec.Vec cpoly.field.Ext4)
     (hv : VecReduced v) (hw : VecReduced w)
     (hlen : v.val.length + w.val.length ≤ Std.Usize.max) :
-    cpoly.Shared1Poly.Insts.CoreOpsArithMulShared0PolyPoly.mul v w ⦃ z => VecReduced z ∧
+    Poly.mul v w ⦃ z => VecReduced z ∧
         toRaw z = CPolynomial.Raw.mul (toRaw v) (toRaw w) ∧
         z.val.length ≤ v.val.length + w.val.length ⦄ := by
   have hnewred : VecReduced (alloc.vec.Vec.new cpoly.field.Ext4) := by intro u hu; simp at hu
   have hnewraw : toRaw (alloc.vec.Vec.new cpoly.field.Ext4) = (0 : CPolynomial.Raw F) := by
     simp [toRaw]
-  rw [cpoly.Shared1Poly.Insts.CoreOpsArithMulShared0PolyPoly.mul]
+  unfold Poly.mul
+  rw [cpoly.Shared1UnivariatePoly.Insts.CoreOpsArithMulShared0UnivariatePolyUnivariatePoly.mul]
   by_cases hp0 : alloc.vec.Vec.len v = 0#usize
   · -- empty left factor
-    rw [if_pos hp0, cpoly.univariate.Poly.zero]
+    rw [if_pos hp0, cpoly.univariate.UnivariatePoly.zero]
     simp only [spec_ok]
     refine ⟨hnewred, ?_, by simp⟩
     have hvz : toRaw v = (0 : CPolynomial.Raw F) := by
@@ -720,7 +882,7 @@ theorem mul_spec (v w : alloc.vec.Vec cpoly.field.Ext4)
   · rw [if_neg hp0]
     by_cases hq0 : alloc.vec.Vec.len w = 0#usize
     · -- empty right factor
-      rw [if_pos hq0, cpoly.univariate.Poly.zero]
+      rw [if_pos hq0, cpoly.univariate.UnivariatePoly.zero]
       simp only [spec_ok]
       refine ⟨hnewred, ?_, by simp⟩
       have hwz : toRaw w = (0 : CPolynomial.Raw F) := by

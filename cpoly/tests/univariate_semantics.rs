@@ -28,7 +28,7 @@
 )]
 
 use cpoly::field::{Ext4, Fp, P, W};
-use cpoly::univariate::Poly;
+use cpoly::univariate::UnivariatePoly;
 
 /// The independent representation of an extension element: little-endian
 /// coefficients of `Y^0 .. Y^3`.
@@ -47,14 +47,14 @@ fn to(a: E) -> Ext4 {
     Ext4::new(Fp::new(a[0]), Fp::new(a[1]), Fp::new(a[2]), Fp::new(a[3]))
 }
 
-/// The coefficients of a [`Poly`], in the independent representation.
-fn ofv(p: &Poly) -> Vec<E> {
+/// The coefficients of a [`UnivariatePoly`], in the independent representation.
+fn ofv(p: &UnivariatePoly) -> Vec<E> {
     p.coeffs().iter().map(|&a| of(a)).collect()
 }
 
-/// A [`Poly`] from the independent representation, taken verbatim (no trimming).
-fn tov(v: &[E]) -> Poly {
-    Poly::from_coeffs(v.iter().map(|&a| to(a)).collect())
+/// A [`UnivariatePoly`] from the independent representation, taken verbatim (no trimming).
+fn tov(v: &[E]) -> UnivariatePoly {
+    UnivariatePoly::from_coeffs(v.iter().map(|&a| to(a)).collect())
 }
 
 /// `W` as a raw word, for the reference reduction below.
@@ -187,8 +187,8 @@ fn ref_eval(p: &[E], xv: E) -> E {
 #[test]
 fn univariate_constructors() {
     let r = sample_ext(41, 1)[0];
-    assert_eq!(ofv(&Poly::constant(to(r))), vec![r]);
-    assert_eq!(ofv(&Poly::x()), vec![[0, 0, 0, 0], [1 % P, 0, 0, 0]]);
+    assert_eq!(ofv(&UnivariatePoly::constant(to(r))), vec![r]);
+    assert_eq!(ofv(&UnivariatePoly::x()), vec![[0, 0, 0, 0], [1 % P, 0, 0, 0]]);
 }
 
 #[test]
@@ -318,7 +318,7 @@ fn conventions_pinned() {
 // ---------------------------------------------------------------
 
 /// The coefficient vector goes in and comes back out unchanged, and `coeffs`
-/// agrees with `into_coeffs`.  `Poly` is a newtype, not a normalising
+/// agrees with `into_coeffs`.  `UnivariatePoly` is a newtype, not a normalising
 /// constructor: `from_coeffs` does not trim.
 #[test]
 fn coefficients_round_trip() {
@@ -330,7 +330,7 @@ fn coefficients_round_trip() {
         assert_eq!(ofv(&p), e);
         let back: Vec<E> = p.clone().into_coeffs().iter().map(|&a| of(a)).collect();
         assert_eq!(back, e);
-        assert_eq!(Poly::from(p.clone().into_coeffs()), p, "From<Vec<Ext4>>");
+        assert_eq!(UnivariatePoly::from(p.clone().into_coeffs()), p, "From<Vec<Ext4>>");
     }
     // trailing zeros are representable, and survive `from_coeffs`
     let z: E = [0, 0, 0, 0];
@@ -339,15 +339,15 @@ fn coefficients_round_trip() {
 
 #[test]
 fn len_is_empty_and_degree() {
-    assert!(Poly::zero().is_empty());
-    assert_eq!(Poly::zero().len(), 0);
-    assert_eq!(Poly::zero().degree(), None);
-    assert_eq!(Poly::default(), Poly::zero(), "Default is the zero polynomial");
+    assert!(UnivariatePoly::zero().is_empty());
+    assert_eq!(UnivariatePoly::zero().len(), 0);
+    assert_eq!(UnivariatePoly::zero().degree(), None);
+    assert_eq!(UnivariatePoly::default(), UnivariatePoly::zero(), "Default is the zero polynomial");
 
-    // `Poly::constant` is untrimmed, so even a zero constant has one coefficient
-    assert!(!Poly::constant(Ext4::ZERO).is_empty());
-    assert_eq!(Poly::constant(Ext4::ZERO).degree(), Some(0));
-    assert_eq!(Poly::x().degree(), Some(1));
+    // `UnivariatePoly::constant` is untrimmed, so even a zero constant has one coefficient
+    assert!(!UnivariatePoly::constant(Ext4::ZERO).is_empty());
+    assert_eq!(UnivariatePoly::constant(Ext4::ZERO).degree(), Some(0));
+    assert_eq!(UnivariatePoly::x().degree(), Some(1));
 
     for n in 1..6usize {
         let p = tov(&sample_ext(220 + n as u64, n));
@@ -371,6 +371,6 @@ fn indexing_agrees_with_coeffs() {
 #[test]
 #[should_panic(expected = "index out of bounds")]
 fn indexing_past_the_end_panics() {
-    let p = Poly::x();
+    let p = UnivariatePoly::x();
     let _ = p[2];
 }

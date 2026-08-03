@@ -24,9 +24,9 @@
 use cpoly::field::{Ext4, Fp, P, W};
 use cpoly::multilinear::{
     add_pointwise, eq_tilde, lagrange_basis, lagrange_to_mono_level, monomial_basis,
-    mono_to_lagrange_level, table_len, Coeffs, Evals,
+    mono_to_lagrange_level, neg_pointwise, scale_pointwise, table_len, MultilinearEvals,
+    MultilinearPoly,
 };
-use cpoly::univariate::Poly;
 
 /// The independent representation of an extension element: little-endian
 /// coefficients of `Y^0 .. Y^3`.
@@ -54,23 +54,23 @@ fn tov(v: &[E]) -> Vec<Ext4> {
 }
 
 /// A `2^n`-entry table read in the monomial basis.
-fn coeffs(v: &[E], n: usize) -> Coeffs {
-    Coeffs::from_coeffs(tov(v), n)
+fn coeffs(v: &[E], n: usize) -> MultilinearPoly {
+    MultilinearPoly::from_coeffs(tov(v), n)
 }
 
 /// The same table read on the Boolean hypercube.  Distinguishing these two is
 /// the point of the two types: before the refactor both were `Vec<Ext4>` and
 /// nothing stopped a caller evaluating one as if it were the other, which is now
 /// a compile error rather than a silently wrong answer.
-fn evals(v: &[E]) -> Evals {
-    Evals::from_values(tov(v))
+fn evals(v: &[E]) -> MultilinearEvals {
+    MultilinearEvals::from_values(tov(v))
 }
 
-fn ofc(p: &Coeffs) -> Vec<E> {
+fn ofc(p: &MultilinearPoly) -> Vec<E> {
     ofv(p.coeffs())
 }
 
-fn ofe(p: &Evals) -> Vec<E> {
+fn ofe(p: &MultilinearEvals) -> Vec<E> {
     ofv(p.values())
 }
 
@@ -249,9 +249,15 @@ fn table_len_matches_shift() {
 #[test]
 fn zero_is_all_zeros() {
     for n in 0..8 {
-        let z = Coeffs::zeros(n);
+        let z = MultilinearPoly::zeros(n);
         assert_eq!(z.len(), 1usize << n);
         assert!(ofc(&z).iter().all(|&c| c == RZERO));
+        // the zero polynomial also vanishes on the whole hypercube, so the two
+        // readings of it are the same table
+        let ze = MultilinearEvals::zeros(n);
+        assert_eq!(ze.len(), 1usize << n);
+        assert_eq!(ofe(&ze), ofc(&z));
+        assert_eq!(ofe(&z.clone().to_evals(n)), ofe(&ze), "zeta of zero is zero");
     }
 }
 
@@ -463,24 +469,33 @@ fn eq_tilde_matches_product_form() {
     }
 }
 
-/// Negation and scalar multiplication are the univariate ones, reused: the Lean
-/// development states their multilinear specs about `cpoly::univariate::Poly`'s
-/// `Neg` and `Mul<Ext4>` impls.
+/// Negation and scalar multiplication, in both readings.  These used to be the
+/// univariate operations applied to a shared `Vec<Ext4>`; once the two readings
+/// became distinct types that stopped being callable, so each reading has its own
+/// `Neg` and `Mul<Ext4>` now, sharing one loop underneath.
 #[test]
 fn neg_and_smul_are_coefficientwise() {
     for n in 0..6 {
         let sz = 1usize << n;
         let p = sample(n as u64 + 181, sz);
         let s = sample(n as u64 + 191, 1)[0];
+        let want_neg: Vec<E> = p.iter().map(|&a| rneg(a)).collect();
+        let want_smul: Vec<E> = p.iter().map(|&a| rmul(s, a)).collect();
+
+        assert_eq!(ofc(&-&coeffs(&p, n)), want_neg, "MultilinearPoly neg n={n}");
+        assert_eq!(ofe(&-&evals(&p)), want_neg, "MultilinearEvals neg n={n}");
+        assert_eq!(ofc(&(&coeffs(&p, n) * to(s))), want_smul, "MultilinearPoly smul n={n}");
+        assert_eq!(ofe(&(&evals(&p) * to(s))), want_smul, "MultilinearEvals smul n={n}");
+
+        // the shared helpers agree with the impls that call them
+        assert_eq!(ofv(&neg_pointwise(&tov(&p))), want_neg);
+        assert_eq!(ofv(&scale_pointwise(&tov(&p), to(s))), want_smul);
+
+        // negation is the additive inverse, in both readings
         assert_eq!(
-            ofv((-&Poly::from_coeffs(tov(&p))).coeffs()),
-            p.iter().map(|&a| rneg(a)).collect::<Vec<E>>(),
-            "neg n={n}"
-        );
-        assert_eq!(
-            ofv((&Poly::from_coeffs(tov(&p)) * to(s)).coeffs()),
-            p.iter().map(|&a| rmul(s, a)).collect::<Vec<E>>(),
-            "smul n={n}"
+            ofc(&(&coeffs(&p, n) + &-&coeffs(&p, n))),
+            vec![RZERO; sz],
+            "p + (-p) = 0, n={n}"
         );
     }
 }
@@ -549,14 +564,15 @@ fn tables_round_trip() {
         assert_eq!(ofv(&e.clone().into_values()), t);
 
         for i in 0..sz {
-            assert_eq!(of(c[i]), t[i], "Coeffs[{i}] at n={n}");
-            assert_eq!(of(e[i]), t[i], "Evals[{i}] at n={n}");
+            assert_eq!(of(c[i]), t[i], "MultilinearPoly[{i}] at n={n}");
+            assert_eq!(of(e[i]), t[i], "MultilinearEvals[{i}] at n={n}");
         }
     }
 }
 
-/// The `Evals` `Add` impl is pointwise too, and agrees with the `Coeffs` one on
-/// the same underlying words — they share `add_pointwise`.
+/// The `MultilinearEvals` `Add` impl is pointwise too, and agrees with the
+/// `MultilinearPoly` one on the same underlying words — they share
+/// `add_pointwise`.
 #[test]
 fn evals_add_is_pointwise() {
     for n in 0..6 {

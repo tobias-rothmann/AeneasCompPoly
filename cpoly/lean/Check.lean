@@ -16,7 +16,8 @@ under a `_spec`.
 
 Sections 7-11 are about the newtypes the Rust side gained: that they cost these
 proofs nothing, and -- section 8 -- that the price of that is a real limitation,
-namely that `Coeffs` and `Evals` are indistinguishable here.
+namely that `MultilinearPoly` and `MultilinearEvals` are
+indistinguishable here.
 -/
 
 open Aeneas Aeneas.Std Aeneas.Std.WP Result
@@ -70,7 +71,7 @@ example (a b : cpoly.field.Ext4) (ha : Reduced a) (hb : Reduced b) :
 
 example (v w : alloc.vec.Vec cpoly.field.Ext4) (hv : VecReduced v) (hw : VecReduced w)
     (hlen : v.val.length + w.val.length ≤ Std.Usize.max) :
-    ∃ z, cpoly.Shared1Poly.Insts.CoreOpsArithMulShared0PolyPoly.mul v w = ok z ∧ VecReduced z ∧
+    ∃ z, cpoly.Shared1UnivariatePoly.Insts.CoreOpsArithMulShared0UnivariatePolyUnivariatePoly.mul v w = ok z ∧ VecReduced z ∧
       toRaw z = CPolynomial.Raw.mul (toRaw v) (toRaw w) ∧
       z.val.length ≤ v.val.length + w.val.length :=
   spec_imp_exists (mul_spec v w hv hw hlen)
@@ -83,19 +84,19 @@ example : CMlPolynomial F 3 = Vector F 8 := by norm_num [CMlPolynomial]
 --    single-field tuple struct as a `@[reducible]` abbreviation, so each wrapper
 --    *is* its content here and no spec had to change domain to accommodate one.
 example : cpoly.field.Fp = Std.U64 := rfl
-example : cpoly.univariate.Poly = alloc.vec.Vec cpoly.field.Ext4 := rfl
-example : cpoly.multilinear.Coeffs = alloc.vec.Vec cpoly.field.Ext4 := rfl
-example : cpoly.multilinear.Evals = alloc.vec.Vec cpoly.field.Ext4 := rfl
+example : cpoly.univariate.UnivariatePoly = alloc.vec.Vec cpoly.field.Ext4 := rfl
+example : cpoly.multilinear.MultilinearPoly = alloc.vec.Vec cpoly.field.Ext4 := rfl
+example : cpoly.multilinear.MultilinearEvals = alloc.vec.Vec cpoly.field.Ext4 := rfl
 
 -- 8. ... and the flip side of that, stated plainly because it is a limitation:
---    `Coeffs` and `Evals` are the *same* type here, so the separation between the
+--    `MultilinearPoly` and `MultilinearEvals` are the *same* type here, so the separation between the
 --    monomial and the Lagrange reading is enforced by rustc and not by these
 --    proofs.  What the proofs do give is that each Rust operation computes the
 --    CompPoly operation for the reading its Rust type names -- `add_spec` is
 --    about `CMlPolynomial.add` and `add_evals_spec` about
 --    `CMlPolynomialEval.add` -- so a Rust caller who mixes the two gets a
 --    compile error, and a caller who does not gets the operation it asked for.
-example : cpoly.multilinear.Coeffs = cpoly.multilinear.Evals := rfl
+example : cpoly.multilinear.MultilinearPoly = cpoly.multilinear.MultilinearEvals := rfl
 
 -- 9. `Fp`'s reducedness is a real constraint, and `Fp::new` establishes it for
 --    an arbitrary word -- which is what makes `Red` an invariant of the Rust type
@@ -116,7 +117,7 @@ example (a : cpoly.field.Fp) (b : cpoly.field.Ext4) (ha : Red a) (hb : Reduced b
 example (n : ℕ) (v w : alloc.vec.Vec cpoly.field.Ext4)
     (hv : VecReduced v) (hw : VecReduced w)
     (hvl : v.val.length = 2 ^ n) (hwl : w.val.length = 2 ^ n) :
-    ∃ z, cpoly.Shared1Evals.Insts.CoreOpsArithAddShared0EvalsEvals.add v w = ok z ∧
+    ∃ z, cpoly.Shared1MultilinearEvals.Insts.CoreOpsArithAddShared0MultilinearEvalsMultilinearEvals.add v w = ok z ∧
       VecReduced z ∧ z.val.length = 2 ^ n ∧
       Ml.toMlEval n z = CMlPolynomialEval.add (Ml.toMlEval n v) (Ml.toMlEval n w) :=
   spec_imp_exists (Ml.add_evals_spec n v w hv hw hvl hwl)
@@ -129,7 +130,38 @@ example : ∃ z, cpoly.multilinear.table_len 10#usize = ok z ∧ z.val = 1024 :=
   obtain ⟨z, hz, hzv⟩ := spec_imp_exists h
   exact ⟨z, hz, by simpa using hzv⟩
 
--- 12. Print the headline statements for review.
+-- 12. The readable aliases in `Univariate.lean` / `Multilinear.lean` really are
+--     the generated operator impls.  They are `abbrev`s, so this is `rfl` — the
+--     point is that a rename in `Generated.lean` cannot silently repoint one
+--     without this file failing to compile.
+example : Poly.add = cpoly.Shared1UnivariatePoly.Insts.CoreOpsArithAddShared0UnivariatePolyUnivariatePoly.add := rfl
+example : Poly.sub = cpoly.Shared1UnivariatePoly.Insts.CoreOpsArithSubShared0UnivariatePolyUnivariatePoly.sub := rfl
+example : Poly.mul = cpoly.Shared1UnivariatePoly.Insts.CoreOpsArithMulShared0UnivariatePolyUnivariatePoly.mul := rfl
+example : Poly.neg = cpoly.Shared0UnivariatePoly.Insts.CoreOpsArithNegUnivariatePoly.neg := rfl
+example : Poly.smul = cpoly.Shared0UnivariatePoly.Insts.CoreOpsArithMulExt4UnivariatePoly.mul := rfl
+example : Ml.polyAdd = cpoly.Shared1MultilinearPoly.Insts.CoreOpsArithAddShared0MultilinearPolyMultilinearPoly.add := rfl
+example : Ml.evalsAdd = cpoly.Shared1MultilinearEvals.Insts.CoreOpsArithAddShared0MultilinearEvalsMultilinearEvals.add := rfl
+example : Ml.polyNeg = cpoly.Shared0MultilinearPoly.Insts.CoreOpsArithNegMultilinearPoly.neg := rfl
+example : Ml.evalsNeg = cpoly.Shared0MultilinearEvals.Insts.CoreOpsArithNegMultilinearEvals.neg := rfl
+example : Ml.polySmul = cpoly.Shared0MultilinearPoly.Insts.CoreOpsArithMulExt4MultilinearPoly.mul := rfl
+example : Ml.evalsSmul = cpoly.Shared0MultilinearEvals.Insts.CoreOpsArithMulExt4MultilinearEvals.mul := rfl
+
+-- 13. The multilinear layer has its own negation and scaling now: before the two
+--     readings were separate types it borrowed the univariate ones, which stopped
+--     being callable when the types split.
+example (n : ℕ) (v : alloc.vec.Vec cpoly.field.Ext4) (hv : VecReduced v)
+    (hvl : v.val.length = 2 ^ n) :
+    ∃ z, Ml.polyNeg v = ok z ∧ VecReduced z ∧ z.val.length = 2 ^ n ∧
+      Ml.toMl n z = CMlPolynomial.neg (Ml.toMl n v) :=
+  spec_imp_exists (Ml.neg_spec n v hv hvl)
+
+example (n : ℕ) (r : cpoly.field.Ext4) (v : alloc.vec.Vec cpoly.field.Ext4)
+    (hr : Reduced r) (hv : VecReduced v) (hvl : v.val.length = 2 ^ n) :
+    ∃ z, Ml.evalsSmul v r = ok z ∧ VecReduced z ∧ z.val.length = 2 ^ n ∧
+      Ml.toMlEval n z = CMlPolynomialEval.smul (toExt r) (Ml.toMlEval n v) :=
+  spec_imp_exists (Ml.smul_evals_spec n r v hr hv hvl)
+
+-- 14. Print the headline statements for review.
 #print axioms CPolyEquiv.ext_mul_spec
 #print axioms CPolyEquiv.mul_spec
 #print axioms CPolyEquiv.eval_spec
@@ -143,5 +175,8 @@ example : ∃ z, cpoly.multilinear.table_len 10#usize = ok z ∧ z.val = 1024 :=
 #print axioms CPolyEquiv.Ml.add_evals_spec
 #print axioms CPolyEquiv.ext_smul_spec
 #print axioms CPolyEquiv.fp_new_spec
+#print axioms CPolyEquiv.Ml.neg_spec
+#print axioms CPolyEquiv.Ml.smul_evals_spec
+#print axioms CPolyEquiv.Ml.zero_evals_spec
 
 end CPolyEquiv.Check

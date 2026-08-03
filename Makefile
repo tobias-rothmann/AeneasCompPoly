@@ -80,10 +80,7 @@ help:
 	@echo '  make test      run the Rust-side semantics tests'
 	@echo '  make clean     drop build output, keeping fetched dependencies'
 	@echo ''
-	@echo '  A fresh clone needs `make setup` once, then `make build`: roughly three'
-	@echo '  minutes and 8.5 GB for the first, four for the second. Mathlib comes'
-	@echo '  prebuilt from its cache, but the Aeneas backend and CompPoly are'
-	@echo '  compiled locally. Later builds are incremental.'
+	@echo '  Run `make setup` once after cloning; the other targets work from there.'
 	@echo ''
 
 # --- setup -------------------------------------------------------------------
