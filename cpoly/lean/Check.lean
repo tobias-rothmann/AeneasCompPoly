@@ -14,10 +14,9 @@ weaker than total correctness.  It also prints the axiom dependencies of the
 headline specs, which is how a reader confirms there is no `sorryAx` hiding
 under a `_spec`.
 
-Sections 7-11 are about the newtypes the Rust side gained: that they cost these
-proofs nothing, and -- section 8 -- that the price of that is a real limitation,
-namely that `MultilinearPoly` and `MultilinearEvals` are
-indistinguishable here.
+Sections 7-11 are about the Rust newtypes: that they cost these proofs nothing,
+and -- section 8 -- that the price of that is a real limitation, namely that
+`MultilinearPoly` and `MultilinearEvals` are indistinguishable here.
 -/
 
 open Aeneas Aeneas.Std Aeneas.Std.WP Result
@@ -122,9 +121,9 @@ example (n : ℕ) (v w : alloc.vec.Vec cpoly.field.Ext4)
       Ml.toMlEval n z = CMlPolynomialEval.add (Ml.toMlEval n v) (Ml.toMlEval n w) :=
   spec_imp_exists (Ml.add_evals_spec n v w hv hw hvl hwl)
 
--- 11. `table_len` is `1usize << vars`, and its side condition is the one the
---     previous checked-doubling loop had: the shift fails exactly when `2 ^ vars`
---     does not fit.  Sanity-check the spec at a concrete arity.
+-- 11. `table_len` is `1usize << vars`, and its side condition is exact: the
+--     shift fails exactly when `2 ^ vars` does not fit.  Sanity-check the spec
+--     at a concrete arity.
 example : ∃ z, cpoly.multilinear.table_len 10#usize = ok z ∧ z.val = 1024 := by
   have h := Ml.pow2_spec 10#usize (by scalar_tac)
   obtain ⟨z, hz, hzv⟩ := spec_imp_exists h
@@ -146,9 +145,7 @@ example : Ml.evalsNeg = cpoly.Shared0MultilinearEvals.Insts.CoreOpsArithNegMulti
 example : Ml.polySmul = cpoly.Shared0MultilinearPoly.Insts.CoreOpsArithMulExt4MultilinearPoly.mul := rfl
 example : Ml.evalsSmul = cpoly.Shared0MultilinearEvals.Insts.CoreOpsArithMulExt4MultilinearEvals.mul := rfl
 
--- 13. The multilinear layer has its own negation and scaling now: before the two
---     readings were separate types it borrowed the univariate ones, which stopped
---     being callable when the types split.
+-- 13. The multilinear layer has its own negation and scaling.
 example (n : ℕ) (v : alloc.vec.Vec cpoly.field.Ext4) (hv : VecReduced v)
     (hvl : v.val.length = 2 ^ n) :
     ∃ z, Ml.polyNeg v = ok z ∧ VecReduced z ∧ z.val.length = 2 ^ n ∧

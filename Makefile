@@ -72,15 +72,44 @@ BUILD_LOG  := $(STAMPS)/build.log
 .DEFAULT_GOAL := help
 .PHONY: help setup build test extract check-toolchain clean
 
+# One synopsis, then targets, then variables -- the usual shape for a command's
+# --help. No per-target variable subsections: a variable on the command line
+# applies to the whole invocation whichever target ends up reading it, so which
+# one that is belongs in its description, not in a heading.
+#
+# Where a new target goes: `Targets` if someone who just cloned the repo would
+# type it, `Advanced targets` if it exists so the optimization loop can check or
+# regenerate something mid-iteration. A target with no listing in either is
+# internal (`check-toolchain`, `bench-toolchain`) -- a prerequisite, not something
+# to invoke.
+#
+# One line per entry, every list aligned on the same column, nothing past ~77
+# characters. Anything that needs more than a line belongs in the comment above
+# the target it describes, not here -- and a description must not promise what
+# the target does not do.
 help:
 	@echo ''
-	@echo '  make setup     install all prerequisites (elan, Lean deps, charon/aeneas, rust)'
-	@echo '  make build     check the Lean proofs -- fails on any error or `sorry`'
-	@echo '  make extract   regenerate cpoly/lean/Generated.lean from cpoly/src/'
-	@echo '  make test      run the Rust-side semantics tests'
-	@echo '  make clean     drop build output, keeping fetched dependencies'
-	@echo ''
 	@echo '  Run `make setup` once after cloning; the other targets work from there.'
+	@echo ''
+	@echo '  Usage: make <target> [VAR=VALUE]...'
+	@echo ''
+	@echo '  Targets:'
+	@echo '    setup          install elan, the Lean deps, charon/aeneas and rust'
+	@echo '    build          check the Lean proofs -- fails on any error or `sorry`'
+	@echo '    extract        regenerate cpoly/lean/Generated.lean from cpoly/src/'
+	@echo '    test           run the Rust-side semantics tests'
+	@echo '    clean          drop build output, keeping fetched dependencies'
+	@echo '    run-bench      time every operation against its frozen first translation'
+	@echo ''
+	@echo '  Advanced targets (driven by the optimization loop, rarely by hand):'
+	@echo '    bench-check    check the frozen baseline against git, and bench coverage'
+	@echo '    bench-stamp    re-derive the @genesis stamps after adding a function'
+	@echo ''
+	@echo '  Variables:'
+	@echo '    AENEAS=<path>  aeneas binary for `extract` (default ./toolchain/aeneas)'
+	@echo '    BENCH=<regex>  bench only the cases whose id matches this regex'
+	@echo '    CHARON=<path>  charon binary for `extract` (default ./toolchain/charon)'
+	@echo '    JSON=<path>    also write the bench report as JSON, for an agent'
 	@echo ''
 
 # --- setup -------------------------------------------------------------------
@@ -229,6 +258,107 @@ extract: check-toolchain | $(STAMPS)
 	fi; \
 	rm -f "$$prev"
 	@echo '==> now re-check the proofs: make build'
+
+# --- benchmarks ---------------------------------------------------------------
+
+# The fitness function of the optimization loop: criterion wall-clock time for
+# every translated CompPoly operation, measured against the frozen first
+# translation in ./cpoly/benches/genesis.
+#
+# The one thing worth understanding before reading a number out of this: the
+# "vs genesis" column is not a remembered figure. `cpoly/benches/genesis` is a
+# real crate holding the first translation of every operation, and every run measures
+# it and `cpoly` back to back, in the same criterion session. So that column is
+# always a comparison made *now*, on this machine, at this temperature, with this
+# compiler.
+#
+# Nothing is ever compared across runs. A cross-run comparison inherits the
+# difference in machine conditions between two moments possibly days apart, and
+# on an ordinary desktop that dwarfs anything the code does -- the threshold it
+# would imply swallows every verdict in the table. The error bar that remains
+# is measured inside each run by the `_control/*` cases, one per bench binary,
+# which run identical code as both variants. They are a sanity check on the
+# run, not a per-case error bar: the worst of the three has to stay under 10%
+# or the report refuses the run.
+#
+# The toolchain is pinned for the same reason the profile is (cpoly/Cargo.toml
+# § profile.bench): a number is only comparable to another number produced by
+# the same compiler. This is charon's channel, which `make setup` installs
+# anyway, so benchmarking adds no toolchain the repository did not already need.
+# Moving it makes any number kept from before the move incomparable with any
+# number after, so treat a change to it as a re-baseline.
+BENCH_TOOLCHAIN := nightly-2026-06-01
+HARNESS         := $(PKG)/benches/harness.py
+
+.PHONY: run-bench bench-check bench-stamp bench-toolchain
+
+# Statistics cannot rescue a corrupted baseline, so this runs before any
+# measurement and is a hard gate. Coverage is reported by `run-bench` but does
+# not stop it: an unmeasured operation makes the picture incomplete, while an
+# edited genesis makes every past and present "vs genesis" number wrong.
+bench-check:
+	@set -euo pipefail; \
+	python3 '$(HARNESS)' check-genesis; \
+	python3 '$(HARNESS)' coverage --strict
+
+# Re-derive the `// @genesis <sha> <date>` annotations from git history. Run
+# after copying a newly translated function into cpoly/benches/genesis/src/.
+bench-stamp:
+	@python3 '$(HARNESS)' stamp-genesis
+	@python3 '$(HARNESS)' check-genesis
+
+bench-toolchain:
+	@set -euo pipefail; \
+	if ! command -v python3 >/dev/null; then \
+	  echo 'error: python3 not found; benches/harness.py needs it (stdlib only).' >&2; \
+	  exit 1; \
+	fi; \
+	if ! command -v rustup >/dev/null; then \
+	  echo 'error: rustup not found. Run `make setup`.' >&2; exit 1; \
+	fi; \
+	if ! rustup run '$(BENCH_TOOLCHAIN)' rustc --version >/dev/null 2>&1; then \
+	  echo '==> installing rust $(BENCH_TOOLCHAIN) (pinned for benchmarks)'; \
+	  rustup toolchain install --profile minimal --no-self-update '$(BENCH_TOOLCHAIN)' >/dev/null; \
+	fi
+#
+#   make run-bench                  every bench, one full-rigour pass (~18 min)
+#   make run-bench BENCH=univariate only cases whose id matches this regex
+#   make run-bench JSON=out.json    also write the report as JSON, for an agent
+#
+# There is one mode and one pass. Two levers are deliberately not offered:
+#
+# * Reduced sampling, for a tight loop. On byte-identical code it produces
+#   non-noise verdicts while printing the same "faster"/"slower" words as a full
+#   run and the same `usable: true`. A mode whose output cannot be told apart
+#   from a trustworthy one is not a shortcut.
+#
+# * Repeating the suite and taking the per-case median delta. It would assume
+#   per-round error is independent, which it is not always: a machine can settle
+#   into a slower state and hold it for several rounds, and the median across
+#   rounds then selects the corrupted value rather than the correct one.
+#
+# What survives all of this is the `vs genesis` column, because a machine-state
+# artefact lands on both variants at once. An absolute time does not: it is not
+# comparable to another run's, and not comparable to another row's in the same
+# run. Read the deltas.
+#
+# The start time is stamped before cargo runs so the report contains only what
+# this invocation measured. Without it a `BENCH=` filter would silently republish
+# stale rows for everything it skipped, which is the most plausible way this
+# harness could come to lie.
+run-bench: bench-toolchain | $(STAMPS)
+	@set -euo pipefail; \
+	python3 '$(HARNESS)' check-genesis
+	@set -euo pipefail; \
+	python3 '$(HARNESS)' coverage || true
+	@set -euo pipefail; \
+	started=$$(date +%s); \
+	( cd $(PKG) && rustup run '$(BENCH_TOOLCHAIN)' cargo bench --benches -- \
+	    $(if $(BENCH),'$(BENCH)',) ); \
+	python3 '$(HARNESS)' report \
+	  --toolchain '$(BENCH_TOOLCHAIN)' \
+	  --since "$$started" \
+	  $(if $(JSON),--json '$(JSON)',)
 
 # --- clean -------------------------------------------------------------------
 

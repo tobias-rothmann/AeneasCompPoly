@@ -27,8 +27,9 @@ There are two layers here:
      invariant* `Red u : u.val < P`.  `Red` is also what discharges the
      no-overflow side conditions in the generated `Result`-monad code: `P < 2^32`,
      so for reduced `a, b` we have `a + b < 2^33` and `a * b < 2^64` — see the
-     header of `field.rs`.  This is tighter than it was for BabyBear/KoalaBear,
-     but it still holds with about `859 * 2^32` to spare on the multiplication.
+     header of `field.rs`.  This is exactly where the Hachi prime is tighter than
+     BabyBear/KoalaBear, and it still holds with about `859 * 2^32` to spare on
+     the multiplication.
 
      On the Rust side `Fp`'s `u64` is *private* and `Fp::new` reduces, so `Red`
      holds of every value a caller can construct.  Nothing here relies on that —
@@ -40,7 +41,9 @@ There are two layers here:
      `toK`-images of its fields (`toExt`), under the componentwise invariant
      `Reduced`.  The extracted `Add`, `Sub`, `Neg` and `Mul` impls are shown total
      and to commute with `Ext`'s ring operations, as is the heterogeneous
-     `Mul<Ext4> for Fp` that the polynomial layers use for scalar multiplication.
+     `Mul<Ext4> for Fp`.  (That last one has no caller in the crate: every scalar
+     in the polynomial layers is an `Ext4`, so those sites use `Ext4 * Ext4`.  It
+     is public, so it carries a spec.)
      `ext_mul_spec` is the load-bearing one: the Rust code is an unrolled
      schoolbook product with the `Y^4 = 2` wrap folded in by hand, and the
      reference `Ext.mul` is a double `Finset` sum over `Fin 4 × Fin 4` with a
@@ -83,7 +86,7 @@ theorem getElem_of_list_eq {α} {l l' : List α} (h : l = l') {i : ℕ}
 /-! ## A `Result`-monad helper
 
 Aeneas ends a `do` block with `let x ← m; ok x` whenever the Rust function's tail
-expression is a local it has just bound.  That shape is everywhere now that the
+expression is a local it has just bound.  That shape is everywhere, because the
 operations are methods and trait impls which name their result before returning
 it, and it blocks `spec_mono` from seeing the last call as the whole body. -/
 
@@ -559,8 +562,10 @@ theorem ext_mul_spec (a b : cpoly.field.Ext4) (ha : Reduced a) (hb : Reduced b) 
 
 /-- `impl Mul<Ext4> for Fp` — scaling an extension element by a base-field one.
 
-This is the heterogeneous impl the polynomial layers use for scalar
-multiplication.  Its reference is CompPoly's `SMul K F`: `Ext.coeff_smul` says
+No caller in the crate reaches this impl — `univariate` and `multilinear` type
+every scalar as an `Ext4`, so those sites resolve to `Ext4 * Ext4` — but it is
+public, so it is proved.  Its reference is CompPoly's `SMul K F`:
+`Ext.coeff_smul` says
 `coeff (c • x) i = c * coeff x i`, which is coefficient-for-coefficient what the
 Rust does. -/
 @[step]
@@ -739,8 +744,7 @@ theorem ext_clone_eq (a : cpoly.field.Ext4) :
   rw [cpoly.field.Ext4.Insts.CoreCloneClone.clone]
 
 /-- Hence `Vec<Ext4>::clone` returns the very same vector.  The multilinear
-evaluators use `self.0.clone()` to get a working copy of their table, where the
-previous version of the crate copied it entry by entry in a loop. -/
+evaluators use `self.0.clone()` to get a working copy of their table. -/
 @[step]
 theorem vec_clone_spec (v : alloc.vec.Vec cpoly.field.Ext4) :
     alloc.vec.CloneVec.clone cpoly.field.Ext4.Insts.CoreCloneClone v ⦃ z => z = v ⦄ := by

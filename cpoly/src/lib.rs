@@ -29,14 +29,14 @@
 //! Every layer wraps its representation in a newtype rather than passing
 //! `Vec<Ext4>` around.  That is not decoration: [`MultilinearPoly`] and
 //! [`MultilinearEvals`] are *the same bytes* under two different readings, and
-//! before they were separate types nothing stopped a caller evaluating one as if
-//! it were the other.  Likewise [`Fp`] hides its `u64`, so the reducedness
-//! invariant the Lean proofs call `Red` cannot be violated through the public
-//! API — it holds of every value of the type.
+//! nothing but the type distinction stops a caller evaluating one as if it were
+//! the other.  Likewise [`Fp`] hides its `u64`, so the reducedness invariant
+//! the Lean proofs call `Red` cannot be violated through the public API — it
+//! holds of every value of the type.
 //!
 //! All of this is free on the Lean side.  Aeneas extracts a single-field tuple
 //! struct as a `@[reducible]` abbreviation of its content, so
-//! `cpoly.field.Fp` *is* `Std.U64` and `cpoly.univariate.Poly` *is*
+//! `cpoly.field.Fp` *is* `Std.U64` and `cpoly.univariate.UnivariatePoly` *is*
 //! `alloc.vec.Vec cpoly.field.Ext4` as far as the proofs are concerned, while
 //! `lean/Generated.lean` gains the more informative names.
 //!
@@ -45,8 +45,7 @@
 //! Field and polynomial arithmetic is the standard [`core::ops`] traits, so the
 //! code reads `a + b * c` rather than `fadd(a, fmul(b, c))`.  Charon resolves
 //! each operator to its concrete impl and Aeneas extracts that impl as an
-//! ordinary definition, whose body is exactly what the corresponding free
-//! function's was — the operators cost the proofs a rename and nothing else.
+//! ordinary definition.
 //!
 //! # Style notes (for clean Aeneas output)
 //!

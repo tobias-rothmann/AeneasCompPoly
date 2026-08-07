@@ -314,7 +314,7 @@ fn conventions_pinned() {
 }
 
 // ---------------------------------------------------------------
-// API introduced by the newtype refactor.
+// The newtype API.
 // ---------------------------------------------------------------
 
 /// The coefficient vector goes in and comes back out unchanged, and `coeffs`

@@ -1,0 +1,41 @@
+# Mirrored items that deliberately have no benchmark.
+#
+# `make bench-coverage` requires every item in `cpoly/src` whose docstring says
+# `Mirrors CompPoly.X` to be either benched or listed here. Silence is not an
+# exclusion: an operation nobody measures is one the optimization loop cannot
+# notice a regression in, and "we forgot" and "it is not worth measuring" must
+# not look the same from the outside.
+#
+# The bar for adding a line here is that a criterion run on the item would
+# measure the harness rather than the item -- a type with no runtime, or a
+# constant the compiler folds. It is NOT "this seemed slow to benchmark" or
+# "this is not on the hot path". If an item does real work at any size, bench it.
+#
+# Each entry must say *why*, in a form that can be checked by reading the item.
+
+[exclusions]
+
+# -- types ------------------------------------------------------------------
+#
+# A struct declaration has no runtime. The operations over these types are
+# benched individually; the type itself cannot be.
+
+"field::Ext4" = "a type declaration, not code — its operations are benched separately"
+"univariate::UnivariatePoly" = "a type declaration, not code"
+"multilinear::MultilinearPoly" = "a type declaration, not code"
+"multilinear::MultilinearEvals" = "a type declaration, not code"
+
+# -- constants ---------------------------------------------------------------
+#
+# These are `const` items that rustc materialises at compile time. A bench would
+# time `black_box` and nothing else.
+
+"field::W" = "a compile-time constant (Fp(2)); there is no code to run"
+"field::Ext4::GEN" = "a compile-time constant; pins the basis convention, never computed"
+
+# -- O(1) by inspection ------------------------------------------------------
+
+"multilinear::table_len" = """
+a single `1usize << vars`. One shift instruction, and every caller of it is
+already benched at the size it produces, so a regression here is unmissable
+there. Benching it would measure the black_box around it."""

@@ -1,0 +1,20 @@
+[package]
+name = "cpoly-genesis"
+version = "0.0.0"
+edition = "2021"
+publish = false
+license = "Apache-2.0"
+description = "Frozen first-translation snapshot of cpoly, kept only so `make run-bench` can re-measure the starting point on the same machine, in the same run, as the current code"
+
+[lib]
+name = "cpoly_genesis"
+path = "src/lib.rs"
+# The frozen modules are byte-for-byte copies of `cpoly/src/*.rs`, doc examples
+# included, and those examples say `use cpoly::…`. They are compiled and checked
+# in the real crate; running them again here would only test that a copy of a
+# doctest still names the crate it was copied from.
+doctest = false
+
+# No dependencies, ever. A frozen baseline that could drift with a dependency
+# would not be frozen.
+[dependencies]

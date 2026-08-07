@@ -504,7 +504,7 @@ functions are `loop (fun s => body s) init`.  Reason about them with
   • invariant tying the accumulator's field-image to the processed prefix, e.g.
       `s.1.val.map toExt = (p.val.take s.2.val).map (fun u => - toExt u)`
 The body obligation steps with `step` through `Vec.index_usize_spec`,
-`fp_neg_spec` (now `@[step]`), and `Vec.push_spec`; the `List.take_succ` /
+`fp_neg_spec` (`@[step]`), and `Vec.push_spec`; the `List.take_succ` /
 `List.map_append` lemmas extend the prefix by one.  The triple `m ⦃ r => P ⦄`
 is `Aeneas.Std.spec m P` (a WP predicate, NOT a bare `∃`), so compose loop
 specs into the top-level operation with `spec_mono` / `spec_bind`, then convert

@@ -8,12 +8,111 @@ description = "Computable univariate and multilinear polynomials over the quarti
 repository = "https://github.com/tobias-rothmann/AeneasCompPoly"
 keywords = ["polynomial", "finite-field", "multilinear", "formal-verification"]
 categories = ["cryptography", "mathematics", "no-std"]
+# `benches/genesis` is a package of its own nested in this one (see
+# dev-dependencies). Excluding it keeps `cargo package` from trying to
+# vendor a second manifest inside this crate's tarball.
+exclude = ["benches/genesis", "benches/*.py", "benches/*.toml"]
+
+# Every bench target is declared below, so an unrecognised file dropped into
+# `benches/` becomes a hard error instead of a silent extra binary -- and
+# `benches/support/` stays what it is, a shared module rather than a target.
+autobenches = false
+# Every test target is declared below too. Not pedantry: `cargo bench` selects
+# *every* target with `bench = true`, and that flag defaults to true on the lib
+# and on each auto-discovered integration test. Left alone, `cargo bench` hands
+# criterion's `--sample-size` to libtest, which rejects it and fails the run.
+autotests = false
 
 [lib]
 name = "cpoly"
 path = "src/lib.rs"
+# There are no `#[bench]` functions here; the benchmarks are the criterion
+# targets below. See `autotests` above for why this has to be said out loud.
+bench = false
 
+[[test]]
+name = "field_semantics"
+bench = false
+
+[[test]]
+name = "univariate_semantics"
+bench = false
+
+[[test]]
+name = "multilinear_semantics"
+bench = false
+
+# The library itself still has none, and must keep it that way: it is the thing
+# Aeneas extracts.
 [dependencies]
+
+# `cargo build --lib` -- all that `charon cargo --preset=aeneas -- --lib` asks
+# for -- does not build dev-dependencies, so nothing here reaches
+# `lean/Generated.lean`. Checked, not assumed: `make extract` reports
+# `unchanged` with these present.
+[dev-dependencies]
+# criterion **0.7**, not 0.8, and the version is load-bearing. Cargo resolves the
+# whole dependency graph before it builds anything, so a dev-dependency whose
+# `rust-version` exceeds the active toolchain fails `cargo test` even though the
+# tests never link it. 0.8 declares 1.86; this repository's default toolchain is
+# a 1.85 nightly and its stable is 1.82, so 0.8 here breaks `make test` outright.
+# 0.7 declares 1.80 and is otherwise a drop-in: same `iter_batched` timing
+# semantics (setup and output-drop both outside the timed region), same
+# `estimates.json`/`sample.json`/`benchmark.json`, same deprecation of
+# `criterion::black_box` in favour of `std::hint::black_box`.
+#
+# Before bumping this, check `rust-version` against the oldest toolchain anyone
+# runs `cargo test` with -- not against what the benchmarks need.
+#
+# `default-features = false` drops `plotters` and `rayon`, which 0.7 does enable
+# by default: `cpoly/benches/harness.py` reads criterion's own JSON, which it writes
+# either way, and a thread pool spinning up between cases is measurement noise
+# bought for a picture nobody reads.
+criterion = { version = "0.7", default-features = false, features = ["cargo_bench_support"] }
+# The frozen first translation of this crate. `make run-bench` measures it and
+# `cpoly` back to back so the "vs genesis" column is a comparison made now,
+# on this machine, rather than against a remembered number. It has no
+# dependencies of its own and declares no `rust-version`, so it cannot repeat
+# the MSRV problem described above.
+cpoly-genesis = { path = "benches/genesis" }
+
+# Benchmarks are the fitness function of this project, so their build is pinned
+# rather than left to whatever cargo defaults to this month.
+#
+# `codegen-units = 1` is for *comparability* before speed: with 16, which
+# functions land together -- and so which get inlined -- shifts with unrelated
+# edits, and that shift is indistinguishable from an optimization.
+#
+# `lto = "fat"` is not the usual "fat is a bit faster" choice; it is load-bearing
+# for the A/B comparison, and it was measured. `cpoly` and `cpoly_genesis`
+# currently hold byte-identical source, so every comparison between them must
+# read ~0%. Under `lto = "thin"` it did not: `field/fp_sub` came out **+28% and
+# +29% on two consecutive rounds** -- reproducible, and present in the *minimum*
+# per-iteration time, so not contention. Thin LTO optimizes the two crates in
+# separate modules and made different vectorization decisions for the same code.
+# Fat LTO merges them before optimizing; the same case then read +0.8%, and
+# `field/ext4_add` was within 0.2% under both.
+#
+# A benchmark that reports a 28% difference between two copies of one function is
+# not a slow benchmark, it is a wrong one. Do not move this back to `thin` for
+# build times without re-running the `_control/*` cases.
+[profile.bench]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+debug = false
+
+[[bench]]
+name = "field"
+harness = false
+
+[[bench]]
+name = "univariate"
+harness = false
+
+[[bench]]
+name = "multilinear"
+harness = false
 
 # Warn rather than deny: `make extract` builds this crate with charon's own
 # rustc, and a lint that is only a style opinion must never be able to stop the

@@ -24,6 +24,9 @@ counterpart. What *is* trusted is enumerated under [Trusted computing base](#tru
 
 The goal of this project is not only to do the trivial translation, but to employ
 AI to heavily optimize the Lean definitions, Rust code, and the Lean-Rust loop.
+That optimization needs a fitness function, and `make run-bench` is it: criterion
+wall-clock time for every operation, measured against a frozen copy of its first
+translation in the same run, on the machine that will act on the result.
 
 Note, the field is concrete throughout the Rust implementation: base field `F_P` with `P = 2^32 - 99` (the
 "Hachi" prime), and its quartic extension `Ext4 = F_P[Y] / (Y^4 - 2)`.
@@ -34,6 +37,7 @@ Note, the field is concrete throughout the Rust implementation: base field `F_P`
 make setup     # install everything: elan, the Lean dependencies, rust, the extraction binaries
 make build     # check the proofs
 make extract   # regenerate lean/Generated.lean from src/
+make run-bench # time every operation against its frozen baseline
 ```
 
 `make` on its own lists the targets.
@@ -51,14 +55,15 @@ kept elsewhere.
 ## Layout
 
 ```
-Makefile              setup, build, test, extraction
+Makefile              setup, build, test, extraction, benchmarks
 toolchain/            charon and aeneas, put there by `make setup`; not in git
-.claude/skills/       repo-specific skills: idiomatic Rust under Aeneas
+.claude/skills/       repo-specific skills: idiomatic Rust under Aeneas, benchmarking
 
 cpoly/
   Cargo.toml          the `cpoly` crate: a library, no dependencies
-  src/                the Rust implementation, one module per layer
+  src/                the Rust implementation
   tests/              Rust-side semantics tests, one per src/ module
+  benches/            criterion benchmarks, one file per src/ module
 
   lakefile.lean       Lean library, srcDir `lean/`
   lean/

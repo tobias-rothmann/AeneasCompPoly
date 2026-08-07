@@ -418,9 +418,9 @@ fn extension_conventions_pinned() {
 }
 
 // ---------------------------------------------------------------
-// API introduced by the newtype refactor.  These have no counterpart in the
-// reference implementations above — they are about the *type*, not the
-// arithmetic — so each states its property directly.
+// The newtype API.  These have no counterpart in the reference implementations
+// above — they are about the *type*, not the arithmetic — so each states its
+// property directly.
 // ---------------------------------------------------------------
 
 /// `Fp::new` is the only public way in from a machine word, and it reduces.

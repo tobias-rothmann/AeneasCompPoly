@@ -21,14 +21,16 @@
 //! coefficient vector `c0 + c1 Y + c2 Y^2 + c3 Y^3`, mirroring
 //! `CompPoly.Extension.Ext P = Vector F P.d` at `d = 4`.
 //!
-//! # Operators
+//! # Why the operators are traits and not functions
 //!
 //! [`Fp`] and [`Ext4`] implement [`Add`], [`Sub`], [`Mul`], [`Neg`] and the
 //! `*Assign` forms, so field arithmetic is written `a + b * c` rather than
 //! `fadd(a, fmul(b, c))`.  Charon resolves each operator to its concrete impl,
-//! and Aeneas extracts that impl as an ordinary Lean definition.  There is
-//! also a heterogeneous `impl Mul<Ext4> for Fp`, which is what makes
-//! scalar-by-polynomial multiplication read as `scalar * coefficient`.
+//! and Aeneas extracts that impl as an ordinary Lean definition whose body is
+//! exactly what the old free function's was — so this costs the proofs a rename
+//! and nothing more.  There is also a heterogeneous
+//! `impl Mul<Ext4> for Fp`, which is what makes scalar-by-polynomial
+//! multiplication read as `scalar * coefficient`.
 //!
 //! # No overflow
 //!
@@ -52,6 +54,7 @@
 
 use core::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 
+// @genesis 7ca92f9 2026-07-31 — field::P
 /// The base-field modulus (the Hachi prime `2^32 - 99`).  `P < 2^32`.
 pub const P: u64 = 4_294_967_197;
 
@@ -59,6 +62,7 @@ pub const P: u64 = 4_294_967_197;
 // The base field.
 // ------------------------------------------------------------------
 
+// @genesis 7ca92f9 2026-07-31 — field::Fp
 /// An element of the base field `F_P`, held as its reduced representative in
 /// `[0, P)`.
 ///
@@ -72,25 +76,31 @@ pub const P: u64 = 4_294_967_197;
 pub struct Fp(u64);
 
 impl Fp {
+    // @genesis 7ca92f9 2026-07-31 — field::Fp::ZERO
     /// The additive identity.
     pub const ZERO: Fp = Fp(0);
 
+    // @genesis 7ca92f9 2026-07-31 — field::Fp::ONE
     /// The multiplicative identity.
     pub const ONE: Fp = Fp(1);
 
+    // @genesis 7ca92f9 2026-07-31 — field::Fp::MODULUS
     /// The modulus, as a machine word.
     pub const MODULUS: u64 = P;
 
+    // @genesis 7ca92f9 2026-07-31 — field::Fp::new
     /// Reduce a machine word into the field.
     pub fn new(v: u64) -> Fp {
         Fp(v % P)
     }
 
+    // @genesis 7ca92f9 2026-07-31 — field::Fp::to_u64
     /// The canonical representative, in `[0, P)`.
     pub const fn to_u64(self) -> u64 {
         self.0
     }
 
+    // @genesis 7ca92f9 2026-07-31 — field::Fp::is_zero
     /// Is this the additive identity?
     pub fn is_zero(self) -> bool {
         self.0 == 0
@@ -98,6 +108,7 @@ impl Fp {
 }
 
 impl From<u64> for Fp {
+    // @genesis 7ca92f9 2026-07-31 — field::<Fp as From<u64>>::from
     /// Reduces; see [`Fp::new`].
     fn from(v: u64) -> Fp {
         Fp::new(v)
@@ -107,6 +118,7 @@ impl From<u64> for Fp {
 impl Add for Fp {
     type Output = Fp;
 
+    // @genesis 7ca92f9 2026-07-31 — field::<Fp as Add>::add
     /// `a + b <= 2(P-1) < 2^64`, so the `u64` sum cannot overflow.
     fn add(self, rhs: Fp) -> Fp {
         Fp((self.0 + rhs.0) % P)
@@ -116,6 +128,7 @@ impl Add for Fp {
 impl Sub for Fp {
     type Output = Fp;
 
+    // @genesis 7ca92f9 2026-07-31 — field::<Fp as Sub>::sub
     /// Adding `P` first keeps the subtraction on `u64` from going negative;
     /// `a + P - b <= (P-1) + P < 2^64`.
     fn sub(self, rhs: Fp) -> Fp {
@@ -126,6 +139,7 @@ impl Sub for Fp {
 impl Mul for Fp {
     type Output = Fp;
 
+    // @genesis 7ca92f9 2026-07-31 — field::<Fp as Mul>::mul
     /// `a * b <= (P-1)^2 < 2^64` because `P < 2^32`; this is the tightest of the
     /// no-overflow bounds, with about `859 * 2^32` to spare.
     fn mul(self, rhs: Fp) -> Fp {
@@ -136,6 +150,7 @@ impl Mul for Fp {
 impl Neg for Fp {
     type Output = Fp;
 
+    // @genesis 7ca92f9 2026-07-31 — field::<Fp as Neg>::neg
     /// The outer `% P` is what sends `0` to `0` rather than to `P`.
     fn neg(self) -> Fp {
         Fp((P - self.0) % P)
@@ -143,18 +158,21 @@ impl Neg for Fp {
 }
 
 impl AddAssign for Fp {
+    // @genesis 7ca92f9 2026-07-31 — field::<Fp as AddAssign>::add_assign
     fn add_assign(&mut self, rhs: Fp) {
         *self = *self + rhs;
     }
 }
 
 impl SubAssign for Fp {
+    // @genesis 7ca92f9 2026-07-31 — field::<Fp as SubAssign>::sub_assign
     fn sub_assign(&mut self, rhs: Fp) {
         *self = *self - rhs;
     }
 }
 
 impl MulAssign for Fp {
+    // @genesis 7ca92f9 2026-07-31 — field::<Fp as MulAssign>::mul_assign
     fn mul_assign(&mut self, rhs: Fp) {
         *self = *self * rhs;
     }
@@ -164,12 +182,14 @@ impl MulAssign for Fp {
 // The extension field.
 // ------------------------------------------------------------------
 
+// @genesis 7ca92f9 2026-07-31 — field::W
 /// The binomial-extension constant: `Ext4 = F_P[Y] / (Y^4 - W)`.
 ///
 /// `W = 2` is the smallest non-square mod `P`, so multiplication by `W` is a
 /// doubling.  Mirrors `Hachi.ext4Params.W`.
 pub const W: Fp = Fp(2);
 
+// @genesis 7ca92f9 2026-07-31 — field::Ext4
 /// An element of `Ext4 = F_P[Y] / (Y^4 - W)`, as its dense little-endian
 /// coefficient vector: `c0 + c1 Y + c2 Y^2 + c3 Y^3`.
 ///
@@ -194,6 +214,7 @@ pub struct Ext4 {
 }
 
 impl Ext4 {
+    // @genesis 7ca92f9 2026-07-31 — field::Ext4::ZERO
     /// The additive identity.  Mirrors `(0 : Ext P)`.
     pub const ZERO: Ext4 = Ext4 {
         c0: Fp::ZERO,
@@ -202,6 +223,7 @@ impl Ext4 {
         c3: Fp::ZERO,
     };
 
+    // @genesis 7ca92f9 2026-07-31 — field::Ext4::ONE
     /// The multiplicative identity.  Mirrors `(1 : Ext P)`, i.e. `ofBase 1`.
     pub const ONE: Ext4 = Ext4 {
         c0: Fp::ONE,
@@ -210,6 +232,7 @@ impl Ext4 {
         c3: Fp::ZERO,
     };
 
+    // @genesis 7ca92f9 2026-07-31 — field::Ext4::GEN
     /// The adjoined fourth root of [`W`], i.e. `Y`.  Mirrors `Ext.gen`.
     ///
     /// Not used by the arithmetic; it pins the basis convention, so that `c1`
@@ -221,11 +244,13 @@ impl Ext4 {
         c3: Fp::ZERO,
     };
 
+    // @genesis 7ca92f9 2026-07-31 — field::Ext4::new
     /// The element with the given little-endian coefficients.
     pub const fn new(c0: Fp, c1: Fp, c2: Fp, c3: Fp) -> Ext4 {
         Ext4 { c0, c1, c2, c3 }
     }
 
+    // @genesis 7ca92f9 2026-07-31 — field::Ext4::from_base
     /// Embed a base-field element as the constant coefficient.  Mirrors
     /// `Ext.ofBase`.
     pub const fn from_base(a: Fp) -> Ext4 {
@@ -237,24 +262,27 @@ impl Ext4 {
         }
     }
 
+    // @genesis 7ca92f9 2026-07-31 — field::Ext4::is_zero
     /// Is this the additive identity?
     ///
     /// Written out coefficient by coefficient rather than as
     /// `*self == Self::ZERO` so that the extracted model is a plain chain of
     /// word comparisons.  This is the only place the crate compares field
-    /// elements (see [`crate::univariate::UnivariatePoly::trim`]).
+    /// elements (see [`crate::univariate::Poly::trim`]).
     pub fn is_zero(self) -> bool {
         self.c0.is_zero() && self.c1.is_zero() && self.c2.is_zero() && self.c3.is_zero()
     }
 }
 
 impl From<Fp> for Ext4 {
+    // @genesis 7ca92f9 2026-07-31 — field::<Ext4 as From<Fp>>::from
     fn from(a: Fp) -> Ext4 {
         Ext4::from_base(a)
     }
 }
 
 impl From<u64> for Ext4 {
+    // @genesis 7ca92f9 2026-07-31 — field::<Ext4 as From<u64>>::from
     /// Reduces the word, then embeds it; see [`Fp::new`] and [`Ext4::from_base`].
     fn from(a: u64) -> Ext4 {
         Ext4::from_base(Fp::new(a))
@@ -264,6 +292,7 @@ impl From<u64> for Ext4 {
 impl Add for Ext4 {
     type Output = Ext4;
 
+    // @genesis 7ca92f9 2026-07-31 — field::<Ext4 as Add>::add
     /// Coefficient-wise.  Mirrors `Ext.add`.
     fn add(self, rhs: Ext4) -> Ext4 {
         Ext4 {
@@ -278,6 +307,7 @@ impl Add for Ext4 {
 impl Sub for Ext4 {
     type Output = Ext4;
 
+    // @genesis 7ca92f9 2026-07-31 — field::<Ext4 as Sub>::sub
     /// Coefficient-wise.  Mirrors `Ext.sub`.
     fn sub(self, rhs: Ext4) -> Ext4 {
         Ext4 {
@@ -292,6 +322,7 @@ impl Sub for Ext4 {
 impl Neg for Ext4 {
     type Output = Ext4;
 
+    // @genesis 7ca92f9 2026-07-31 — field::<Ext4 as Neg>::neg
     /// Coefficient-wise.  Mirrors `Ext.neg`.
     fn neg(self) -> Ext4 {
         Ext4 {
@@ -306,6 +337,7 @@ impl Neg for Ext4 {
 impl Mul for Ext4 {
     type Output = Ext4;
 
+    // @genesis 7ca92f9 2026-07-31 — field::<Ext4 as Mul>::mul
     /// Mirrors `Ext.mul` at `d = 4`.
     ///
     /// `t0 .. t6` are the schoolbook product's coefficients before reduction,
@@ -332,6 +364,7 @@ impl Mul for Ext4 {
 impl Mul<Ext4> for Fp {
     type Output = Ext4;
 
+    // @genesis 7ca92f9 2026-07-31 — field::<Fp as Mul<Ext4>>::mul
     /// Scale an extension element by a base-field one, coefficient-wise.  This
     /// is what lets the polynomial layers write `scalar * coefficient`.
     fn mul(self, rhs: Ext4) -> Ext4 {
@@ -345,18 +378,21 @@ impl Mul<Ext4> for Fp {
 }
 
 impl AddAssign for Ext4 {
+    // @genesis 7ca92f9 2026-07-31 — field::<Ext4 as AddAssign>::add_assign
     fn add_assign(&mut self, rhs: Ext4) {
         *self = *self + rhs;
     }
 }
 
 impl SubAssign for Ext4 {
+    // @genesis 7ca92f9 2026-07-31 — field::<Ext4 as SubAssign>::sub_assign
     fn sub_assign(&mut self, rhs: Ext4) {
         *self = *self - rhs;
     }
 }
 
 impl MulAssign for Ext4 {
+    // @genesis 7ca92f9 2026-07-31 — field::<Ext4 as MulAssign>::mul_assign
     fn mul_assign(&mut self, rhs: Ext4) {
         *self = *self * rhs;
     }

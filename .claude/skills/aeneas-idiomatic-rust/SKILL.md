@@ -219,8 +219,11 @@ Things the repaired proofs need that are not obvious:
   accessors, `Index`, `Default`, `From` included, 111 `_spec` theorems. It is easy
   to break by adding API; adding a by-value operator impl means adding its
   one-line corollary spec too.
-* **`cargo clippy --all-targets` clean** under `pedantic`. Where a lint is wrong
-  for this crate, `#[allow]` it **with a one-line reason**, at the narrowest scope.
+* **`cargo clippy --all-targets` clean** under `pedantic`. Note `--all-targets`
+  now includes `benches/`. Where a lint is wrong for this crate, `#[allow]` it
+  **with a one-line reason**, at the narrowest scope.
+* **`make bench-check` passes.** Touching `src/` has benchmark obligations; see
+  the section below.
 * **Never weaken a spec to make it pass.** If a statement cannot be proved,
   the interesting possibilities are that the Rust is wrong, the reference is a
   different operation, or a hypothesis is genuinely needed — say which, do not
@@ -256,3 +259,34 @@ removed *negation and scalar multiplication* from the multilinear layer — they
 been the univariate operations applied to a shared `Vec<Ext4>` — and left two specs
 proving things about operations no caller could invoke any more. After a type split,
 enumerate what the old shared type could do and check each capability survived.
+
+## What a change to `src/` owes the benchmarks
+
+`cpoly/benches/` measures every operation here against `benches/genesis/`, a
+frozen copy of its *first* translation. Three obligations follow, and
+`make bench-check` enforces all three — run it before you call a refactor done.
+
+**Never apply a rename inside `benches/genesis/`.** This is the trap, because the
+mechanical rename pass above trains exactly the wrong reflex. Genesis is
+append-only and byte-exact: every item is verified against the git blob of the
+commit its `// @genesis` annotation names, so "fixing" it to match a rename
+breaks the check *and*, if the check were somehow satisfied, would silently
+rewrite what every past measurement was compared against. Genesis records what
+the code used to be. That is the whole point of it.
+
+**A renamed or split item needs a new frozen entry.** `bench-check` lists items
+in `src/` with no counterpart in genesis, and a rename produces exactly that: the
+new path is unfrozen while the old one sits in genesis forever. Copy the item's
+current text in, `make bench-stamp`, and leave the old entry alone. The 2026-07-31
+split of `Poly` into `MultilinearPoly`/`MultilinearEvals` is the shape of change
+that does this.
+
+**A renamed item also orphans its coverage markers.** `// @covers <path>` lines in
+`benches/*.rs` and keys in `benches/exclusions.toml` are full item paths —
+`multilinear::<&MultilinearPoly as Neg>::neg` — so a rename dangles them.
+`bench-check` fails on a `@covers` path that names no item, which is how you find
+them; grep the old name in `benches/` and fix both places.
+
+The reverse direction matters too: **adding a public operation** means freezing it
+and, if its docstring says `Mirrors CompPoly.X`, benching it or excluding it by
+name with a reason. `.claude/skills/rust-bench` is the procedure.

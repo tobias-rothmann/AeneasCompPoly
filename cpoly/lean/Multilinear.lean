@@ -54,13 +54,12 @@ evaluation algorithms free of `Vector.head`/`Vector.tail` reasoning.
 
 `cpoly::multilinear::table_len` is `1usize << vars`, and Aeneas's model of `<<<`
 fails once the shift amount reaches the word width -- so it fails on exactly the
-inputs for which `2 ^ vars` does not fit in a `usize`, which is the same condition
-the earlier checked-doubling version had.  Specs whose inputs already include a
-vector of length `2 ^ n` get `2 ^ n ≤ Usize.max` for free from the `alloc.vec.Vec`
-invariant (`Vec α = { l : List α // l.length ≤ Usize.max }`); the others
-(`zero_spec`, `zero_evals_spec`, `of_array_spec`, the two bases, `eq_tilde_spec`)
-take it as a hypothesis, which is exactly the weakest condition making the triple
-true.
+inputs for which `2 ^ vars` does not fit in a `usize`.  Specs whose inputs
+already include a vector of length `2 ^ n` get `2 ^ n ≤ Usize.max` for free from
+the `alloc.vec.Vec` invariant (`Vec α = { l : List α // l.length ≤ Usize.max }`);
+the others (`zero_spec`, `zero_evals_spec`, `of_array_spec`, the two bases,
+`eq_tilde_spec`) take it as a hypothesis, which is exactly the weakest condition
+making the triple true.
 -/
 import Field
 import Univariate
@@ -466,9 +465,8 @@ theorem mlValL_eq_eval (n : ℕ) (p : alloc.vec.Vec cpoly.field.Ext4) (w : Slice
 `multilinear::table_len` is `1usize << vars`.  The Aeneas model of `<<<` fails
 when the shift amount reaches the word width and otherwise reduces modulo
 `2 ^ 64`, so the function succeeds exactly when `vars < 64` — which, since
-`2 ^ vars ≤ Usize.max = 2 ^ 64 - 1` iff `vars < 64`, is the same side condition
-the previous checked-doubling loop had.  Hence the spec below is unchanged from
-that version, and the loop and its invariant are gone. -/
+`2 ^ vars ≤ Usize.max = 2 ^ 64 - 1` iff `vars < 64`, is the side condition the
+spec below carries. -/
 
 /-- `2 ^ n ≤ Usize.max` forces `n` below the word width: the shift's own
 precondition.  Stated in terms of `System.Platform.numBits` rather than `64`, so
@@ -506,8 +504,8 @@ theorem pow2_spec (n : Std.Usize) (hn : 2 ^ n.val ≤ Std.Usize.max) :
 
 /-- `cpoly::multilinear::MultilinearPoly::zeros` ↔ `CMlPolynomial.zero`.
 
-`vec![Ext4::ZERO; table_len(vars)]` is a single `alloc::vec::from_elem`, so
-unlike the previous version there is no fill loop to reason about. -/
+`vec![Ext4::ZERO; table_len(vars)]` is a single `alloc::vec::from_elem`, so there
+is no fill loop to reason about. -/
 theorem zero_spec (n : Std.Usize) (hn : 2 ^ n.val ≤ Std.Usize.max) :
     cpoly.multilinear.MultilinearPoly.zeros n ⦃ z => VecReduced z ∧ z.val.length = 2 ^ n.val ∧
       toMl n.val z = (CMlPolynomial.zero : CMlPolynomial F n.val) ⦄ := by
@@ -858,10 +856,7 @@ theorem add_evals_spec (n : ℕ) (v w : alloc.vec.Vec cpoly.field.Ext4)
 Negating or scaling an entry does not care how the index is read, so the Rust
 factors each into one loop over a slice — `multilinear::neg_pointwise` and
 `multilinear::scale_pointwise` — and the `Neg` and `Mul<Ext4>` impls of both
-readings call them.  Before `MultilinearPoly` and `MultilinearEvals` were separate
-types this layer had no negation of its own and reused the univariate one; that
-stopped being callable when the types split, so these are the operations that
-replace it.
+readings call them.
 
 `toMl_eq_ofFn` is the shared tail: a table whose `toExt`-image is a `range` map
 denotes the `Vector` of that map, which is what `Vector.map` unfolds to on the
@@ -1411,8 +1406,7 @@ theorem dot_loop_spec (a b : Slice cpoly.field.Ext4) (n : Std.Usize)
 
 /-- `cpoly::multilinear::dot` ↔ `Vector.dotProduct`, as a `Finset.range` sum.
 
-The Rust takes two slices and runs over `a.len()`, so `n` is pinned to that
-rather than passed in as it was when the length was an explicit parameter. -/
+The Rust takes two slices and runs over `a.len()`, so `n` is pinned to that. -/
 theorem dot_spec (a b : Slice cpoly.field.Ext4) (n : Std.Usize)
     (ha : VecReduced a) (hb : VecReduced b)
     (han : n = Slice.len a) (hbn : n.val ≤ b.val.length) :
@@ -1653,8 +1647,7 @@ theorem eval_horner_spec (n : ℕ) (p : alloc.vec.Vec cpoly.field.Ext4) (w : Sli
       toExt z = CMlPolynomial.evalHorner (toMl n p) (toPoint n w) ⦄ := by
   rw [cpoly.multilinear.MultilinearPoly.eval_horner]
   have hlen : w.len.val = n := by simpa using hwl
-  -- `self.0.clone()` replaces the entry-by-entry copy loop the previous version
-  -- of the crate used to seed the layers.
+  -- `self.0.clone()` seeds the layers.
   apply spec_bind (vec_clone_spec p)
   intro cur hcur
   rw [hcur]
@@ -1830,8 +1823,7 @@ theorem eval_mle_spec (n : ℕ) (p : alloc.vec.Vec cpoly.field.Ext4) (w : Slice 
       toExt z = CMlPolynomialEval.evalMle (toMlEval n p) (toPoint n w) ⦄ := by
   rw [cpoly.multilinear.MultilinearEvals.eval_mle]
   have hlen : w.len.val = n := by simpa using hwl
-  -- `self.0.clone()` replaces the entry-by-entry copy loop the previous version
-  -- of the crate used to seed the layers.
+  -- `self.0.clone()` seeds the layers.
   apply spec_bind (vec_clone_spec p)
   intro cur hcur
   rw [hcur]

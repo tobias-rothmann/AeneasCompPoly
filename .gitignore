@@ -3,15 +3,21 @@
 # the Aeneas checkouts, the CompPoly clone, the extraction binaries, and every
 # build tree -- is either third-party, machine-local, or derived, and is listed
 # below. `make setup` obtains the parts that are not in git.
+#
+# `cpoly/benches/` is tracked in full, the frozen `genesis/` crate included --
+# it is source, not output. No timings are committed anywhere: the harness keeps
+# nothing between runs, criterion's own output lands under
+# `cpoly/target/criterion`, which `target/` covers, and the optional `JSON=`
+# report is covered at the root. Every figure is re-derived by the next run, on
+# the machine that will act on it.
 
 
 # --- Not tracked, obtained or generated locally ------------------------------
 #
-# No checkout below is needed to build the proofs. `cpoly/lakefile.lean` fetches
-# both dependencies from git and Lake keeps its own copies under
-# `cpoly/.lake/packages/`, at the revisions pinned in `cpoly/lake-manifest.json`.
-# They used to be committed as gitlinks with no .gitmodules, which meant a fresh
-# clone got empty directories and no way to populate them.
+# No checkout below is needed to build the proofs, and none is a submodule.
+# `cpoly/lakefile.lean` fetches both dependencies from git and Lake keeps its own
+# copies under `cpoly/.lake/packages/`, at the revisions pinned in
+# `cpoly/lake-manifest.json`. That manifest is the only thing a clone needs.
 
 # The one that still matters, and only for `make extract`: the charon and aeneas
 # binaries that regenerate `cpoly/lean/Generated.lean`. One of them blows past
@@ -20,8 +26,8 @@
 
 # Working checkouts of the Aeneas fork the Lean backend is built from -- useful
 # for preparing the next Lean bump, read by nothing. `aeneas-432` is a git
-# *worktree* of `aeneas` (branch `lean-4.32.0`), not an independent clone, so it
-# could never have been a submodule in the first place.
+# *worktree* of `aeneas` (branch `lean-4.32.0`) rather than an independent
+# clone, so it is not a candidate for tracking either.
 /aeneas/
 /aeneas-432/
 
@@ -36,7 +42,7 @@
 # nothing but a re-run of `make setup`, which re-checks rather than re-downloads.
 /.make/
 
-# Rust build tree.
+# Rust build tree. Also where criterion writes, under cpoly/target/criterion.
 target/
 
 # Lake build tree, and the dependency sources Lake fetches into it.
@@ -55,10 +61,46 @@ target/
 # only has Lean must still be able to build the proofs.
 *.llbc
 
+# Bench reports. `make run-bench JSON=out.json` writes one relative to wherever
+# make was invoked, which is this directory. A report is a statement about one
+# machine at one moment and is worthless to a reader on another, so none of them
+# is ever committed. Root-scoped: `cpoly/lake-manifest.json` is tracked.
+/*.json
 
-# --- Editor and OS noise -----------------------------------------------------
+# The frozen baseline is built as a path dependency of `cpoly`, so it normally
+# has no lock file of its own; running cargo inside it directly leaves one.
+# `cpoly/Cargo.lock` IS tracked, deliberately -- benchmark numbers are only
+# comparable across runs if the dependency graph criterion is built from is
+# pinned along with the toolchain.
+/cpoly/benches/genesis/Cargo.lock
+
+
+# --- Editor, tooling and OS noise --------------------------------------------
+
+# `benches/harness.py` and `benches/rustitems.py` are stdlib-only and need no
+# environment, but running them -- or a linter over them -- still leaves caches.
+__pycache__/
+*.py[co]
+.mypy_cache/
+.ruff_cache/
+
 .DS_Store
 *.swp
 *~
 .idea/
 .vscode/
+
+# `.claude/skills/` is tracked: those skills are part of the project and are
+# referenced from the README. The settings file beside them is not -- it records
+# tool permissions granted on one machine.
+/.claude/settings.local.json
+
+
+# --- Local working notes -----------------------------------------------------
+#
+# Planning and research documents kept at the repo root. They are working
+# material for one person, not documentation, and they move on a different clock
+# than the code. Anchored to the root on purpose: anything that genuinely
+# belongs to the project lives in a directory, not loose beside the Makefile.
+/*.html
+/skills.md

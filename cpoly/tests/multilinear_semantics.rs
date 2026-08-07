@@ -59,9 +59,8 @@ fn coeffs(v: &[E], n: usize) -> MultilinearPoly {
 }
 
 /// The same table read on the Boolean hypercube.  Distinguishing these two is
-/// the point of the two types: before the refactor both were `Vec<Ext4>` and
-/// nothing stopped a caller evaluating one as if it were the other, which is now
-/// a compile error rather than a silently wrong answer.
+/// the point of the two types: evaluating one as if it were the other is a
+/// compile error rather than a silently wrong answer.
 fn evals(v: &[E]) -> MultilinearEvals {
     MultilinearEvals::from_values(tov(v))
 }
@@ -469,10 +468,8 @@ fn eq_tilde_matches_product_form() {
     }
 }
 
-/// Negation and scalar multiplication, in both readings.  These used to be the
-/// univariate operations applied to a shared `Vec<Ext4>`; once the two readings
-/// became distinct types that stopped being callable, so each reading has its own
-/// `Neg` and `Mul<Ext4>` now, sharing one loop underneath.
+/// Negation and scalar multiplication, in both readings.  Each reading has its
+/// own `Neg` and `Mul<Ext4>`, sharing one loop underneath.
 #[test]
 fn neg_and_smul_are_coefficientwise() {
     for n in 0..6 {
@@ -540,7 +537,7 @@ fn extension_point_pinned() {
 }
 
 // ---------------------------------------------------------------
-// API introduced by the newtype refactor.
+// The newtype API.
 // ---------------------------------------------------------------
 
 /// The two readings round-trip through their constructors and accessors, and
