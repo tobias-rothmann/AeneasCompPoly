@@ -84,7 +84,10 @@ Check **all four** things, in this order — each catches a different failure:
 * **`Vec::truncate`, `pop`, `last`, `first`, `clear`, `extend`** — no model.
   `resize` is the substitute for `truncate` and is documented as equivalent when
   shrinking.
-* **`checked_shl`** and friends returning `Option` → axiom.
+* **`checked_shl`** → axiom. Its family does **not** share its fate:
+  `checked_add` extracts to `U64.checked_add`, modelled and axiom-free
+  (probed 2026-08-10, `nightly-2026.07.26-3a8586f`) — probe the specific
+  intrinsic, per construct.
 
 ### Deliberately declined: `for i in 0..n`
 

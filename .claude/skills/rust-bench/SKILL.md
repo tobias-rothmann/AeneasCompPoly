@@ -137,6 +137,12 @@ The digest assertion in `case!` runs for **every** case in the file even under a
 `BENCH=` filter, so a semantic disagreement between `cpoly` and the baseline
 surfaces on the first run regardless of what you filtered to.
 
+What a filtered run does **not** validate: the `_control/*` self-test cases
+do not match the filter, so the report prints that `vs genesis` is
+unvalidated — the digest oracle stands, but the timing delta carries no
+error bar. An accept/reject decision takes a full `make run-bench`, never a
+filtered one.
+
 ## 4 · Adversarial review — mandatory, before the case is trusted
 
 Do **not** review your own bench by rereading it. You wrote it believing it was

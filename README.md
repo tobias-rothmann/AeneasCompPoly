@@ -57,7 +57,7 @@ kept elsewhere.
 ```
 Makefile              setup, build, test, extraction, benchmarks
 toolchain/            charon and aeneas, put there by `make setup`; not in git
-.claude/skills/       repo-specific skills: idiomatic Rust under Aeneas, benchmarking
+.claude/skills/       local skills and the vendored upstream Aeneas suite
 
 cpoly/
   Cargo.toml          the `cpoly` crate: a library, no dependencies

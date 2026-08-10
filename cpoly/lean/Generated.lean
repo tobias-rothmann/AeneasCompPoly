@@ -74,53 +74,53 @@ structure core.ops.arith.MulAssign (Self : Type) (Rhs : Type) where
   mul_assign : Self → Rhs → Result Self
 
 /-- [cpoly::field::P]
-    Source: 'src/field.rs', lines 58:0-58:33
+    Source: 'src/field.rs', lines 56:0-56:33
     Visibility: public -/
 @[global_simps, irreducible] def field.P : Std.U64 := 4294967197#u64
 
 /-- [cpoly::field::Fp]
-    Source: 'src/field.rs', lines 74:0-74:19
+    Source: 'src/field.rs', lines 72:0-72:19
     Visibility: public -/
 @[reducible]
 def field.Fp := Std.U64
 
 /-- [cpoly::field::{impl core::clone::Clone for cpoly::field::Fp}::clone]:
-    Source: 'src/field.rs', lines 73:15-73:20
+    Source: 'src/field.rs', lines 71:15-71:20
     Visibility: public -/
 def field.Fp.Insts.CoreCloneClone.clone
   (self : field.Fp) : Result field.Fp := do
   ok self
 
 /-- Trait implementation: [cpoly::field::{impl core::clone::Clone for cpoly::field::Fp}]
-    Source: 'src/field.rs', lines 73:15-73:20 -/
+    Source: 'src/field.rs', lines 71:15-71:20 -/
 @[reducible]
 def field.Fp.Insts.CoreCloneClone : core.clone.Clone field.Fp := {
   clone := field.Fp.Insts.CoreCloneClone.clone
 }
 
 /-- Trait implementation: [cpoly::field::{impl core::marker::Copy for cpoly::field::Fp}]
-    Source: 'src/field.rs', lines 73:9-73:13 -/
+    Source: 'src/field.rs', lines 71:9-71:13 -/
 @[reducible]
 def field.Fp.Insts.CoreMarkerCopy : core.marker.Copy field.Fp := {
   cloneInst := field.Fp.Insts.CoreCloneClone
 }
 
 /-- Trait implementation: [cpoly::field::{impl core::marker::StructuralPartialEq for cpoly::field::Fp}]
-    Source: 'src/field.rs', lines 73:22-73:31 -/
+    Source: 'src/field.rs', lines 71:22-71:31 -/
 @[reducible]
 def field.Fp.Insts.CoreMarkerStructuralPartialEq :
   core.marker.StructuralPartialEq field.Fp := {
 }
 
 /-- [cpoly::field::{impl core::cmp::PartialEq<cpoly::field::Fp> for cpoly::field::Fp}::eq]:
-    Source: 'src/field.rs', lines 73:22-73:31
+    Source: 'src/field.rs', lines 71:22-71:31
     Visibility: public -/
 def field.Fp.Insts.CoreCmpPartialEqFp.eq
   (self : field.Fp) (other : field.Fp) : Result Bool := do
   ok (self = other)
 
 /-- Trait implementation: [cpoly::field::{impl core::cmp::PartialEq<cpoly::field::Fp> for cpoly::field::Fp}]
-    Source: 'src/field.rs', lines 73:22-73:31 -/
+    Source: 'src/field.rs', lines 71:22-71:31 -/
 @[reducible]
 def field.Fp.Insts.CoreCmpPartialEqFp : core.cmp.PartialEq field.Fp field.Fp
   := {
@@ -128,14 +128,14 @@ def field.Fp.Insts.CoreCmpPartialEqFp : core.cmp.PartialEq field.Fp field.Fp
 }
 
 /-- [cpoly::field::{impl core::cmp::Eq for cpoly::field::Fp}::assert_fields_are_eq]:
-    Source: 'src/field.rs', lines 73:33-73:35
+    Source: 'src/field.rs', lines 71:33-71:35
     Visibility: public -/
 def field.Fp.Insts.CoreCmpEq.assert_fields_are_eq
   (self : field.Fp) : Result Unit := do
   ok ()
 
 /-- Trait implementation: [cpoly::field::{impl core::cmp::Eq for cpoly::field::Fp}]
-    Source: 'src/field.rs', lines 73:33-73:35 -/
+    Source: 'src/field.rs', lines 71:33-71:35 -/
 @[reducible]
 def field.Fp.Insts.CoreCmpEq : core.cmp.Eq field.Fp := {
   partialEqInst := field.Fp.Insts.CoreCmpPartialEqFp
@@ -143,20 +143,20 @@ def field.Fp.Insts.CoreCmpEq : core.cmp.Eq field.Fp := {
 }
 
 /-- [cpoly::field::{impl core::default::Default for cpoly::field::Fp}::default]:
-    Source: 'src/field.rs', lines 73:37-73:44
+    Source: 'src/field.rs', lines 71:37-71:44
     Visibility: public -/
 def field.Fp.Insts.CoreDefaultDefault.default : Result field.Fp := do
   ok (core.default.DefaultU64.default)
 
 /-- Trait implementation: [cpoly::field::{impl core::default::Default for cpoly::field::Fp}]
-    Source: 'src/field.rs', lines 73:37-73:44 -/
+    Source: 'src/field.rs', lines 71:37-71:44 -/
 @[reducible]
 def field.Fp.Insts.CoreDefaultDefault : core.default.Default field.Fp := {
   default := field.Fp.Insts.CoreDefaultDefault.default
 }
 
 /-- [cpoly::field::{impl core::fmt::Debug for cpoly::field::Fp}::fmt]:
-    Source: 'src/field.rs', lines 73:46-73:51
+    Source: 'src/field.rs', lines 71:46-71:51
     Visibility: public -/
 def field.Fp.Insts.CoreFmtDebug.fmt
   (self : field.Fp) (f : core.fmt.Formatter) :
@@ -166,62 +166,62 @@ def field.Fp.Insts.CoreFmtDebug.fmt
   core.fmt.Formatter.debug_tuple_field1_finish f (toStr "Fp") dyn
 
 /-- Trait implementation: [cpoly::field::{impl core::fmt::Debug for cpoly::field::Fp}]
-    Source: 'src/field.rs', lines 73:46-73:51 -/
+    Source: 'src/field.rs', lines 71:46-71:51 -/
 @[reducible]
 def field.Fp.Insts.CoreFmtDebug : core.fmt.Debug field.Fp := {
   fmt := field.Fp.Insts.CoreFmtDebug.fmt
 }
 
 /-- [cpoly::field::{cpoly::field::Fp}::ZERO]
-    Source: 'src/field.rs', lines 78:4-78:31
+    Source: 'src/field.rs', lines 76:4-76:31
     Visibility: public -/
 @[global_simps, irreducible] def field.Fp.ZERO : field.Fp := 0#u64
 
 /-- [cpoly::field::{cpoly::field::Fp}::ONE]
-    Source: 'src/field.rs', lines 81:4-81:30
+    Source: 'src/field.rs', lines 79:4-79:30
     Visibility: public -/
 @[global_simps, irreducible] def field.Fp.ONE : field.Fp := 1#u64
 
 /-- [cpoly::field::{cpoly::field::Fp}::MODULUS]
-    Source: 'src/field.rs', lines 84:4-84:31
+    Source: 'src/field.rs', lines 82:4-82:31
     Visibility: public -/
 @[global_simps, irreducible] def field.Fp.MODULUS : Std.U64 := field.P
 
 /-- [cpoly::field::{cpoly::field::Fp}::new]:
-    Source: 'src/field.rs', lines 87:4-89:5
+    Source: 'src/field.rs', lines 85:4-87:5
     Visibility: public -/
 def field.Fp.new (v : Std.U64) : Result field.Fp := do
   let i ← v % field.P
   ok i
 
 /-- [cpoly::field::{cpoly::field::Fp}::to_u64]:
-    Source: 'src/field.rs', lines 92:4-94:5
+    Source: 'src/field.rs', lines 90:4-92:5
     Visibility: public -/
 def field.Fp.to_u64 (self : field.Fp) : Result Std.U64 := do
   ok self
 
 /-- [cpoly::field::{cpoly::field::Fp}::is_zero]:
-    Source: 'src/field.rs', lines 97:4-99:5
+    Source: 'src/field.rs', lines 95:4-97:5
     Visibility: public -/
 def field.Fp.is_zero (self : field.Fp) : Result Bool := do
   ok (self = 0#u64)
 
 /-- [cpoly::field::{impl core::convert::From<u64> for cpoly::field::Fp}::from]:
-    Source: 'src/field.rs', lines 104:4-106:5
+    Source: 'src/field.rs', lines 102:4-104:5
     Visibility: public -/
 def field.Fp.Insts.CoreConvertFromU64.from
   (v : Std.U64) : Result field.Fp := do
   field.Fp.new v
 
 /-- Trait implementation: [cpoly::field::{impl core::convert::From<u64> for cpoly::field::Fp}]
-    Source: 'src/field.rs', lines 102:0-107:1 -/
+    Source: 'src/field.rs', lines 100:0-105:1 -/
 @[reducible]
 def field.Fp.Insts.CoreConvertFromU64 : core.convert.From field.Fp Std.U64 := {
   «from» := field.Fp.Insts.CoreConvertFromU64.from
 }
 
 /-- [cpoly::field::{impl core::ops::arith::Add<cpoly::field::Fp, cpoly::field::Fp> for cpoly::field::Fp}::add]:
-    Source: 'src/field.rs', lines 113:4-115:5
+    Source: 'src/field.rs', lines 111:4-113:5
     Visibility: public -/
 def field.Fp.Insts.CoreOpsArithAddFpFp.add
   (self : field.Fp) (rhs : field.Fp) : Result field.Fp := do
@@ -230,7 +230,7 @@ def field.Fp.Insts.CoreOpsArithAddFpFp.add
   ok i1
 
 /-- Trait implementation: [cpoly::field::{impl core::ops::arith::Add<cpoly::field::Fp, cpoly::field::Fp> for cpoly::field::Fp}]
-    Source: 'src/field.rs', lines 109:0-116:1 -/
+    Source: 'src/field.rs', lines 107:0-114:1 -/
 @[reducible]
 def field.Fp.Insts.CoreOpsArithAddFpFp : core.ops.arith.Add field.Fp field.Fp
   field.Fp := {
@@ -238,7 +238,7 @@ def field.Fp.Insts.CoreOpsArithAddFpFp : core.ops.arith.Add field.Fp field.Fp
 }
 
 /-- [cpoly::field::{impl core::ops::arith::Sub<cpoly::field::Fp, cpoly::field::Fp> for cpoly::field::Fp}::sub]:
-    Source: 'src/field.rs', lines 123:4-125:5
+    Source: 'src/field.rs', lines 121:4-123:5
     Visibility: public -/
 def field.Fp.Insts.CoreOpsArithSubFpFp.sub
   (self : field.Fp) (rhs : field.Fp) : Result field.Fp := do
@@ -248,7 +248,7 @@ def field.Fp.Insts.CoreOpsArithSubFpFp.sub
   ok i2
 
 /-- Trait implementation: [cpoly::field::{impl core::ops::arith::Sub<cpoly::field::Fp, cpoly::field::Fp> for cpoly::field::Fp}]
-    Source: 'src/field.rs', lines 118:0-126:1 -/
+    Source: 'src/field.rs', lines 116:0-124:1 -/
 @[reducible]
 def field.Fp.Insts.CoreOpsArithSubFpFp : core.ops.arith.Sub field.Fp field.Fp
   field.Fp := {
@@ -256,7 +256,7 @@ def field.Fp.Insts.CoreOpsArithSubFpFp : core.ops.arith.Sub field.Fp field.Fp
 }
 
 /-- [cpoly::field::{impl core::ops::arith::Mul<cpoly::field::Fp, cpoly::field::Fp> for cpoly::field::Fp}::mul]:
-    Source: 'src/field.rs', lines 133:4-135:5
+    Source: 'src/field.rs', lines 131:4-133:5
     Visibility: public -/
 def field.Fp.Insts.CoreOpsArithMulFpFp.mul
   (self : field.Fp) (rhs : field.Fp) : Result field.Fp := do
@@ -265,7 +265,7 @@ def field.Fp.Insts.CoreOpsArithMulFpFp.mul
   ok i1
 
 /-- Trait implementation: [cpoly::field::{impl core::ops::arith::Mul<cpoly::field::Fp, cpoly::field::Fp> for cpoly::field::Fp}]
-    Source: 'src/field.rs', lines 128:0-136:1 -/
+    Source: 'src/field.rs', lines 126:0-134:1 -/
 @[reducible]
 def field.Fp.Insts.CoreOpsArithMulFpFp : core.ops.arith.Mul field.Fp field.Fp
   field.Fp := {
@@ -273,7 +273,7 @@ def field.Fp.Insts.CoreOpsArithMulFpFp : core.ops.arith.Mul field.Fp field.Fp
 }
 
 /-- [cpoly::field::{impl core::ops::arith::Neg<cpoly::field::Fp> for cpoly::field::Fp}::neg]:
-    Source: 'src/field.rs', lines 142:4-144:5
+    Source: 'src/field.rs', lines 140:4-142:5
     Visibility: public -/
 def field.Fp.Insts.CoreOpsArithNegFp.neg
   (self : field.Fp) : Result field.Fp := do
@@ -282,7 +282,7 @@ def field.Fp.Insts.CoreOpsArithNegFp.neg
   ok i1
 
 /-- Trait implementation: [cpoly::field::{impl core::ops::arith::Neg<cpoly::field::Fp> for cpoly::field::Fp}]
-    Source: 'src/field.rs', lines 138:0-145:1 -/
+    Source: 'src/field.rs', lines 136:0-143:1 -/
 @[reducible]
 def field.Fp.Insts.CoreOpsArithNegFp : core.ops.arith.Neg field.Fp field.Fp
   := {
@@ -290,14 +290,14 @@ def field.Fp.Insts.CoreOpsArithNegFp : core.ops.arith.Neg field.Fp field.Fp
 }
 
 /-- [cpoly::field::{impl core::ops::arith::AddAssign<cpoly::field::Fp> for cpoly::field::Fp}::add_assign]:
-    Source: 'src/field.rs', lines 148:4-150:5
+    Source: 'src/field.rs', lines 146:4-148:5
     Visibility: public -/
 def field.Fp.Insts.CoreOpsArithAddAssignFp.add_assign
   (self : field.Fp) (rhs : field.Fp) : Result field.Fp := do
   field.Fp.Insts.CoreOpsArithAddFpFp.add self rhs
 
 /-- Trait implementation: [cpoly::field::{impl core::ops::arith::AddAssign<cpoly::field::Fp> for cpoly::field::Fp}]
-    Source: 'src/field.rs', lines 147:0-151:1 -/
+    Source: 'src/field.rs', lines 145:0-149:1 -/
 @[reducible]
 def field.Fp.Insts.CoreOpsArithAddAssignFp : core.ops.arith.AddAssign field.Fp
   field.Fp := {
@@ -305,14 +305,14 @@ def field.Fp.Insts.CoreOpsArithAddAssignFp : core.ops.arith.AddAssign field.Fp
 }
 
 /-- [cpoly::field::{impl core::ops::arith::SubAssign<cpoly::field::Fp> for cpoly::field::Fp}::sub_assign]:
-    Source: 'src/field.rs', lines 154:4-156:5
+    Source: 'src/field.rs', lines 152:4-154:5
     Visibility: public -/
 def field.Fp.Insts.CoreOpsArithSubAssignFp.sub_assign
   (self : field.Fp) (rhs : field.Fp) : Result field.Fp := do
   field.Fp.Insts.CoreOpsArithSubFpFp.sub self rhs
 
 /-- Trait implementation: [cpoly::field::{impl core::ops::arith::SubAssign<cpoly::field::Fp> for cpoly::field::Fp}]
-    Source: 'src/field.rs', lines 153:0-157:1 -/
+    Source: 'src/field.rs', lines 151:0-155:1 -/
 @[reducible]
 def field.Fp.Insts.CoreOpsArithSubAssignFp : core.ops.arith.SubAssign field.Fp
   field.Fp := {
@@ -320,14 +320,14 @@ def field.Fp.Insts.CoreOpsArithSubAssignFp : core.ops.arith.SubAssign field.Fp
 }
 
 /-- [cpoly::field::{impl core::ops::arith::MulAssign<cpoly::field::Fp> for cpoly::field::Fp}::mul_assign]:
-    Source: 'src/field.rs', lines 160:4-162:5
+    Source: 'src/field.rs', lines 158:4-160:5
     Visibility: public -/
 def field.Fp.Insts.CoreOpsArithMulAssignFp.mul_assign
   (self : field.Fp) (rhs : field.Fp) : Result field.Fp := do
   field.Fp.Insts.CoreOpsArithMulFpFp.mul self rhs
 
 /-- Trait implementation: [cpoly::field::{impl core::ops::arith::MulAssign<cpoly::field::Fp> for cpoly::field::Fp}]
-    Source: 'src/field.rs', lines 159:0-163:1 -/
+    Source: 'src/field.rs', lines 157:0-161:1 -/
 @[reducible]
 def field.Fp.Insts.CoreOpsArithMulAssignFp : core.ops.arith.MulAssign field.Fp
   field.Fp := {
@@ -335,12 +335,12 @@ def field.Fp.Insts.CoreOpsArithMulAssignFp : core.ops.arith.MulAssign field.Fp
 }
 
 /-- [cpoly::field::W]
-    Source: 'src/field.rs', lines 173:0-173:24
+    Source: 'src/field.rs', lines 171:0-171:24
     Visibility: public -/
 @[global_simps, irreducible] def field.W : field.Fp := 2#u64
 
 /-- [cpoly::field::Ext4]
-    Source: 'src/field.rs', lines 187:0-196:1
+    Source: 'src/field.rs', lines 185:0-194:1
     Visibility: public -/
 structure field.Ext4 where
   c0 : field.Fp
@@ -349,35 +349,35 @@ structure field.Ext4 where
   c3 : field.Fp
 
 /-- [cpoly::field::{impl core::clone::Clone for cpoly::field::Ext4}::clone]:
-    Source: 'src/field.rs', lines 186:15-186:20
+    Source: 'src/field.rs', lines 184:15-184:20
     Visibility: public -/
 def field.Ext4.Insts.CoreCloneClone.clone
   (self : field.Ext4) : Result field.Ext4 := do
   ok self
 
 /-- Trait implementation: [cpoly::field::{impl core::clone::Clone for cpoly::field::Ext4}]
-    Source: 'src/field.rs', lines 186:15-186:20 -/
+    Source: 'src/field.rs', lines 184:15-184:20 -/
 @[reducible]
 def field.Ext4.Insts.CoreCloneClone : core.clone.Clone field.Ext4 := {
   clone := field.Ext4.Insts.CoreCloneClone.clone
 }
 
 /-- Trait implementation: [cpoly::field::{impl core::marker::Copy for cpoly::field::Ext4}]
-    Source: 'src/field.rs', lines 186:9-186:13 -/
+    Source: 'src/field.rs', lines 184:9-184:13 -/
 @[reducible]
 def field.Ext4.Insts.CoreMarkerCopy : core.marker.Copy field.Ext4 := {
   cloneInst := field.Ext4.Insts.CoreCloneClone
 }
 
 /-- Trait implementation: [cpoly::field::{impl core::marker::StructuralPartialEq for cpoly::field::Ext4}]
-    Source: 'src/field.rs', lines 186:22-186:31 -/
+    Source: 'src/field.rs', lines 184:22-184:31 -/
 @[reducible]
 def field.Ext4.Insts.CoreMarkerStructuralPartialEq :
   core.marker.StructuralPartialEq field.Ext4 := {
 }
 
 /-- [cpoly::field::{impl core::cmp::PartialEq<cpoly::field::Ext4> for cpoly::field::Ext4}::eq]:
-    Source: 'src/field.rs', lines 186:22-186:31
+    Source: 'src/field.rs', lines 184:22-184:31
     Visibility: public -/
 def field.Ext4.Insts.CoreCmpPartialEqExt4.eq
   (self : field.Ext4) (other : field.Ext4) : Result Bool := do
@@ -395,7 +395,7 @@ def field.Ext4.Insts.CoreCmpPartialEqExt4.eq
   else ok false
 
 /-- Trait implementation: [cpoly::field::{impl core::cmp::PartialEq<cpoly::field::Ext4> for cpoly::field::Ext4}]
-    Source: 'src/field.rs', lines 186:22-186:31 -/
+    Source: 'src/field.rs', lines 184:22-184:31 -/
 @[reducible]
 def field.Ext4.Insts.CoreCmpPartialEqExt4 : core.cmp.PartialEq field.Ext4
   field.Ext4 := {
@@ -403,14 +403,14 @@ def field.Ext4.Insts.CoreCmpPartialEqExt4 : core.cmp.PartialEq field.Ext4
 }
 
 /-- [cpoly::field::{impl core::cmp::Eq for cpoly::field::Ext4}::assert_fields_are_eq]:
-    Source: 'src/field.rs', lines 186:33-186:35
+    Source: 'src/field.rs', lines 184:33-184:35
     Visibility: public -/
 def field.Ext4.Insts.CoreCmpEq.assert_fields_are_eq
   (self : field.Ext4) : Result Unit := do
   ok ()
 
 /-- Trait implementation: [cpoly::field::{impl core::cmp::Eq for cpoly::field::Ext4}]
-    Source: 'src/field.rs', lines 186:33-186:35 -/
+    Source: 'src/field.rs', lines 184:33-184:35 -/
 @[reducible]
 def field.Ext4.Insts.CoreCmpEq : core.cmp.Eq field.Ext4 := {
   partialEqInst := field.Ext4.Insts.CoreCmpPartialEqExt4
@@ -418,21 +418,21 @@ def field.Ext4.Insts.CoreCmpEq : core.cmp.Eq field.Ext4 := {
 }
 
 /-- [cpoly::field::{impl core::default::Default for cpoly::field::Ext4}::default]:
-    Source: 'src/field.rs', lines 186:37-186:44
+    Source: 'src/field.rs', lines 184:37-184:44
     Visibility: public -/
 def field.Ext4.Insts.CoreDefaultDefault.default : Result field.Ext4 := do
   let f ← field.Fp.Insts.CoreDefaultDefault.default
   ok { c0 := f, c1 := f, c2 := f, c3 := f }
 
 /-- Trait implementation: [cpoly::field::{impl core::default::Default for cpoly::field::Ext4}]
-    Source: 'src/field.rs', lines 186:37-186:44 -/
+    Source: 'src/field.rs', lines 184:37-184:44 -/
 @[reducible]
 def field.Ext4.Insts.CoreDefaultDefault : core.default.Default field.Ext4 := {
   default := field.Ext4.Insts.CoreDefaultDefault.default
 }
 
 /-- [cpoly::field::{impl core::fmt::Debug for cpoly::field::Ext4}::fmt]:
-    Source: 'src/field.rs', lines 186:46-186:51
+    Source: 'src/field.rs', lines 184:46-184:51
     Visibility: public -/
 def field.Ext4.Insts.CoreFmtDebug.fmt
   (self : field.Ext4) (f : core.fmt.Formatter) :
@@ -447,14 +447,14 @@ def field.Ext4.Insts.CoreFmtDebug.fmt
     dyn (toStr "c1") dyn1 (toStr "c2") dyn2 (toStr "c3") dyn3
 
 /-- Trait implementation: [cpoly::field::{impl core::fmt::Debug for cpoly::field::Ext4}]
-    Source: 'src/field.rs', lines 186:46-186:51 -/
+    Source: 'src/field.rs', lines 184:46-184:51 -/
 @[reducible]
 def field.Ext4.Insts.CoreFmtDebug : core.fmt.Debug field.Ext4 := {
   fmt := field.Ext4.Insts.CoreFmtDebug.fmt
 }
 
 /-- [cpoly::field::{cpoly::field::Ext4}::ZERO]
-    Source: 'src/field.rs', lines 200:4-205:6
+    Source: 'src/field.rs', lines 198:4-203:6
     Visibility: public -/
 @[global_simps, irreducible]
 def field.Ext4.ZERO : field.Ext4 :=
@@ -466,7 +466,7 @@ def field.Ext4.ZERO : field.Ext4 :=
   }
 
 /-- [cpoly::field::{cpoly::field::Ext4}::ONE]
-    Source: 'src/field.rs', lines 208:4-213:6
+    Source: 'src/field.rs', lines 206:4-211:6
     Visibility: public -/
 @[global_simps, irreducible]
 def field.Ext4.ONE : field.Ext4 :=
@@ -478,7 +478,7 @@ def field.Ext4.ONE : field.Ext4 :=
   }
 
 /-- [cpoly::field::{cpoly::field::Ext4}::GEN]
-    Source: 'src/field.rs', lines 219:4-224:6
+    Source: 'src/field.rs', lines 217:4-222:6
     Visibility: public -/
 @[global_simps, irreducible]
 def field.Ext4.GEN : field.Ext4 :=
@@ -490,7 +490,7 @@ def field.Ext4.GEN : field.Ext4 :=
   }
 
 /-- [cpoly::field::{cpoly::field::Ext4}::new]:
-    Source: 'src/field.rs', lines 227:4-229:5
+    Source: 'src/field.rs', lines 225:4-227:5
     Visibility: public -/
 def field.Ext4.new
   (c0 : field.Fp) (c1 : field.Fp) (c2 : field.Fp) (c3 : field.Fp) :
@@ -499,13 +499,13 @@ def field.Ext4.new
   ok { c0, c1, c2, c3 }
 
 /-- [cpoly::field::{cpoly::field::Ext4}::from_base]:
-    Source: 'src/field.rs', lines 233:4-240:5
+    Source: 'src/field.rs', lines 231:4-238:5
     Visibility: public -/
 def field.Ext4.from_base (a : field.Fp) : Result field.Ext4 := do
   ok { c0 := a, c1 := field.Fp.ZERO, c2 := field.Fp.ZERO, c3 := field.Fp.ZERO }
 
 /-- [cpoly::field::{cpoly::field::Ext4}::is_zero]:
-    Source: 'src/field.rs', lines 248:4-250:5
+    Source: 'src/field.rs', lines 246:4-248:5
     Visibility: public -/
 def field.Ext4.is_zero (self : field.Ext4) : Result Bool := do
   let b ← field.Fp.is_zero self.c0
@@ -522,14 +522,14 @@ def field.Ext4.is_zero (self : field.Ext4) : Result Bool := do
   else ok false
 
 /-- [cpoly::field::{impl core::convert::From<cpoly::field::Fp> for cpoly::field::Ext4}::from]:
-    Source: 'src/field.rs', lines 254:4-256:5
+    Source: 'src/field.rs', lines 252:4-254:5
     Visibility: public -/
 def field.Ext4.Insts.CoreConvertFromFp.from
   (a : field.Fp) : Result field.Ext4 := do
   field.Ext4.from_base a
 
 /-- Trait implementation: [cpoly::field::{impl core::convert::From<cpoly::field::Fp> for cpoly::field::Ext4}]
-    Source: 'src/field.rs', lines 253:0-257:1 -/
+    Source: 'src/field.rs', lines 251:0-255:1 -/
 @[reducible]
 def field.Ext4.Insts.CoreConvertFromFp : core.convert.From field.Ext4 field.Fp
   := {
@@ -537,7 +537,7 @@ def field.Ext4.Insts.CoreConvertFromFp : core.convert.From field.Ext4 field.Fp
 }
 
 /-- [cpoly::field::{impl core::convert::From<u64> for cpoly::field::Ext4}::from]:
-    Source: 'src/field.rs', lines 261:4-263:5
+    Source: 'src/field.rs', lines 259:4-261:5
     Visibility: public -/
 def field.Ext4.Insts.CoreConvertFromU64.from
   (a : Std.U64) : Result field.Ext4 := do
@@ -545,7 +545,7 @@ def field.Ext4.Insts.CoreConvertFromU64.from
   field.Ext4.from_base f
 
 /-- Trait implementation: [cpoly::field::{impl core::convert::From<u64> for cpoly::field::Ext4}]
-    Source: 'src/field.rs', lines 259:0-264:1 -/
+    Source: 'src/field.rs', lines 257:0-262:1 -/
 @[reducible]
 def field.Ext4.Insts.CoreConvertFromU64 : core.convert.From field.Ext4 Std.U64
   := {
@@ -553,7 +553,7 @@ def field.Ext4.Insts.CoreConvertFromU64 : core.convert.From field.Ext4 Std.U64
 }
 
 /-- [cpoly::field::{impl core::ops::arith::Add<cpoly::field::Ext4, cpoly::field::Ext4> for cpoly::field::Ext4}::add]:
-    Source: 'src/field.rs', lines 270:4-277:5
+    Source: 'src/field.rs', lines 268:4-275:5
     Visibility: public -/
 def field.Ext4.Insts.CoreOpsArithAddExt4Ext4.add
   (self : field.Ext4) (rhs : field.Ext4) : Result field.Ext4 := do
@@ -564,7 +564,7 @@ def field.Ext4.Insts.CoreOpsArithAddExt4Ext4.add
   ok { c0 := f, c1 := f1, c2 := f2, c3 := f3 }
 
 /-- Trait implementation: [cpoly::field::{impl core::ops::arith::Add<cpoly::field::Ext4, cpoly::field::Ext4> for cpoly::field::Ext4}]
-    Source: 'src/field.rs', lines 266:0-278:1 -/
+    Source: 'src/field.rs', lines 264:0-276:1 -/
 @[reducible]
 def field.Ext4.Insts.CoreOpsArithAddExt4Ext4 : core.ops.arith.Add field.Ext4
   field.Ext4 field.Ext4 := {
@@ -572,7 +572,7 @@ def field.Ext4.Insts.CoreOpsArithAddExt4Ext4 : core.ops.arith.Add field.Ext4
 }
 
 /-- [cpoly::field::{impl core::ops::arith::Sub<cpoly::field::Ext4, cpoly::field::Ext4> for cpoly::field::Ext4}::sub]:
-    Source: 'src/field.rs', lines 284:4-291:5
+    Source: 'src/field.rs', lines 282:4-289:5
     Visibility: public -/
 def field.Ext4.Insts.CoreOpsArithSubExt4Ext4.sub
   (self : field.Ext4) (rhs : field.Ext4) : Result field.Ext4 := do
@@ -583,7 +583,7 @@ def field.Ext4.Insts.CoreOpsArithSubExt4Ext4.sub
   ok { c0 := f, c1 := f1, c2 := f2, c3 := f3 }
 
 /-- Trait implementation: [cpoly::field::{impl core::ops::arith::Sub<cpoly::field::Ext4, cpoly::field::Ext4> for cpoly::field::Ext4}]
-    Source: 'src/field.rs', lines 280:0-292:1 -/
+    Source: 'src/field.rs', lines 278:0-290:1 -/
 @[reducible]
 def field.Ext4.Insts.CoreOpsArithSubExt4Ext4 : core.ops.arith.Sub field.Ext4
   field.Ext4 field.Ext4 := {
@@ -591,7 +591,7 @@ def field.Ext4.Insts.CoreOpsArithSubExt4Ext4 : core.ops.arith.Sub field.Ext4
 }
 
 /-- [cpoly::field::{impl core::ops::arith::Neg<cpoly::field::Ext4> for cpoly::field::Ext4}::neg]:
-    Source: 'src/field.rs', lines 298:4-305:5
+    Source: 'src/field.rs', lines 296:4-303:5
     Visibility: public -/
 def field.Ext4.Insts.CoreOpsArithNegExt4.neg
   (self : field.Ext4) : Result field.Ext4 := do
@@ -602,7 +602,7 @@ def field.Ext4.Insts.CoreOpsArithNegExt4.neg
   ok { c0 := f, c1 := f1, c2 := f2, c3 := f3 }
 
 /-- Trait implementation: [cpoly::field::{impl core::ops::arith::Neg<cpoly::field::Ext4> for cpoly::field::Ext4}]
-    Source: 'src/field.rs', lines 294:0-306:1 -/
+    Source: 'src/field.rs', lines 292:0-304:1 -/
 @[reducible]
 def field.Ext4.Insts.CoreOpsArithNegExt4 : core.ops.arith.Neg field.Ext4
   field.Ext4 := {
@@ -610,7 +610,7 @@ def field.Ext4.Insts.CoreOpsArithNegExt4 : core.ops.arith.Neg field.Ext4
 }
 
 /-- [cpoly::field::{impl core::ops::arith::Mul<cpoly::field::Ext4, cpoly::field::Ext4> for cpoly::field::Ext4}::mul]:
-    Source: 'src/field.rs', lines 317:4-331:5
+    Source: 'src/field.rs', lines 315:4-329:5
     Visibility: public -/
 def field.Ext4.Insts.CoreOpsArithMulExt4Ext4.mul
   (self : field.Ext4) (rhs : field.Ext4) : Result field.Ext4 := do
@@ -648,7 +648,7 @@ def field.Ext4.Insts.CoreOpsArithMulExt4Ext4.mul
   ok { c0 := f19, c1 := f21, c2 := f23, c3 := t3 }
 
 /-- Trait implementation: [cpoly::field::{impl core::ops::arith::Mul<cpoly::field::Ext4, cpoly::field::Ext4> for cpoly::field::Ext4}]
-    Source: 'src/field.rs', lines 308:0-332:1 -/
+    Source: 'src/field.rs', lines 306:0-330:1 -/
 @[reducible]
 def field.Ext4.Insts.CoreOpsArithMulExt4Ext4 : core.ops.arith.Mul field.Ext4
   field.Ext4 field.Ext4 := {
@@ -656,7 +656,7 @@ def field.Ext4.Insts.CoreOpsArithMulExt4Ext4 : core.ops.arith.Mul field.Ext4
 }
 
 /-- [cpoly::field::{impl core::ops::arith::Mul<cpoly::field::Ext4, cpoly::field::Ext4> for cpoly::field::Fp}::mul]:
-    Source: 'src/field.rs', lines 339:4-346:5
+    Source: 'src/field.rs', lines 337:4-344:5
     Visibility: public -/
 def field.Fp.Insts.CoreOpsArithMulExt4Ext4.mul
   (self : field.Fp) (rhs : field.Ext4) : Result field.Ext4 := do
@@ -667,7 +667,7 @@ def field.Fp.Insts.CoreOpsArithMulExt4Ext4.mul
   ok { c0 := f, c1 := f1, c2 := f2, c3 := f3 }
 
 /-- Trait implementation: [cpoly::field::{impl core::ops::arith::Mul<cpoly::field::Ext4, cpoly::field::Ext4> for cpoly::field::Fp}]
-    Source: 'src/field.rs', lines 334:0-347:1 -/
+    Source: 'src/field.rs', lines 332:0-345:1 -/
 @[reducible]
 def field.Fp.Insts.CoreOpsArithMulExt4Ext4 : core.ops.arith.Mul field.Fp
   field.Ext4 field.Ext4 := {
@@ -675,14 +675,14 @@ def field.Fp.Insts.CoreOpsArithMulExt4Ext4 : core.ops.arith.Mul field.Fp
 }
 
 /-- [cpoly::field::{impl core::ops::arith::AddAssign<cpoly::field::Ext4> for cpoly::field::Ext4}::add_assign]:
-    Source: 'src/field.rs', lines 350:4-352:5
+    Source: 'src/field.rs', lines 348:4-350:5
     Visibility: public -/
 def field.Ext4.Insts.CoreOpsArithAddAssignExt4.add_assign
   (self : field.Ext4) (rhs : field.Ext4) : Result field.Ext4 := do
   field.Ext4.Insts.CoreOpsArithAddExt4Ext4.add self rhs
 
 /-- Trait implementation: [cpoly::field::{impl core::ops::arith::AddAssign<cpoly::field::Ext4> for cpoly::field::Ext4}]
-    Source: 'src/field.rs', lines 349:0-353:1 -/
+    Source: 'src/field.rs', lines 347:0-351:1 -/
 @[reducible]
 def field.Ext4.Insts.CoreOpsArithAddAssignExt4 : core.ops.arith.AddAssign
   field.Ext4 field.Ext4 := {
@@ -690,14 +690,14 @@ def field.Ext4.Insts.CoreOpsArithAddAssignExt4 : core.ops.arith.AddAssign
 }
 
 /-- [cpoly::field::{impl core::ops::arith::SubAssign<cpoly::field::Ext4> for cpoly::field::Ext4}::sub_assign]:
-    Source: 'src/field.rs', lines 356:4-358:5
+    Source: 'src/field.rs', lines 354:4-356:5
     Visibility: public -/
 def field.Ext4.Insts.CoreOpsArithSubAssignExt4.sub_assign
   (self : field.Ext4) (rhs : field.Ext4) : Result field.Ext4 := do
   field.Ext4.Insts.CoreOpsArithSubExt4Ext4.sub self rhs
 
 /-- Trait implementation: [cpoly::field::{impl core::ops::arith::SubAssign<cpoly::field::Ext4> for cpoly::field::Ext4}]
-    Source: 'src/field.rs', lines 355:0-359:1 -/
+    Source: 'src/field.rs', lines 353:0-357:1 -/
 @[reducible]
 def field.Ext4.Insts.CoreOpsArithSubAssignExt4 : core.ops.arith.SubAssign
   field.Ext4 field.Ext4 := {
@@ -705,14 +705,14 @@ def field.Ext4.Insts.CoreOpsArithSubAssignExt4 : core.ops.arith.SubAssign
 }
 
 /-- [cpoly::field::{impl core::ops::arith::MulAssign<cpoly::field::Ext4> for cpoly::field::Ext4}::mul_assign]:
-    Source: 'src/field.rs', lines 362:4-364:5
+    Source: 'src/field.rs', lines 360:4-362:5
     Visibility: public -/
 def field.Ext4.Insts.CoreOpsArithMulAssignExt4.mul_assign
   (self : field.Ext4) (rhs : field.Ext4) : Result field.Ext4 := do
   field.Ext4.Insts.CoreOpsArithMulExt4Ext4.mul self rhs
 
 /-- Trait implementation: [cpoly::field::{impl core::ops::arith::MulAssign<cpoly::field::Ext4> for cpoly::field::Ext4}]
-    Source: 'src/field.rs', lines 361:0-365:1 -/
+    Source: 'src/field.rs', lines 359:0-363:1 -/
 @[reducible]
 def field.Ext4.Insts.CoreOpsArithMulAssignExt4 : core.ops.arith.MulAssign
   field.Ext4 field.Ext4 := {
@@ -720,13 +720,13 @@ def field.Ext4.Insts.CoreOpsArithMulAssignExt4 : core.ops.arith.MulAssign
 }
 
 /-- [cpoly::multilinear::table_len]:
-    Source: 'src/multilinear.rs', lines 109:0-111:1
+    Source: 'src/multilinear.rs', lines 107:0-109:1
     Visibility: public -/
 def multilinear.table_len (vars : Std.Usize) : Result Std.Usize := do
   1#usize <<< vars
 
 /-- [cpoly::multilinear::dot]: loop body 0:
-    Source: 'src/multilinear.rs', lines 129:4-132:5
+    Source: 'src/multilinear.rs', lines 127:4-130:5
     Visibility: public -/
 @[rust_loop_body]
 def multilinear.dot_loop.body
@@ -745,7 +745,7 @@ def multilinear.dot_loop.body
   else ok (done acc)
 
 /-- [cpoly::multilinear::dot]: loop 0:
-    Source: 'src/multilinear.rs', lines 129:4-132:5
+    Source: 'src/multilinear.rs', lines 127:4-130:5
     Visibility: public -/
 @[rust_loop]
 def multilinear.dot_loop
@@ -758,7 +758,7 @@ def multilinear.dot_loop
     (acc, i)
 
 /-- [cpoly::multilinear::dot]:
-    Source: 'src/multilinear.rs', lines 125:0-134:1
+    Source: 'src/multilinear.rs', lines 123:0-132:1
     Visibility: public -/
 def multilinear.dot
   (a : Slice field.Ext4) (b : Slice field.Ext4) : Result field.Ext4 := do
@@ -766,7 +766,7 @@ def multilinear.dot
   multilinear.dot_loop a b n field.Ext4.ZERO 0#usize
 
 /-- [cpoly::multilinear::monomial_basis]: loop body 1:
-    Source: 'src/multilinear.rs', lines 151:8-157:9
+    Source: 'src/multilinear.rs', lines 149:8-155:9
     Visibility: public -/
 @[rust_loop_body]
 def multilinear.monomial_basis_loop0_loop0.body
@@ -790,7 +790,7 @@ def multilinear.monomial_basis_loop0_loop0.body
   else ok (done acc)
 
 /-- [cpoly::multilinear::monomial_basis]: loop 1:
-    Source: 'src/multilinear.rs', lines 151:8-157:9
+    Source: 'src/multilinear.rs', lines 149:8-155:9
     Visibility: public -/
 @[rust_loop]
 def multilinear.monomial_basis_loop0_loop0
@@ -804,7 +804,7 @@ def multilinear.monomial_basis_loop0_loop0
     (acc, m, j)
 
 /-- [cpoly::multilinear::monomial_basis]: loop body 0:
-    Source: 'src/multilinear.rs', lines 147:4-160:5
+    Source: 'src/multilinear.rs', lines 145:4-158:5
     Visibility: public -/
 @[rust_loop_body]
 def multilinear.monomial_basis_loop0.body
@@ -824,7 +824,7 @@ def multilinear.monomial_basis_loop0.body
   else ok (done basis)
 
 /-- [cpoly::multilinear::monomial_basis]: loop 0:
-    Source: 'src/multilinear.rs', lines 147:4-160:5
+    Source: 'src/multilinear.rs', lines 145:4-158:5
     Visibility: public -/
 @[rust_loop]
 def multilinear.monomial_basis_loop0
@@ -838,7 +838,7 @@ def multilinear.monomial_basis_loop0
     (basis, i)
 
 /-- [cpoly::multilinear::monomial_basis]:
-    Source: 'src/multilinear.rs', lines 142:0-162:1
+    Source: 'src/multilinear.rs', lines 140:0-160:1
     Visibility: public -/
 def multilinear.monomial_basis
   (point : Slice field.Ext4) : Result (alloc.vec.Vec field.Ext4) := do
@@ -848,13 +848,13 @@ def multilinear.monomial_basis
     0#usize
 
 /-- [cpoly::multilinear::MultilinearEvals]
-    Source: 'src/multilinear.rs', lines 489:0-489:39
+    Source: 'src/multilinear.rs', lines 487:0-487:39
     Visibility: public -/
 @[reducible]
 def multilinear.MultilinearEvals := alloc.vec.Vec field.Ext4
 
 /-- [cpoly::multilinear::lagrange_basis]: loop body 1:
-    Source: 'src/multilinear.rs', lines 180:8-188:9
+    Source: 'src/multilinear.rs', lines 178:8-186:9
     Visibility: public -/
 @[rust_loop_body]
 def multilinear.lagrange_basis_loop0_loop0.body
@@ -883,7 +883,7 @@ def multilinear.lagrange_basis_loop0_loop0.body
   else ok (done acc)
 
 /-- [cpoly::multilinear::lagrange_basis]: loop 1:
-    Source: 'src/multilinear.rs', lines 180:8-188:9
+    Source: 'src/multilinear.rs', lines 178:8-186:9
     Visibility: public -/
 @[rust_loop]
 def multilinear.lagrange_basis_loop0_loop0
@@ -897,7 +897,7 @@ def multilinear.lagrange_basis_loop0_loop0
     (acc, m, j)
 
 /-- [cpoly::multilinear::lagrange_basis]: loop body 0:
-    Source: 'src/multilinear.rs', lines 176:4-191:5
+    Source: 'src/multilinear.rs', lines 174:4-189:5
     Visibility: public -/
 @[rust_loop_body]
 def multilinear.lagrange_basis_loop0.body
@@ -917,7 +917,7 @@ def multilinear.lagrange_basis_loop0.body
   else ok (done basis)
 
 /-- [cpoly::multilinear::lagrange_basis]: loop 0:
-    Source: 'src/multilinear.rs', lines 176:4-191:5
+    Source: 'src/multilinear.rs', lines 174:4-189:5
     Visibility: public -/
 @[rust_loop]
 def multilinear.lagrange_basis_loop0
@@ -931,7 +931,7 @@ def multilinear.lagrange_basis_loop0
     (basis, i)
 
 /-- [cpoly::multilinear::lagrange_basis]:
-    Source: 'src/multilinear.rs', lines 171:0-193:1
+    Source: 'src/multilinear.rs', lines 169:0-191:1
     Visibility: public -/
 def multilinear.lagrange_basis
   (point : Slice field.Ext4) : Result multilinear.MultilinearEvals := do
@@ -943,7 +943,7 @@ def multilinear.lagrange_basis
   ok basis
 
 /-- [cpoly::multilinear::add_pointwise]: loop body 0:
-    Source: 'src/multilinear.rs', lines 209:4-212:5
+    Source: 'src/multilinear.rs', lines 207:4-210:5
     Visibility: public -/
 @[rust_loop_body]
 def multilinear.add_pointwise_loop.body
@@ -963,7 +963,7 @@ def multilinear.add_pointwise_loop.body
   else ok (done out)
 
 /-- [cpoly::multilinear::add_pointwise]: loop 0:
-    Source: 'src/multilinear.rs', lines 209:4-212:5
+    Source: 'src/multilinear.rs', lines 207:4-210:5
     Visibility: public -/
 @[rust_loop]
 def multilinear.add_pointwise_loop
@@ -976,7 +976,7 @@ def multilinear.add_pointwise_loop
     (out, i)
 
 /-- [cpoly::multilinear::add_pointwise]:
-    Source: 'src/multilinear.rs', lines 205:0-214:1
+    Source: 'src/multilinear.rs', lines 203:0-212:1
     Visibility: public -/
 def multilinear.add_pointwise
   (a : Slice field.Ext4) (b : Slice field.Ext4) :
@@ -986,7 +986,7 @@ def multilinear.add_pointwise
   multilinear.add_pointwise_loop a b n (alloc.vec.Vec.new field.Ext4) 0#usize
 
 /-- [cpoly::multilinear::neg_pointwise]: loop body 0:
-    Source: 'src/multilinear.rs', lines 226:4-229:5
+    Source: 'src/multilinear.rs', lines 224:4-227:5
     Visibility: public -/
 @[rust_loop_body]
 def multilinear.neg_pointwise_loop.body
@@ -1005,7 +1005,7 @@ def multilinear.neg_pointwise_loop.body
   else ok (done out)
 
 /-- [cpoly::multilinear::neg_pointwise]: loop 0:
-    Source: 'src/multilinear.rs', lines 226:4-229:5
+    Source: 'src/multilinear.rs', lines 224:4-227:5
     Visibility: public -/
 @[rust_loop]
 def multilinear.neg_pointwise_loop
@@ -1018,7 +1018,7 @@ def multilinear.neg_pointwise_loop
     (out, i)
 
 /-- [cpoly::multilinear::neg_pointwise]:
-    Source: 'src/multilinear.rs', lines 222:0-231:1
+    Source: 'src/multilinear.rs', lines 220:0-229:1
     Visibility: public -/
 def multilinear.neg_pointwise
   (v : Slice field.Ext4) : Result (alloc.vec.Vec field.Ext4) := do
@@ -1026,7 +1026,7 @@ def multilinear.neg_pointwise
   multilinear.neg_pointwise_loop v n (alloc.vec.Vec.new field.Ext4) 0#usize
 
 /-- [cpoly::multilinear::scale_pointwise]: loop body 0:
-    Source: 'src/multilinear.rs', lines 241:4-244:5
+    Source: 'src/multilinear.rs', lines 239:4-242:5
     Visibility: public -/
 @[rust_loop_body]
 def multilinear.scale_pointwise_loop.body
@@ -1045,7 +1045,7 @@ def multilinear.scale_pointwise_loop.body
   else ok (done out)
 
 /-- [cpoly::multilinear::scale_pointwise]: loop 0:
-    Source: 'src/multilinear.rs', lines 241:4-244:5
+    Source: 'src/multilinear.rs', lines 239:4-242:5
     Visibility: public -/
 @[rust_loop]
 def multilinear.scale_pointwise_loop
@@ -1059,7 +1059,7 @@ def multilinear.scale_pointwise_loop
     (out, i)
 
 /-- [cpoly::multilinear::scale_pointwise]:
-    Source: 'src/multilinear.rs', lines 237:0-246:1
+    Source: 'src/multilinear.rs', lines 235:0-244:1
     Visibility: public -/
 def multilinear.scale_pointwise
   (v : Slice field.Ext4) (scalar : field.Ext4) :
@@ -1070,7 +1070,7 @@ def multilinear.scale_pointwise
     0#usize
 
 /-- [cpoly::multilinear::{cpoly::multilinear::MultilinearEvals}::eval]:
-    Source: 'src/multilinear.rs', lines 533:4-536:5
+    Source: 'src/multilinear.rs', lines 531:4-534:5
     Visibility: public -/
 def multilinear.MultilinearEvals.eval
   (self : multilinear.MultilinearEvals) (point : Slice field.Ext4) :
@@ -1082,7 +1082,7 @@ def multilinear.MultilinearEvals.eval
   multilinear.dot s s1
 
 /-- [cpoly::multilinear::eq_tilde]:
-    Source: 'src/multilinear.rs', lines 250:0-252:1
+    Source: 'src/multilinear.rs', lines 248:0-250:1
     Visibility: public -/
 def multilinear.eq_tilde
   (w : Slice field.Ext4) (x : Slice field.Ext4) : Result field.Ext4 := do
@@ -1090,7 +1090,7 @@ def multilinear.eq_tilde
   multilinear.MultilinearEvals.eval me x
 
 /-- [cpoly::multilinear::eval_horner_layer]: loop body 0:
-    Source: 'src/multilinear.rs', lines 268:4-273:5
+    Source: 'src/multilinear.rs', lines 266:4-271:5
     Visibility: public -/
 @[rust_loop_body]
 def multilinear.eval_horner_layer_loop.body
@@ -1113,7 +1113,7 @@ def multilinear.eval_horner_layer_loop.body
   else ok (done out)
 
 /-- [cpoly::multilinear::eval_horner_layer]: loop 0:
-    Source: 'src/multilinear.rs', lines 268:4-273:5
+    Source: 'src/multilinear.rs', lines 266:4-271:5
     Visibility: public -/
 @[rust_loop]
 def multilinear.eval_horner_layer_loop
@@ -1127,7 +1127,7 @@ def multilinear.eval_horner_layer_loop
     (out, j)
 
 /-- [cpoly::multilinear::eval_horner_layer]:
-    Source: 'src/multilinear.rs', lines 264:0-275:1
+    Source: 'src/multilinear.rs', lines 262:0-273:1
     Visibility: public -/
 def multilinear.eval_horner_layer
   (coeffs : Slice field.Ext4) (x0 : field.Ext4) :
@@ -1139,7 +1139,7 @@ def multilinear.eval_horner_layer
     field.Ext4) 0#usize
 
 /-- [cpoly::multilinear::eval_mle_layer]: loop body 0:
-    Source: 'src/multilinear.rs', lines 287:4-292:5
+    Source: 'src/multilinear.rs', lines 285:4-290:5
     Visibility: public -/
 @[rust_loop_body]
 def multilinear.eval_mle_layer_loop.body
@@ -1163,7 +1163,7 @@ def multilinear.eval_mle_layer_loop.body
   else ok (done out)
 
 /-- [cpoly::multilinear::eval_mle_layer]: loop 0:
-    Source: 'src/multilinear.rs', lines 287:4-292:5
+    Source: 'src/multilinear.rs', lines 285:4-290:5
     Visibility: public -/
 @[rust_loop]
 def multilinear.eval_mle_layer_loop
@@ -1177,7 +1177,7 @@ def multilinear.eval_mle_layer_loop
     (out, j)
 
 /-- [cpoly::multilinear::eval_mle_layer]:
-    Source: 'src/multilinear.rs', lines 282:0-294:1
+    Source: 'src/multilinear.rs', lines 280:0-292:1
     Visibility: public -/
 def multilinear.eval_mle_layer
   (values : Slice field.Ext4) (x0 : field.Ext4) :
@@ -1191,7 +1191,7 @@ def multilinear.eval_mle_layer
     field.Ext4) 0#usize
 
 /-- [cpoly::multilinear::mono_to_lagrange_level]: loop body 0:
-    Source: 'src/multilinear.rs', lines 307:4-314:5
+    Source: 'src/multilinear.rs', lines 305:4-312:5
     Visibility: public -/
 @[rust_loop_body]
 def multilinear.mono_to_lagrange_level_loop.body
@@ -1221,7 +1221,7 @@ def multilinear.mono_to_lagrange_level_loop.body
   else ok (done out)
 
 /-- [cpoly::multilinear::mono_to_lagrange_level]: loop 0:
-    Source: 'src/multilinear.rs', lines 307:4-314:5
+    Source: 'src/multilinear.rs', lines 305:4-312:5
     Visibility: public -/
 @[rust_loop]
 def multilinear.mono_to_lagrange_level_loop
@@ -1235,7 +1235,7 @@ def multilinear.mono_to_lagrange_level_loop
     (out, i)
 
 /-- [cpoly::multilinear::mono_to_lagrange_level]:
-    Source: 'src/multilinear.rs', lines 302:0-316:1
+    Source: 'src/multilinear.rs', lines 300:0-314:1
     Visibility: public -/
 def multilinear.mono_to_lagrange_level
   (v : Slice field.Ext4) (j : Std.Usize) :
@@ -1247,7 +1247,7 @@ def multilinear.mono_to_lagrange_level
     field.Ext4) 0#usize
 
 /-- [cpoly::multilinear::lagrange_to_mono_level]: loop body 0:
-    Source: 'src/multilinear.rs', lines 329:4-336:5
+    Source: 'src/multilinear.rs', lines 327:4-334:5
     Visibility: public -/
 @[rust_loop_body]
 def multilinear.lagrange_to_mono_level_loop.body
@@ -1277,7 +1277,7 @@ def multilinear.lagrange_to_mono_level_loop.body
   else ok (done out)
 
 /-- [cpoly::multilinear::lagrange_to_mono_level]: loop 0:
-    Source: 'src/multilinear.rs', lines 329:4-336:5
+    Source: 'src/multilinear.rs', lines 327:4-334:5
     Visibility: public -/
 @[rust_loop]
 def multilinear.lagrange_to_mono_level_loop
@@ -1291,7 +1291,7 @@ def multilinear.lagrange_to_mono_level_loop
     (out, i)
 
 /-- [cpoly::multilinear::lagrange_to_mono_level]:
-    Source: 'src/multilinear.rs', lines 324:0-338:1
+    Source: 'src/multilinear.rs', lines 322:0-336:1
     Visibility: public -/
 def multilinear.lagrange_to_mono_level
   (v : Slice field.Ext4) (j : Std.Usize) :
@@ -1303,13 +1303,13 @@ def multilinear.lagrange_to_mono_level
     field.Ext4) 0#usize
 
 /-- [cpoly::multilinear::MultilinearPoly]
-    Source: 'src/multilinear.rs', lines 350:0-350:38
+    Source: 'src/multilinear.rs', lines 348:0-348:38
     Visibility: public -/
 @[reducible]
 def multilinear.MultilinearPoly := alloc.vec.Vec field.Ext4
 
 /-- [cpoly::multilinear::{impl core::clone::Clone for cpoly::multilinear::MultilinearPoly}::clone]:
-    Source: 'src/multilinear.rs', lines 349:9-349:14
+    Source: 'src/multilinear.rs', lines 347:9-347:14
     Visibility: public -/
 def multilinear.MultilinearPoly.Insts.CoreCloneClone.clone
   (self : multilinear.MultilinearPoly) :
@@ -1319,7 +1319,7 @@ def multilinear.MultilinearPoly.Insts.CoreCloneClone.clone
   ok v
 
 /-- Trait implementation: [cpoly::multilinear::{impl core::clone::Clone for cpoly::multilinear::MultilinearPoly}]
-    Source: 'src/multilinear.rs', lines 349:9-349:14 -/
+    Source: 'src/multilinear.rs', lines 347:9-347:14 -/
 @[reducible]
 def multilinear.MultilinearPoly.Insts.CoreCloneClone : core.clone.Clone
   multilinear.MultilinearPoly := {
@@ -1327,14 +1327,14 @@ def multilinear.MultilinearPoly.Insts.CoreCloneClone : core.clone.Clone
 }
 
 /-- Trait implementation: [cpoly::multilinear::{impl core::marker::StructuralPartialEq for cpoly::multilinear::MultilinearPoly}]
-    Source: 'src/multilinear.rs', lines 349:16-349:25 -/
+    Source: 'src/multilinear.rs', lines 347:16-347:25 -/
 @[reducible]
 def multilinear.MultilinearPoly.Insts.CoreMarkerStructuralPartialEq :
   core.marker.StructuralPartialEq multilinear.MultilinearPoly := {
 }
 
 /-- [cpoly::multilinear::{impl core::cmp::PartialEq<cpoly::multilinear::MultilinearPoly> for cpoly::multilinear::MultilinearPoly}::eq]:
-    Source: 'src/multilinear.rs', lines 349:16-349:25
+    Source: 'src/multilinear.rs', lines 347:16-347:25
     Visibility: public -/
 def multilinear.MultilinearPoly.Insts.CoreCmpPartialEqMultilinearPoly.eq
   (self : multilinear.MultilinearPoly) (other : multilinear.MultilinearPoly) :
@@ -1344,7 +1344,7 @@ def multilinear.MultilinearPoly.Insts.CoreCmpPartialEqMultilinearPoly.eq
     self other
 
 /-- Trait implementation: [cpoly::multilinear::{impl core::cmp::PartialEq<cpoly::multilinear::MultilinearPoly> for cpoly::multilinear::MultilinearPoly}]
-    Source: 'src/multilinear.rs', lines 349:16-349:25 -/
+    Source: 'src/multilinear.rs', lines 347:16-347:25 -/
 @[reducible]
 def multilinear.MultilinearPoly.Insts.CoreCmpPartialEqMultilinearPoly :
   core.cmp.PartialEq multilinear.MultilinearPoly multilinear.MultilinearPoly
@@ -1353,14 +1353,14 @@ def multilinear.MultilinearPoly.Insts.CoreCmpPartialEqMultilinearPoly :
 }
 
 /-- [cpoly::multilinear::{impl core::cmp::Eq for cpoly::multilinear::MultilinearPoly}::assert_fields_are_eq]:
-    Source: 'src/multilinear.rs', lines 349:27-349:29
+    Source: 'src/multilinear.rs', lines 347:27-347:29
     Visibility: public -/
 def multilinear.MultilinearPoly.Insts.CoreCmpEq.assert_fields_are_eq
   (self : multilinear.MultilinearPoly) : Result Unit := do
   ok ()
 
 /-- Trait implementation: [cpoly::multilinear::{impl core::cmp::Eq for cpoly::multilinear::MultilinearPoly}]
-    Source: 'src/multilinear.rs', lines 349:27-349:29 -/
+    Source: 'src/multilinear.rs', lines 347:27-347:29 -/
 @[reducible]
 def multilinear.MultilinearPoly.Insts.CoreCmpEq : core.cmp.Eq
   multilinear.MultilinearPoly := {
@@ -1371,7 +1371,7 @@ def multilinear.MultilinearPoly.Insts.CoreCmpEq : core.cmp.Eq
 }
 
 /-- [cpoly::multilinear::{impl core::fmt::Debug for cpoly::multilinear::MultilinearPoly}::fmt]:
-    Source: 'src/multilinear.rs', lines 349:31-349:36
+    Source: 'src/multilinear.rs', lines 347:31-347:36
     Visibility: public -/
 def multilinear.MultilinearPoly.Insts.CoreFmtDebug.fmt
   (self : multilinear.MultilinearPoly) (f : core.fmt.Formatter) :
@@ -1383,7 +1383,7 @@ def multilinear.MultilinearPoly.Insts.CoreFmtDebug.fmt
   core.fmt.Formatter.debug_tuple_field1_finish f (toStr "MultilinearPoly") dyn
 
 /-- Trait implementation: [cpoly::multilinear::{impl core::fmt::Debug for cpoly::multilinear::MultilinearPoly}]
-    Source: 'src/multilinear.rs', lines 349:31-349:36 -/
+    Source: 'src/multilinear.rs', lines 347:31-347:36 -/
 @[reducible]
 def multilinear.MultilinearPoly.Insts.CoreFmtDebug : core.fmt.Debug
   multilinear.MultilinearPoly := {
@@ -1391,7 +1391,7 @@ def multilinear.MultilinearPoly.Insts.CoreFmtDebug : core.fmt.Debug
 }
 
 /-- [cpoly::multilinear::{cpoly::multilinear::MultilinearPoly}::zeros]:
-    Source: 'src/multilinear.rs', lines 354:4-356:5
+    Source: 'src/multilinear.rs', lines 352:4-354:5
     Visibility: public -/
 def multilinear.MultilinearPoly.zeros
   (vars : Std.Usize) : Result multilinear.MultilinearPoly := do
@@ -1401,7 +1401,7 @@ def multilinear.MultilinearPoly.zeros
   ok v
 
 /-- [cpoly::multilinear::{cpoly::multilinear::MultilinearPoly}::from_coeffs]:
-    Source: 'src/multilinear.rs', lines 363:4-366:5
+    Source: 'src/multilinear.rs', lines 361:4-364:5
     Visibility: public -/
 def multilinear.MultilinearPoly.from_coeffs
   (coeffs : alloc.vec.Vec field.Ext4) (vars : Std.Usize) :
@@ -1414,14 +1414,14 @@ def multilinear.MultilinearPoly.from_coeffs
   ok coeffs1
 
 /-- [cpoly::multilinear::{cpoly::multilinear::MultilinearPoly}::coeffs]:
-    Source: 'src/multilinear.rs', lines 369:4-371:5
+    Source: 'src/multilinear.rs', lines 367:4-369:5
     Visibility: public -/
 def multilinear.MultilinearPoly.coeffs
   (self : multilinear.MultilinearPoly) : Result (Slice field.Ext4) := do
   ok (alloc.vec.Vec.deref self)
 
 /-- [cpoly::multilinear::{cpoly::multilinear::MultilinearPoly}::into_coeffs]:
-    Source: 'src/multilinear.rs', lines 374:4-376:5
+    Source: 'src/multilinear.rs', lines 372:4-374:5
     Visibility: public -/
 def multilinear.MultilinearPoly.into_coeffs
   (self : multilinear.MultilinearPoly) :
@@ -1430,14 +1430,14 @@ def multilinear.MultilinearPoly.into_coeffs
   ok self
 
 /-- [cpoly::multilinear::{cpoly::multilinear::MultilinearPoly}::len]:
-    Source: 'src/multilinear.rs', lines 379:4-381:5
+    Source: 'src/multilinear.rs', lines 377:4-379:5
     Visibility: public -/
 def multilinear.MultilinearPoly.len
   (self : multilinear.MultilinearPoly) : Result Std.Usize := do
   ok (alloc.vec.Vec.len self)
 
 /-- [cpoly::multilinear::{cpoly::multilinear::MultilinearPoly}::is_empty]:
-    Source: 'src/multilinear.rs', lines 388:4-390:5
+    Source: 'src/multilinear.rs', lines 386:4-388:5
     Visibility: public -/
 def multilinear.MultilinearPoly.is_empty
   (self : multilinear.MultilinearPoly) : Result Bool := do
@@ -1445,7 +1445,7 @@ def multilinear.MultilinearPoly.is_empty
   ok (i = 0#usize)
 
 /-- [cpoly::multilinear::{cpoly::multilinear::MultilinearPoly}::eval]:
-    Source: 'src/multilinear.rs', lines 396:4-399:5
+    Source: 'src/multilinear.rs', lines 394:4-397:5
     Visibility: public -/
 def multilinear.MultilinearPoly.eval
   (self : multilinear.MultilinearPoly) (point : Slice field.Ext4) :
@@ -1457,7 +1457,7 @@ def multilinear.MultilinearPoly.eval
   multilinear.dot s s1
 
 /-- [cpoly::multilinear::{cpoly::multilinear::MultilinearPoly}::eval_horner]: loop body 0:
-    Source: 'src/multilinear.rs', lines 411:8-414:9
+    Source: 'src/multilinear.rs', lines 409:8-412:9
     Visibility: public -/
 @[rust_loop_body]
 def multilinear.MultilinearPoly.eval_horner_loop.body
@@ -1476,7 +1476,7 @@ def multilinear.MultilinearPoly.eval_horner_loop.body
   else ok (done cur)
 
 /-- [cpoly::multilinear::{cpoly::multilinear::MultilinearPoly}::eval_horner]: loop 0:
-    Source: 'src/multilinear.rs', lines 411:8-414:9
+    Source: 'src/multilinear.rs', lines 409:8-412:9
     Visibility: public -/
 @[rust_loop]
 def multilinear.MultilinearPoly.eval_horner_loop
@@ -1490,7 +1490,7 @@ def multilinear.MultilinearPoly.eval_horner_loop
     (cur, j)
 
 /-- [cpoly::multilinear::{cpoly::multilinear::MultilinearPoly}::eval_horner]:
-    Source: 'src/multilinear.rs', lines 407:4-416:5
+    Source: 'src/multilinear.rs', lines 405:4-414:5
     Visibility: public -/
 def multilinear.MultilinearPoly.eval_horner
   (self : multilinear.MultilinearPoly) (point : Slice field.Ext4) :
@@ -1504,7 +1504,7 @@ def multilinear.MultilinearPoly.eval_horner
     0#usize
 
 /-- [cpoly::multilinear::{cpoly::multilinear::MultilinearPoly}::to_evals]: loop body 0:
-    Source: 'src/multilinear.rs', lines 426:8-429:9
+    Source: 'src/multilinear.rs', lines 424:8-427:9
     Visibility: public -/
 @[rust_loop_body]
 def multilinear.MultilinearPoly.to_evals_loop.body
@@ -1521,7 +1521,7 @@ def multilinear.MultilinearPoly.to_evals_loop.body
   else ok (done cur)
 
 /-- [cpoly::multilinear::{cpoly::multilinear::MultilinearPoly}::to_evals]: loop 0:
-    Source: 'src/multilinear.rs', lines 426:8-429:9
+    Source: 'src/multilinear.rs', lines 424:8-427:9
     Visibility: public -/
 @[rust_loop]
 def multilinear.MultilinearPoly.to_evals_loop
@@ -1534,7 +1534,7 @@ def multilinear.MultilinearPoly.to_evals_loop
     (cur, j)
 
 /-- [cpoly::multilinear::{cpoly::multilinear::MultilinearPoly}::to_evals]:
-    Source: 'src/multilinear.rs', lines 423:4-431:5
+    Source: 'src/multilinear.rs', lines 421:4-429:5
     Visibility: public -/
 def multilinear.MultilinearPoly.to_evals
   (self : multilinear.MultilinearPoly) (vars : Std.Usize) :
@@ -1544,7 +1544,7 @@ def multilinear.MultilinearPoly.to_evals
   ok cur
 
 /-- [cpoly::multilinear::{impl core::ops::index::Index<usize, cpoly::field::Ext4> for cpoly::multilinear::MultilinearPoly}::index]:
-    Source: 'src/multilinear.rs', lines 440:4-442:5
+    Source: 'src/multilinear.rs', lines 438:4-440:5
     Visibility: public -/
 def multilinear.MultilinearPoly.Insts.CoreOpsIndexIndexUsizeExt4.index
   (self : multilinear.MultilinearPoly) (i : Std.Usize) :
@@ -1553,7 +1553,7 @@ def multilinear.MultilinearPoly.Insts.CoreOpsIndexIndexUsizeExt4.index
   alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice field.Ext4) self i
 
 /-- Trait implementation: [cpoly::multilinear::{impl core::ops::index::Index<usize, cpoly::field::Ext4> for cpoly::multilinear::MultilinearPoly}]
-    Source: 'src/multilinear.rs', lines 434:0-443:1 -/
+    Source: 'src/multilinear.rs', lines 432:0-441:1 -/
 @[reducible]
 def multilinear.MultilinearPoly.Insts.CoreOpsIndexIndexUsizeExt4 :
   core.ops.index.Index multilinear.MultilinearPoly Std.Usize field.Ext4 := {
@@ -1561,7 +1561,7 @@ def multilinear.MultilinearPoly.Insts.CoreOpsIndexIndexUsizeExt4 :
 }
 
 /-- [cpoly::multilinear::{impl core::ops::arith::Neg<cpoly::multilinear::MultilinearPoly> for &'_0 cpoly::multilinear::MultilinearPoly}::neg]:
-    Source: 'src/multilinear.rs', lines 449:4-451:5
+    Source: 'src/multilinear.rs', lines 447:4-449:5
     Visibility: public -/
 def Shared0MultilinearPoly.Insts.CoreOpsArithNegMultilinearPoly.neg
   (self : multilinear.MultilinearPoly) :
@@ -1572,7 +1572,7 @@ def Shared0MultilinearPoly.Insts.CoreOpsArithNegMultilinearPoly.neg
   ok v
 
 /-- Trait implementation: [cpoly::multilinear::{impl core::ops::arith::Neg<cpoly::multilinear::MultilinearPoly> for &'_0 cpoly::multilinear::MultilinearPoly}]
-    Source: 'src/multilinear.rs', lines 445:0-452:1 -/
+    Source: 'src/multilinear.rs', lines 443:0-450:1 -/
 @[reducible]
 def Shared0MultilinearPoly.Insts.CoreOpsArithNegMultilinearPoly :
   core.ops.arith.Neg multilinear.MultilinearPoly multilinear.MultilinearPoly
@@ -1581,7 +1581,7 @@ def Shared0MultilinearPoly.Insts.CoreOpsArithNegMultilinearPoly :
 }
 
 /-- [cpoly::multilinear::{impl core::ops::arith::Mul<cpoly::field::Ext4, cpoly::multilinear::MultilinearPoly> for &'_0 cpoly::multilinear::MultilinearPoly}::mul]:
-    Source: 'src/multilinear.rs', lines 458:4-460:5
+    Source: 'src/multilinear.rs', lines 456:4-458:5
     Visibility: public -/
 def Shared0MultilinearPoly.Insts.CoreOpsArithMulExt4MultilinearPoly.mul
   (self : multilinear.MultilinearPoly) (scalar : field.Ext4) :
@@ -1592,7 +1592,7 @@ def Shared0MultilinearPoly.Insts.CoreOpsArithMulExt4MultilinearPoly.mul
   ok v
 
 /-- Trait implementation: [cpoly::multilinear::{impl core::ops::arith::Mul<cpoly::field::Ext4, cpoly::multilinear::MultilinearPoly> for &'_0 cpoly::multilinear::MultilinearPoly}]
-    Source: 'src/multilinear.rs', lines 454:0-461:1 -/
+    Source: 'src/multilinear.rs', lines 452:0-459:1 -/
 @[reducible]
 def Shared0MultilinearPoly.Insts.CoreOpsArithMulExt4MultilinearPoly :
   core.ops.arith.Mul multilinear.MultilinearPoly field.Ext4
@@ -1601,7 +1601,7 @@ def Shared0MultilinearPoly.Insts.CoreOpsArithMulExt4MultilinearPoly :
 }
 
 /-- [cpoly::multilinear::{impl core::ops::arith::Add<&'_0 cpoly::multilinear::MultilinearPoly, cpoly::multilinear::MultilinearPoly> for &'_1 cpoly::multilinear::MultilinearPoly}::add]:
-    Source: 'src/multilinear.rs', lines 474:4-476:5
+    Source: 'src/multilinear.rs', lines 472:4-474:5
     Visibility: public -/
 def
   Shared1MultilinearPoly.Insts.CoreOpsArithAddShared0MultilinearPolyMultilinearPoly.add
@@ -1614,7 +1614,7 @@ def
   ok v
 
 /-- Trait implementation: [cpoly::multilinear::{impl core::ops::arith::Add<&'_0 cpoly::multilinear::MultilinearPoly, cpoly::multilinear::MultilinearPoly> for &'_1 cpoly::multilinear::MultilinearPoly}]
-    Source: 'src/multilinear.rs', lines 463:0-477:1 -/
+    Source: 'src/multilinear.rs', lines 461:0-475:1 -/
 @[reducible]
 def
   Shared1MultilinearPoly.Insts.CoreOpsArithAddShared0MultilinearPolyMultilinearPoly
@@ -1625,7 +1625,7 @@ def
 }
 
 /-- [cpoly::multilinear::{impl core::clone::Clone for cpoly::multilinear::MultilinearEvals}::clone]:
-    Source: 'src/multilinear.rs', lines 488:9-488:14
+    Source: 'src/multilinear.rs', lines 486:9-486:14
     Visibility: public -/
 def multilinear.MultilinearEvals.Insts.CoreCloneClone.clone
   (self : multilinear.MultilinearEvals) :
@@ -1635,7 +1635,7 @@ def multilinear.MultilinearEvals.Insts.CoreCloneClone.clone
   ok v
 
 /-- Trait implementation: [cpoly::multilinear::{impl core::clone::Clone for cpoly::multilinear::MultilinearEvals}]
-    Source: 'src/multilinear.rs', lines 488:9-488:14 -/
+    Source: 'src/multilinear.rs', lines 486:9-486:14 -/
 @[reducible]
 def multilinear.MultilinearEvals.Insts.CoreCloneClone : core.clone.Clone
   multilinear.MultilinearEvals := {
@@ -1643,14 +1643,14 @@ def multilinear.MultilinearEvals.Insts.CoreCloneClone : core.clone.Clone
 }
 
 /-- Trait implementation: [cpoly::multilinear::{impl core::marker::StructuralPartialEq for cpoly::multilinear::MultilinearEvals}]
-    Source: 'src/multilinear.rs', lines 488:16-488:25 -/
+    Source: 'src/multilinear.rs', lines 486:16-486:25 -/
 @[reducible]
 def multilinear.MultilinearEvals.Insts.CoreMarkerStructuralPartialEq :
   core.marker.StructuralPartialEq multilinear.MultilinearEvals := {
 }
 
 /-- [cpoly::multilinear::{impl core::cmp::PartialEq<cpoly::multilinear::MultilinearEvals> for cpoly::multilinear::MultilinearEvals}::eq]:
-    Source: 'src/multilinear.rs', lines 488:16-488:25
+    Source: 'src/multilinear.rs', lines 486:16-486:25
     Visibility: public -/
 def multilinear.MultilinearEvals.Insts.CoreCmpPartialEqMultilinearEvals.eq
   (self : multilinear.MultilinearEvals) (other : multilinear.MultilinearEvals)
@@ -1661,7 +1661,7 @@ def multilinear.MultilinearEvals.Insts.CoreCmpPartialEqMultilinearEvals.eq
     self other
 
 /-- Trait implementation: [cpoly::multilinear::{impl core::cmp::PartialEq<cpoly::multilinear::MultilinearEvals> for cpoly::multilinear::MultilinearEvals}]
-    Source: 'src/multilinear.rs', lines 488:16-488:25 -/
+    Source: 'src/multilinear.rs', lines 486:16-486:25 -/
 @[reducible]
 def multilinear.MultilinearEvals.Insts.CoreCmpPartialEqMultilinearEvals :
   core.cmp.PartialEq multilinear.MultilinearEvals multilinear.MultilinearEvals
@@ -1670,14 +1670,14 @@ def multilinear.MultilinearEvals.Insts.CoreCmpPartialEqMultilinearEvals :
 }
 
 /-- [cpoly::multilinear::{impl core::cmp::Eq for cpoly::multilinear::MultilinearEvals}::assert_fields_are_eq]:
-    Source: 'src/multilinear.rs', lines 488:27-488:29
+    Source: 'src/multilinear.rs', lines 486:27-486:29
     Visibility: public -/
 def multilinear.MultilinearEvals.Insts.CoreCmpEq.assert_fields_are_eq
   (self : multilinear.MultilinearEvals) : Result Unit := do
   ok ()
 
 /-- Trait implementation: [cpoly::multilinear::{impl core::cmp::Eq for cpoly::multilinear::MultilinearEvals}]
-    Source: 'src/multilinear.rs', lines 488:27-488:29 -/
+    Source: 'src/multilinear.rs', lines 486:27-486:29 -/
 @[reducible]
 def multilinear.MultilinearEvals.Insts.CoreCmpEq : core.cmp.Eq
   multilinear.MultilinearEvals := {
@@ -1688,7 +1688,7 @@ def multilinear.MultilinearEvals.Insts.CoreCmpEq : core.cmp.Eq
 }
 
 /-- [cpoly::multilinear::{impl core::fmt::Debug for cpoly::multilinear::MultilinearEvals}::fmt]:
-    Source: 'src/multilinear.rs', lines 488:31-488:36
+    Source: 'src/multilinear.rs', lines 486:31-486:36
     Visibility: public -/
 def multilinear.MultilinearEvals.Insts.CoreFmtDebug.fmt
   (self : multilinear.MultilinearEvals) (f : core.fmt.Formatter) :
@@ -1700,7 +1700,7 @@ def multilinear.MultilinearEvals.Insts.CoreFmtDebug.fmt
   core.fmt.Formatter.debug_tuple_field1_finish f (toStr "MultilinearEvals") dyn
 
 /-- Trait implementation: [cpoly::multilinear::{impl core::fmt::Debug for cpoly::multilinear::MultilinearEvals}]
-    Source: 'src/multilinear.rs', lines 488:31-488:36 -/
+    Source: 'src/multilinear.rs', lines 486:31-486:36 -/
 @[reducible]
 def multilinear.MultilinearEvals.Insts.CoreFmtDebug : core.fmt.Debug
   multilinear.MultilinearEvals := {
@@ -1708,7 +1708,7 @@ def multilinear.MultilinearEvals.Insts.CoreFmtDebug : core.fmt.Debug
 }
 
 /-- [cpoly::multilinear::{cpoly::multilinear::MultilinearEvals}::zeros]:
-    Source: 'src/multilinear.rs', lines 494:4-496:5
+    Source: 'src/multilinear.rs', lines 492:4-494:5
     Visibility: public -/
 def multilinear.MultilinearEvals.zeros
   (vars : Std.Usize) : Result multilinear.MultilinearEvals := do
@@ -1718,7 +1718,7 @@ def multilinear.MultilinearEvals.zeros
   ok v
 
 /-- [cpoly::multilinear::{cpoly::multilinear::MultilinearEvals}::from_values]:
-    Source: 'src/multilinear.rs', lines 504:4-506:5
+    Source: 'src/multilinear.rs', lines 502:4-504:5
     Visibility: public -/
 def multilinear.MultilinearEvals.from_values
   (values : alloc.vec.Vec field.Ext4) :
@@ -1727,14 +1727,14 @@ def multilinear.MultilinearEvals.from_values
   ok values
 
 /-- [cpoly::multilinear::{cpoly::multilinear::MultilinearEvals}::values]:
-    Source: 'src/multilinear.rs', lines 509:4-511:5
+    Source: 'src/multilinear.rs', lines 507:4-509:5
     Visibility: public -/
 def multilinear.MultilinearEvals.values
   (self : multilinear.MultilinearEvals) : Result (Slice field.Ext4) := do
   ok (alloc.vec.Vec.deref self)
 
 /-- [cpoly::multilinear::{cpoly::multilinear::MultilinearEvals}::into_values]:
-    Source: 'src/multilinear.rs', lines 514:4-516:5
+    Source: 'src/multilinear.rs', lines 512:4-514:5
     Visibility: public -/
 def multilinear.MultilinearEvals.into_values
   (self : multilinear.MultilinearEvals) :
@@ -1743,14 +1743,14 @@ def multilinear.MultilinearEvals.into_values
   ok self
 
 /-- [cpoly::multilinear::{cpoly::multilinear::MultilinearEvals}::len]:
-    Source: 'src/multilinear.rs', lines 519:4-521:5
+    Source: 'src/multilinear.rs', lines 517:4-519:5
     Visibility: public -/
 def multilinear.MultilinearEvals.len
   (self : multilinear.MultilinearEvals) : Result Std.Usize := do
   ok (alloc.vec.Vec.len self)
 
 /-- [cpoly::multilinear::{cpoly::multilinear::MultilinearEvals}::is_empty]:
-    Source: 'src/multilinear.rs', lines 524:4-526:5
+    Source: 'src/multilinear.rs', lines 522:4-524:5
     Visibility: public -/
 def multilinear.MultilinearEvals.is_empty
   (self : multilinear.MultilinearEvals) : Result Bool := do
@@ -1758,7 +1758,7 @@ def multilinear.MultilinearEvals.is_empty
   ok (i = 0#usize)
 
 /-- [cpoly::multilinear::{cpoly::multilinear::MultilinearEvals}::eval_mle]: loop body 0:
-    Source: 'src/multilinear.rs', lines 544:8-547:9
+    Source: 'src/multilinear.rs', lines 542:8-545:9
     Visibility: public -/
 @[rust_loop_body]
 def multilinear.MultilinearEvals.eval_mle_loop.body
@@ -1777,7 +1777,7 @@ def multilinear.MultilinearEvals.eval_mle_loop.body
   else ok (done cur)
 
 /-- [cpoly::multilinear::{cpoly::multilinear::MultilinearEvals}::eval_mle]: loop 0:
-    Source: 'src/multilinear.rs', lines 544:8-547:9
+    Source: 'src/multilinear.rs', lines 542:8-545:9
     Visibility: public -/
 @[rust_loop]
 def multilinear.MultilinearEvals.eval_mle_loop
@@ -1791,7 +1791,7 @@ def multilinear.MultilinearEvals.eval_mle_loop
     (cur, j)
 
 /-- [cpoly::multilinear::{cpoly::multilinear::MultilinearEvals}::eval_mle]:
-    Source: 'src/multilinear.rs', lines 540:4-549:5
+    Source: 'src/multilinear.rs', lines 538:4-547:5
     Visibility: public -/
 def multilinear.MultilinearEvals.eval_mle
   (self : multilinear.MultilinearEvals) (point : Slice field.Ext4) :
@@ -1805,7 +1805,7 @@ def multilinear.MultilinearEvals.eval_mle
     0#usize
 
 /-- [cpoly::multilinear::{cpoly::multilinear::MultilinearEvals}::to_coeffs]: loop body 0:
-    Source: 'src/multilinear.rs', lines 559:8-562:9
+    Source: 'src/multilinear.rs', lines 557:8-560:9
     Visibility: public -/
 @[rust_loop_body]
 def multilinear.MultilinearEvals.to_coeffs_loop.body
@@ -1822,7 +1822,7 @@ def multilinear.MultilinearEvals.to_coeffs_loop.body
   else ok (done cur)
 
 /-- [cpoly::multilinear::{cpoly::multilinear::MultilinearEvals}::to_coeffs]: loop 0:
-    Source: 'src/multilinear.rs', lines 559:8-562:9
+    Source: 'src/multilinear.rs', lines 557:8-560:9
     Visibility: public -/
 @[rust_loop]
 def multilinear.MultilinearEvals.to_coeffs_loop
@@ -1835,7 +1835,7 @@ def multilinear.MultilinearEvals.to_coeffs_loop
     (cur, j)
 
 /-- [cpoly::multilinear::{cpoly::multilinear::MultilinearEvals}::to_coeffs]:
-    Source: 'src/multilinear.rs', lines 556:4-564:5
+    Source: 'src/multilinear.rs', lines 554:4-562:5
     Visibility: public -/
 def multilinear.MultilinearEvals.to_coeffs
   (self : multilinear.MultilinearEvals) (vars : Std.Usize) :
@@ -1845,7 +1845,7 @@ def multilinear.MultilinearEvals.to_coeffs
   ok cur
 
 /-- [cpoly::multilinear::{impl core::ops::index::Index<usize, cpoly::field::Ext4> for cpoly::multilinear::MultilinearEvals}::index]:
-    Source: 'src/multilinear.rs', lines 573:4-575:5
+    Source: 'src/multilinear.rs', lines 571:4-573:5
     Visibility: public -/
 def multilinear.MultilinearEvals.Insts.CoreOpsIndexIndexUsizeExt4.index
   (self : multilinear.MultilinearEvals) (i : Std.Usize) :
@@ -1854,7 +1854,7 @@ def multilinear.MultilinearEvals.Insts.CoreOpsIndexIndexUsizeExt4.index
   alloc.vec.Vec.index (core.slice.index.SliceIndexUsizeSlice field.Ext4) self i
 
 /-- Trait implementation: [cpoly::multilinear::{impl core::ops::index::Index<usize, cpoly::field::Ext4> for cpoly::multilinear::MultilinearEvals}]
-    Source: 'src/multilinear.rs', lines 567:0-576:1 -/
+    Source: 'src/multilinear.rs', lines 565:0-574:1 -/
 @[reducible]
 def multilinear.MultilinearEvals.Insts.CoreOpsIndexIndexUsizeExt4 :
   core.ops.index.Index multilinear.MultilinearEvals Std.Usize field.Ext4 := {
@@ -1862,7 +1862,7 @@ def multilinear.MultilinearEvals.Insts.CoreOpsIndexIndexUsizeExt4 :
 }
 
 /-- [cpoly::multilinear::{impl core::ops::arith::Neg<cpoly::multilinear::MultilinearEvals> for &'_0 cpoly::multilinear::MultilinearEvals}::neg]:
-    Source: 'src/multilinear.rs', lines 582:4-584:5
+    Source: 'src/multilinear.rs', lines 580:4-582:5
     Visibility: public -/
 def Shared0MultilinearEvals.Insts.CoreOpsArithNegMultilinearEvals.neg
   (self : multilinear.MultilinearEvals) :
@@ -1873,7 +1873,7 @@ def Shared0MultilinearEvals.Insts.CoreOpsArithNegMultilinearEvals.neg
   ok v
 
 /-- Trait implementation: [cpoly::multilinear::{impl core::ops::arith::Neg<cpoly::multilinear::MultilinearEvals> for &'_0 cpoly::multilinear::MultilinearEvals}]
-    Source: 'src/multilinear.rs', lines 578:0-585:1 -/
+    Source: 'src/multilinear.rs', lines 576:0-583:1 -/
 @[reducible]
 def Shared0MultilinearEvals.Insts.CoreOpsArithNegMultilinearEvals :
   core.ops.arith.Neg multilinear.MultilinearEvals multilinear.MultilinearEvals
@@ -1882,7 +1882,7 @@ def Shared0MultilinearEvals.Insts.CoreOpsArithNegMultilinearEvals :
 }
 
 /-- [cpoly::multilinear::{impl core::ops::arith::Mul<cpoly::field::Ext4, cpoly::multilinear::MultilinearEvals> for &'_0 cpoly::multilinear::MultilinearEvals}::mul]:
-    Source: 'src/multilinear.rs', lines 591:4-593:5
+    Source: 'src/multilinear.rs', lines 589:4-591:5
     Visibility: public -/
 def Shared0MultilinearEvals.Insts.CoreOpsArithMulExt4MultilinearEvals.mul
   (self : multilinear.MultilinearEvals) (scalar : field.Ext4) :
@@ -1893,7 +1893,7 @@ def Shared0MultilinearEvals.Insts.CoreOpsArithMulExt4MultilinearEvals.mul
   ok v
 
 /-- Trait implementation: [cpoly::multilinear::{impl core::ops::arith::Mul<cpoly::field::Ext4, cpoly::multilinear::MultilinearEvals> for &'_0 cpoly::multilinear::MultilinearEvals}]
-    Source: 'src/multilinear.rs', lines 587:0-594:1 -/
+    Source: 'src/multilinear.rs', lines 585:0-592:1 -/
 @[reducible]
 def Shared0MultilinearEvals.Insts.CoreOpsArithMulExt4MultilinearEvals :
   core.ops.arith.Mul multilinear.MultilinearEvals field.Ext4
@@ -1902,7 +1902,7 @@ def Shared0MultilinearEvals.Insts.CoreOpsArithMulExt4MultilinearEvals :
 }
 
 /-- [cpoly::multilinear::{impl core::ops::arith::Add<&'_0 cpoly::multilinear::MultilinearEvals, cpoly::multilinear::MultilinearEvals> for &'_1 cpoly::multilinear::MultilinearEvals}::add]:
-    Source: 'src/multilinear.rs', lines 604:4-606:5
+    Source: 'src/multilinear.rs', lines 602:4-604:5
     Visibility: public -/
 def
   Shared1MultilinearEvals.Insts.CoreOpsArithAddShared0MultilinearEvalsMultilinearEvals.add
@@ -1915,7 +1915,7 @@ def
   ok v
 
 /-- Trait implementation: [cpoly::multilinear::{impl core::ops::arith::Add<&'_0 cpoly::multilinear::MultilinearEvals, cpoly::multilinear::MultilinearEvals> for &'_1 cpoly::multilinear::MultilinearEvals}]
-    Source: 'src/multilinear.rs', lines 596:0-607:1 -/
+    Source: 'src/multilinear.rs', lines 594:0-605:1 -/
 @[reducible]
 def
   Shared1MultilinearEvals.Insts.CoreOpsArithAddShared0MultilinearEvalsMultilinearEvals
