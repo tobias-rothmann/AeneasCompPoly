@@ -8,10 +8,10 @@ description = "Computable univariate and multilinear polynomials over the quarti
 repository = "https://github.com/tobias-rothmann/AeneasCompPoly"
 keywords = ["polynomial", "finite-field", "multilinear", "formal-verification"]
 categories = ["cryptography", "mathematics", "no-std"]
-# `benches/genesis` is a package of its own nested in this one (see
-# dev-dependencies). Excluding it keeps `cargo package` from trying to
-# vendor a second manifest inside this crate's tarball.
-exclude = ["benches/genesis", "benches/*.py", "benches/*.toml"]
+# `benches/genesis` and `benches/candidate` are packages of their own nested
+# in this one (see dev-dependencies). Excluding them keeps `cargo package`
+# from trying to vendor further manifests inside this crate's tarball.
+exclude = ["benches/genesis", "benches/candidate", "benches/*.py", "benches/*.toml"]
 
 # Every bench target is declared below, so an unrecognised file dropped into
 # `benches/` becomes a hard error instead of a silent extra binary -- and
@@ -75,6 +75,18 @@ criterion = { version = "0.7", default-features = false, features = ["cargo_benc
 # dependencies of its own and declares no `rust-version`, so it cannot repeat
 # the MSRV problem described above.
 cpoly-genesis = { path = "benches/genesis" }
+# The candidate slot: at rest a byte-copy of `src/` (enforced by `make
+# bench-check`), overwritten by the optimization loop in its worktree so a
+# candidate and the champion are measured in the same criterion session. Always
+# compiled (a path dependency has to resolve), but timed only under
+# `--features candidate` — a default `make run-bench` measures exactly what it
+# measured before the slot existed. See benches/candidate/src/lib.rs.
+cpoly-candidate = { path = "benches/candidate" }
+
+[features]
+# Adds the `candidate` variant to every bench case: digest-asserted against
+# `now`, then timed between `now` and `genesis`. `make run-bench CANDIDATE=1`.
+candidate = []
 
 # Benchmarks are the fitness function of this project, so their build is pinned
 # rather than left to whatever cargo defaults to this month.

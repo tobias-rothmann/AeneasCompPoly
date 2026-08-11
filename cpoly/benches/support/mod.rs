@@ -317,13 +317,23 @@ pub fn criterion_config() -> Criterion {
 // The case driver
 // ---------------------------------------------------------------------------
 
-/// Measure one case in both variants, after proving they agree.
+/// Measure one case in every variant, after proving they agree.
 ///
 /// The equality assertion is the load-bearing line. `now` and `genesis` are
 /// different code compiled from different crates; if they disagree on a fixed
 /// input, then whatever the timings say, they are not timings of the same
 /// computation and the comparison is meaningless. Failing here is much cheaper
 /// than shipping a "speedup" that changed an answer.
+///
+/// Under `--features candidate` a third variant runs: the `candidate` slot
+/// (`benches/candidate`, see its lib.rs for the contract). It is digest-
+/// asserted against `now` exactly as `genesis` is, and timed **between** `now`
+/// and `genesis`: the verdict the loop acts on is candidate-vs-now, so those
+/// two run closest together, while now-vs-genesis — already positions 1 and 3
+/// only in candidate runs — keeps the `_control` cases as its witness: every
+/// pairwise delta of a control is identical code, and `harness.py` takes the
+/// worst of them all as the run's threshold. Without the feature this macro
+/// expands to exactly what it was before the slot existed.
 #[macro_export]
 macro_rules! case {
     ($g:expr, $f:ident, $param:expr) => {{
@@ -339,8 +349,24 @@ macro_rules! case {
             stringify!($f),
             p
         );
+        #[cfg(feature = "candidate")]
+        {
+            let d_cand = candidate::$f($crate::support::Mode::Digest, p);
+            assert_eq!(
+                d_cand, d_now,
+                "bench `{}` at {}: the candidate slot and cpoly compute DIFFERENT \
+                 results, so this is not an optimization, it is a semantics \
+                 change. The loop must reject the candidate; do not silence this.",
+                stringify!($f),
+                p
+            );
+        }
         $g.bench_with_input(::criterion::BenchmarkId::new("now", p), &p, |b, &p| {
             now::$f($crate::support::Mode::Bench(b), p);
+        });
+        #[cfg(feature = "candidate")]
+        $g.bench_with_input(::criterion::BenchmarkId::new("candidate", p), &p, |b, &p| {
+            candidate::$f($crate::support::Mode::Bench(b), p);
         });
         $g.bench_with_input(::criterion::BenchmarkId::new("genesis", p), &p, |b, &p| {
             genesis::$f($crate::support::Mode::Bench(b), p);

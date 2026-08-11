@@ -116,6 +116,14 @@ return it to the Lean side (P2's `opt-*` + `opt_eq_spec`), then translate
   a spec" currently holds literally (111 `_spec` theorems). Landing the Rust
   without the spec breaks that invariant — flag the debt to the outer
   verification pass explicitly; never let it accrue silently.
+* **Helper visibility is a three-way trade, decided at translation time.**
+  A helper `fn` of one public operation should stay private: `pub` hands it
+  the spec obligation above for no caller's benefit. But a bench target is an
+  *external* crate, so a private item cannot be benched individually — it
+  gets a structural exclusion ("private; measured through `<op>`'s rows",
+  the Karatsuba helpers of 2026-08-11 are the exemplar) and its genesis
+  freeze still happens (first translation, same commit). Re-optimizing such
+  a helper in isolation is the moment to revisit its visibility.
 
 ## Failure modes with teeth
 

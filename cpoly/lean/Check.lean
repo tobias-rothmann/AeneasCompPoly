@@ -1,5 +1,6 @@
 import Univariate
 import Multilinear
+import Opt
 
 /-!
 Audit file: not part of the development, only a machine-checked review of what
@@ -175,5 +176,14 @@ example (n : ℕ) (r : cpoly.field.Ext4) (v : alloc.vec.Vec cpoly.field.Ext4)
 #print axioms CPolyEquiv.Ml.neg_spec
 #print axioms CPolyEquiv.Ml.smul_evals_spec
 #print axioms CPolyEquiv.Ml.zero_evals_spec
+
+-- 15. Every `Foo.opt_eq_spec` lemma in `Opt.lean` is axiom-clean.  The
+--     opt-contract (see `Opt.lean`'s header and the `lean-opt` skill) admits a
+--     variant only together with its proved equivalence lemma; this section is
+--     what makes a `sorry` in one of them a build-visible event instead of a
+--     silent debt.  The loop appends one `#print axioms` line per accepted
+--     variant, next to this comment.
+
+#print axioms CompPoly.CPolynomial.Raw.mul.opt_eq_spec
 
 end CPolyEquiv.Check

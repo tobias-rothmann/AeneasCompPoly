@@ -39,6 +39,8 @@ use criterion::{criterion_group, criterion_main, Criterion};
 
 const _: () = assert!(support::P == cpoly::field::P);
 const _: () = assert!(support::P == cpoly_genesis::field::P);
+#[cfg(feature = "candidate")]
+const _: () = assert!(support::P == cpoly_candidate::field::P);
 
 macro_rules! define_cases {
     ($modname:ident, $cp:path) => {
@@ -232,6 +234,8 @@ macro_rules! define_cases {
 
 define_cases!(now, cpoly);
 define_cases!(genesis, cpoly_genesis);
+#[cfg(feature = "candidate")]
+define_cases!(candidate, cpoly_candidate);
 
 fn univariate_benches(c: &mut Criterion) {
     // The run's sanity check: identical code in both variants, so anything it

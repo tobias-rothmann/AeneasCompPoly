@@ -64,4 +64,4 @@ package «CPolyEquiv» where
 @[default_target]
 lean_lib «CPolyEquiv» where
   srcDir := "lean"
-  roots := #[`Generated, `Field, `Univariate, `Multilinear, `Check]
+  roots := #[`Generated, `Opt, `Field, `Univariate, `Multilinear, `Check]

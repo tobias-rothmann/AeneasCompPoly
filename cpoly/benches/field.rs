@@ -55,6 +55,8 @@ use criterion::{criterion_group, criterion_main, Criterion};
 // promise to accept.
 const _: () = assert!(support::P == cpoly::field::P);
 const _: () = assert!(support::P == cpoly_genesis::field::P);
+#[cfg(feature = "candidate")]
+const _: () = assert!(support::P == cpoly_candidate::field::P);
 
 /// One body per case, instantiated once against the live crate and once against
 /// the frozen baseline. Writing the two separately is how a benchmark quietly
@@ -381,6 +383,8 @@ macro_rules! define_cases {
 
 define_cases!(now, cpoly);
 define_cases!(genesis, cpoly_genesis);
+#[cfg(feature = "candidate")]
+define_cases!(candidate, cpoly_candidate);
 
 fn field_benches(c: &mut Criterion) {
     // The run's sanity check: identical code in both variants, so anything it

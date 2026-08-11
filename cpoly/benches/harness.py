@@ -5,10 +5,13 @@
                     which commit first contained each frozen item
     check-genesis   prove every frozen item, attributes included, is byte-for-byte
                     what `cpoly/src` held at the commit its annotation names
+    check-candidate prove the candidate slot (`benches/candidate/src`) is a null
+                    candidate: byte-copies of `cpoly/src`, module for module
     coverage        pair every `Mirrors CompPoly.X` item with a bench case or an
                     explicit, reasoned exclusion
     report          read criterion's output and compare each operation against
-                    its frozen first translation, measured in the same run
+                    its frozen first translation, measured in the same run —
+                    plus, under CANDIDATE=1, the candidate slot against both
 
 There is one measurement mode and one round. Reduced sampling is not offered: on
 byte-identical code it returns non-noise verdicts while printing exactly what a
@@ -330,6 +333,105 @@ def cmd_check_genesis(args) -> int:
             print(f"  - {p}", file=sys.stderr)
         return 1
     print(f"==> genesis intact: {checked} frozen item(s) verified against git")
+    return 0
+
+
+# ---------------------------------------------------------------------------
+# candidate slot
+# ---------------------------------------------------------------------------
+
+
+CANDIDATE_SRC = BENCHES / "candidate" / "src"
+
+
+def cmd_check_candidate(args) -> int:
+    """At rest, the candidate slot holds byte-copies of `cpoly/src` — a null
+    candidate. The slot is overwritten only inside the loop's worktree; a
+    diverged copy in this tree means a run landed without restoring it, and the
+    next `CANDIDATE=1` run would silently bench a stale diff as the champion's
+    challenger. (On the measurement path itself, `report` fingerprints the slot
+    so numbers stay attributable even mid-loop.)
+
+    Adversarial review (2026-08-11) closed three loopholes the first version
+    left open, all of the shape "the checked bytes are not the compiled bytes":
+
+    * `lib.rs` is compiled code, not just documentation — a `#[path]` redirect
+      or an extra `mod` there swaps entire modules while the byte-copies sit
+      unused. So `lib.rs` and `Cargo.toml` are pinned to git (HEAD, or the
+      index before their first commit): changes to them land as reviewed
+      commits, never as loop edits.
+    * A symlink at a module path passes any self-comparison forever, and the
+      loop's overwrite would then write through it into `cpoly/src` itself.
+      No entry in the slot may be a symlink.
+    * An extra file in `src/` is reachable from a redirected `lib.rs`, so the
+      directory must contain exactly the four expected files.
+    """
+    problems: list[str] = []
+
+    expected = {f"{m}.rs" for m in MODULES} | {"lib.rs"}
+    if CANDIDATE_SRC.exists():
+        entries = {p.name for p in CANDIDATE_SRC.iterdir() if p.name != ".DS_Store"}
+        for extra in sorted(entries - expected):
+            problems.append(
+                f"unexpected entry benches/candidate/src/{extra} — the slot holds exactly "
+                f"{sorted(expected)}, nothing else can be allowed to compile."
+            )
+        for name in sorted(expected | entries):
+            p = CANDIDATE_SRC / name
+            if p.is_symlink():
+                problems.append(
+                    f"benches/candidate/src/{name} is a symlink — a symlinked slot passes every "
+                    f"byte-compare trivially, and the loop's overwrite would write through it."
+                )
+    else:
+        problems.append("cpoly/benches/candidate/src is missing")
+
+    for module in MODULES:
+        live, frozen = SRC / f"{module}.rs", CANDIDATE_SRC / f"{module}.rs"
+        if not frozen.exists():
+            problems.append(
+                f"{module}: candidate copy cpoly/benches/candidate/src/{module}.rs is missing"
+            )
+        elif frozen.is_symlink():
+            pass  # already reported above
+        elif live.read_bytes() != frozen.read_bytes():
+            problems.append(
+                f"{module}: benches/candidate/src/{module}.rs differs from cpoly/src/{module}.rs. "
+                f"The slot is null at rest — restore it with "
+                f"`cp cpoly/src/{module}.rs cpoly/benches/candidate/src/`."
+            )
+
+    # lib.rs and Cargo.toml must match what git holds: HEAD if committed there,
+    # else the index (their introducing change is staged before it lands).
+    for rel_path in ("cpoly/benches/candidate/src/lib.rs", "cpoly/benches/candidate/Cargo.toml"):
+        f = ROOT / rel_path
+        if not f.exists():
+            problems.append(f"{rel_path} is missing")
+            continue
+        pinned = git("show", f"HEAD:{rel_path}", check=False)
+        if not pinned:
+            pinned = git("show", f":{rel_path}", check=False)
+        if not pinned:
+            problems.append(
+                f"{rel_path} is neither committed nor staged — the slot's fixed files are "
+                f"pinned to git; `git add` them before trusting this check."
+            )
+        elif f.read_text() != pinned:
+            problems.append(
+                f"{rel_path} differs from its git-pinned content. The slot's lib.rs and "
+                f"Cargo.toml are fixed; land changes to them as reviewed commits, never as "
+                f"loop edits."
+            )
+
+    if problems:
+        print("==> candidate slot check FAILED", file=sys.stderr)
+        for p in problems:
+            print(f"  - {p}", file=sys.stderr)
+        return 1
+    print(
+        f"==> candidate slot null: {len(MODULES)} module(s) byte-identical to cpoly/src, "
+        f"lib.rs+Cargo.toml git-pinned, no extras, no symlinks"
+    )
     return 0
 
 
@@ -657,9 +759,17 @@ def cmd_report(args) -> int:
     # prevent -- it would show a filtered-out case "unchanged" while its code was
     # being rewritten. `make run-bench` stamps the wall clock before it starts and
     # passes it here, so the cut is exact rather than a guess about mtimes.
+    # The cut is per *variant*, not per case: a `CANDIDATE=1` run leaves
+    # candidate estimates on disk, and a later default run must not lose a case
+    # to that leftover — nor report it. A variant measured before the run
+    # started is dropped; a case with nothing fresh left disappears entirely.
     if args.since is not None:
-        stale = {k for k, v in cases.items() if any(s["mtime"] < args.since for s in v.values())}
-        cases = {k: v for k, v in cases.items() if k not in stale}
+        fresh = {
+            k: {var: s for var, s in v.items() if s["mtime"] >= args.since}
+            for k, v in cases.items()
+        }
+        stale = {k for k, v in fresh.items() if not v}
+        cases = {k: v for k, v in fresh.items() if v}
         if not cases:
             print(
                 "error: criterion wrote no results after the run started. Did every\n"
@@ -673,23 +783,44 @@ def cmd_report(args) -> int:
     rows, control = [], []
     for case in sorted(cases):
         now, gen = cases[case].get("now"), cases[case].get("genesis")
-        if now is None:
+        cand = cases[case].get("candidate")
+        is_control = case.startswith(CONTROL_PREFIX)
+        # A control missing a variant still yields the pairwise deltas its
+        # remaining variants support — throwing it away would discard exactly
+        # the identical-code evidence that can veto a run. A *real* case
+        # without `now` has nothing to say and becomes an error row.
+        if now is None and not is_control:
             rows.append({"case": case, "error": "no `now` measurement"})
             continue
-        row: dict = {"case": case, "now_ns": now["ns"]}
+        row: dict = {"case": case}
+        if now is not None:
+            row["now_ns"] = now["ns"]
 
         if gen is None:
-            row["genesis_missing"] = True
+            if not is_control:
+                row["genesis_missing"] = True
         else:
             row["genesis_ns"] = gen["ns"]
-            row["vs_genesis"] = rel(now["ns"], gen["ns"])
-            # Criterion's own interval, on its own estimator. `vs_genesis` above
-            # is a ratio of `_robust` estimates, so the two do not have to agree;
-            # this is exported for a reader who wants criterion's view, and no
-            # verdict is derived from it.
-            row["vs_genesis_sig"] = disjoint(now, gen)
+            if now is not None:
+                row["vs_genesis"] = rel(now["ns"], gen["ns"])
+                # Criterion's own interval, on its own estimator. `vs_genesis`
+                # above is a ratio of `_robust` estimates, so the two do not
+                # have to agree; this is exported for a reader who wants
+                # criterion's view, and no verdict is derived from it.
+                row["vs_genesis_sig"] = disjoint(now, gen)
 
-        (control if case.startswith(CONTROL_PREFIX) else rows).append(row)
+        # The candidate slot (benches/candidate, timed under CANDIDATE=1).
+        # `cand_vs_now` is the raw delta of the accept pair; the verdict is
+        # never taken from it directly — see the recentering below.
+        if cand is not None:
+            row["candidate_ns"] = cand["ns"]
+            if now is not None:
+                row["cand_vs_now"] = rel(cand["ns"], now["ns"])
+                row["cand_vs_now_sig"] = disjoint(cand, now)
+            if gen is not None:
+                row["cand_vs_genesis"] = rel(cand["ns"], gen["ns"])
+
+        (control if is_control else rows).append(row)
 
     # There is exactly one comparison here, and it is made entirely within this
     # run: `now` against the frozen first translation, measured back to back on
@@ -721,29 +852,111 @@ def cmd_report(args) -> int:
     # spanning four orders of magnitude, most rows would be thresholded by
     # extrapolation from a control up to 100x away. One control, one number,
     # applied to everything, is the honest shape of what is known.
-    biases = [abs(r["vs_genesis"]) for r in control if "vs_genesis" in r]
+    # Every pairwise delta of a control is identical code, so every one of them
+    # is a bias measurement — with the candidate slot active that is three pairs
+    # per control instead of one, and the worst still vetoes the run.
+    DELTAS = ("vs_genesis", "cand_vs_now", "cand_vs_genesis")
+    biases = [abs(r[k]) for r in control for k in DELTAS if k in r]
     bias = max(biases) if biases else None
     usable = bias is None or bias <= USABLE_BIAS_MAX
     t_genesis = max(MIN_EFFECT, bias or 0.0)
 
+    # The accept column is different from the other two, and the difference was
+    # found by adversarial review, not foresight (2026-08-11): the candidate
+    # variant sits at a fixed position in every case, so code layout and timing
+    # order give `cand_vs_now` a *signed, systematic* lean — measured at −3.6%
+    # on byte-identical code the day the slot landed. A symmetric threshold
+    # cannot contain a signed offset: with the documented per-row noise
+    # (σ ≈ 1.8%), a null candidate leaning −3.6% crosses a 5% "faster" bar with
+    # ~20% probability per row, and a true +8% regression reads as noise.
+    #
+    # So the verdict is taken from the RECENTERED delta: each bench binary's
+    # own `_control` measures the lean on identical code in this same run, and
+    # the row's ratio is divided out by it. After recentering the null is
+    # zero-centered again and the flat 5% floor means what it says (~2σ√2 of
+    # the documented row noise; the recentering term itself carries one row's
+    # noise, hence the √2). The lean is per *binary*, not global: layout is a
+    # property of the linked binary. A control's own adjusted value is 0 by
+    # construction — its raw magnitudes still feed the veto above.
+    #
+    # Fail closed: a candidate row in a binary whose control did not measure a
+    # lean THIS run gets no verdict at all, and the run exits 2 — an accept
+    # column with no fairness instrument behind it must never look green.
+    leans: dict[str, float] = {}
+    for r in control:
+        if "cand_vs_now" in r:
+            parts = r["case"].split("/")
+            if len(parts) >= 2:
+                leans[parts[1]] = r["cand_vs_now"]
+
+    def case_binary(row: dict) -> str:
+        parts = row["case"].split("/")
+        return parts[1] if row["case"].startswith(CONTROL_PREFIX) else parts[0]
+
     for row in rows + control:
         row["threshold_vs_genesis"] = t_genesis
-        if "vs_genesis" in row:
-            d = row["vs_genesis"]
-            row["vs_genesis_verdict"] = (
-                "unusable" if not usable
-                else ("faster" if d < 0 else "slower") if abs(d) >= t_genesis
-                else "noise"
-            )
+        for k in ("vs_genesis", "cand_vs_genesis"):
+            if k in row:
+                d = row[k]
+                row[k + "_verdict"] = (
+                    "unusable" if not usable
+                    else ("faster" if d < 0 else "slower") if abs(d) >= t_genesis
+                    else "noise"
+                )
+        if "cand_vs_now" in row:
+            b = case_binary(row)
+            if b in leans:
+                adj = (1.0 + row["cand_vs_now"]) / (1.0 + leans[b]) - 1.0
+                row["cand_lean"] = leans[b]
+                row["cand_vs_now_adj"] = adj
+                row["cand_vs_now_verdict"] = (
+                    "unusable" if not usable
+                    else ("faster" if adj < 0 else "slower") if abs(adj) >= MIN_EFFECT
+                    else "noise"
+                )
+            else:
+                row["cand_vs_now_verdict"] = "unvalidated"
 
-    _print_report(rows, control, mach, tc, bias, t_genesis, usable, args)
+    cand_unvalidated = [r["case"] for r in rows if r.get("cand_vs_now_verdict") == "unvalidated"]
+
+    # Which code the slot actually held, so the numbers above are attributable
+    # to a diff rather than to whatever a previous session left behind. The
+    # at-rest gate is `check-candidate`; this is the measurement-path witness.
+    slot = None
+    if any("candidate_ns" in r for r in rows + control):
+        slot = {"diverged": [], "sha": {}}
+        for m in MODULES:
+            f = CANDIDATE_SRC / f"{m}.rs"
+            if not f.exists():
+                slot["diverged"].append(m)
+                continue
+            data = f.read_bytes()
+            slot["sha"][m] = hashlib.sha256(data).hexdigest()[:12]
+            live = SRC / f"{m}.rs"
+            if not live.exists() or data != live.read_bytes():
+                slot["diverged"].append(m)
+
+    _print_report(rows, control, mach, tc, bias, t_genesis, usable, args, slot)
 
     if args.json:
         Path(args.json).write_text(
             json.dumps({"rows": rows, "control": control, "machine": mach, "toolchain": tc,
                         "ab_bias": bias, "usable": usable,
-                        "threshold_vs_genesis": t_genesis}, indent=2)
+                        "threshold_vs_genesis": t_genesis,
+                        "cand_leans": leans or None,
+                        "candidate_slot": slot}, indent=2)
         )
+
+    if cand_unvalidated:
+        print(
+            f"\n==> CANDIDATE VERDICTS UNVALIDATED. {len(cand_unvalidated)} case(s) measured a "
+            f"candidate in a binary whose `_control` did not run this pass:\n"
+            f"    {', '.join(cand_unvalidated[:6])}\n"
+            f"    The accept column has no fairness instrument behind it. Re-run with\n"
+            f"    BENCH='<op>|_control' so every binary's control is measured.",
+            file=sys.stderr,
+        )
+        return 2
 
     if not usable:
         print(
@@ -758,7 +971,7 @@ def cmd_report(args) -> int:
     return 0
 
 
-def _print_report(rows, control, mach, tc, bias, t_genesis, usable, args) -> None:
+def _print_report(rows, control, mach, tc, bias, t_genesis, usable, args, slot=None) -> None:
     print()
     print(f"  machine   {mach['cpu']} · {mach['cores']} cores · {mach['os']} · id {mach['id']}")
     print(f"  toolchain {tc['rustc']}")
@@ -768,23 +981,39 @@ def _print_report(rows, control, mach, tc, bias, t_genesis, usable, args) -> Non
     print()
 
     w = max((len(r["case"]) for r in rows + control), default=10)
-    print(f"  {'case'.ljust(w)}  {'genesis':>10}  {'now':>10}  {'vs genesis':>18}")
-    print(f"  {'-' * w}  {'-' * 10}  {'-' * 10}  {'-' * 18}")
+    has_cand = any("candidate_ns" in r for r in rows + control)
+
+    def line(r) -> str:
+        gen = fmt_time(r["genesis_ns"]) if "genesis_ns" in r else "—"
+        out = f"  {r['case'].ljust(w)}  {gen:>10}  {fmt_time(r['now_ns']):>10}"
+        if has_cand:
+            cand = fmt_time(r["candidate_ns"]) if "candidate_ns" in r else "—"
+            out += f"  {cand:>10}"
+        out += f"  {_delta(r, 'vs_genesis'):>18}"
+        if has_cand:
+            out += f"  {_delta_cand(r):>18}"
+        return out
+
+    hdr = f"  {'case'.ljust(w)}  {'genesis':>10}  {'now':>10}"
+    dash = f"  {'-' * w}  {'-' * 10}  {'-' * 10}"
+    if has_cand:
+        hdr, dash = hdr + f"  {'candidate':>10}", dash + f"  {'-' * 10}"
+    hdr += f"  {'vs genesis':>18}"
+    dash += f"  {'-' * 18}"
+    if has_cand:
+        hdr, dash = hdr + f"  {'cand vs now':>18}", dash + f"  {'-' * 18}"
+    print(hdr)
+    print(dash)
     for r in rows:
         if "error" in r:
             print(f"  {r['case'].ljust(w)}  {r['error']}")
             continue
-        gen = fmt_time(r["genesis_ns"]) if "genesis_ns" in r else "—"
-        now = fmt_time(r["now_ns"])
-        print(f"  {r['case'].ljust(w)}  {gen:>10}  {now:>10}  "
-              f"{_delta(r, 'vs_genesis'):>18}")
+        print(line(r))
 
     print()
-    print("  harness self-test — both variants run identical code, so these should read 0%")
+    print("  harness self-test — all variants run identical code, so these should read 0%")
     for r in control:
-        gen = fmt_time(r["genesis_ns"]) if "genesis_ns" in r else "—"
-        print(f"  {r['case'].ljust(w)}  {gen:>10}  {fmt_time(r['now_ns']):>10}  "
-              f"{_delta(r, 'vs_genesis'):>18}")
+        print(line(r))
     if not control:
         print("  (none ran — `vs genesis` is unvalidated for this run)")
 
@@ -800,6 +1029,20 @@ def _print_report(rows, control, mach, tc, bias, t_genesis, usable, args) -> Non
     else:
         print(f"  A/B bias     {bias * 100:5.1f}%  worst of the identical-code controls, applied "
               f"as a flat threshold")
+    cand_leans = {r["case"].split("/")[1]: r["cand_lean"] for r in control if "cand_lean" in r}
+    if cand_leans:
+        lstr = "  ".join(f"{b} {v * 100:+.1f}%" for b, v in sorted(cand_leans.items()))
+        print(f"  cand lean    {lstr}")
+        print("               the slot's signed identical-code offset, measured per binary by its")
+        print("               control and divided out of `cand vs now` before any verdict; a")
+        print("               control's own adjusted value is 0 by construction")
+    if slot is not None:
+        if slot["diverged"]:
+            shas = ", ".join(f"{m} {slot['sha'].get(m, 'missing')}" for m in slot["diverged"])
+            print(f"  slot         diverged from cpoly/src: {shas}")
+            print("               the candidate numbers above belong to that diff — keep the sha with them")
+        else:
+            print("  slot         ≡ cpoly/src (null candidate) — candidate rows are a harness self-test")
     if not usable:
         print(f"\n  FAILED: identical code measured {bias * 100:.1f}% apart within this run "
               f"(limit {USABLE_BIAS_MAX * 100:.0f}%).")
@@ -821,6 +1064,18 @@ def _delta(row: dict, key: str) -> str:
     return f"{d * 100:+7.1f}% {mark} {verdict}"
 
 
+def _delta_cand(row: dict) -> str:
+    """The accept column prints the *recentered* delta — the number the verdict
+    is actually taken from; the raw ratio stays in the JSON."""
+    if "cand_vs_now_adj" in row:
+        d, verdict = row["cand_vs_now_adj"], row.get("cand_vs_now_verdict", "")
+        mark = {"faster": "▼", "slower": "▲", "noise": "·", "unusable": "✗"}.get(verdict, " ")
+        return f"{d * 100:+7.1f}% {mark} {verdict}"
+    if "cand_vs_now" in row:
+        return f"{row['cand_vs_now'] * 100:+7.1f}% ✗ unvalidated"
+    return "—"
+
+
 # ---------------------------------------------------------------------------
 
 
@@ -835,6 +1090,9 @@ def main() -> int:
     s = sub.add_parser("check-genesis")
     s.set_defaults(func=cmd_check_genesis)
 
+    s = sub.add_parser("check-candidate")
+    s.set_defaults(func=cmd_check_candidate)
+
     s = sub.add_parser("coverage")
     s.add_argument("--strict", action="store_true", help="exit non-zero if anything is unaccounted for")
     s.add_argument("-v", "--verbose", action="store_true", help="list every mirrored item and its status")
@@ -843,7 +1101,12 @@ def main() -> int:
     s = sub.add_parser("report")
     s.add_argument("--toolchain", default="stable")
     s.add_argument("--json", help="also write the report as JSON here")
-    s.add_argument("--since", type=float, default=None, metavar="EPOCH",
+    # Required, not defaulted: without a start stamp the report would mix
+    # criterion state from different runs — a candidate measured last week
+    # against a `now` measured today is exactly the cross-run comparison this
+    # harness exists to refuse. Re-generating a past run's report is done by
+    # passing that run's original stamp, never by omitting it.
+    s.add_argument("--since", type=float, required=True, metavar="EPOCH",
                    help="ignore criterion results written before this unix time "
                         "(the Makefile stamps it just before `cargo bench` starts)")
     s.set_defaults(func=cmd_report)

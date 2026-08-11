@@ -260,6 +260,71 @@ from `JSON=<path>` and keep it somewhere with a reason attached.
 of the effect you are looking at, you have not measured the effect. Close what
 else is running and measure again — nothing inside the harness will shrink it.
 
+## 6 · The candidate slot — the loop's within-run A/B
+
+`perf-loop`'s accept decision needs "candidate vs current champion", and the
+design above rules out every cross-run answer. So the harness carries a third
+variant: `cpoly/benches/candidate/`, a sibling crate like genesis (same
+compilation path, same fat-LTO merge — the symmetry argument in
+`benches/genesis/src/lib.rs` applies unchanged), timed only under
+
+```bash
+make run-bench CANDIDATE=1 BENCH='<op>|_control' JSON=<file>
+```
+
+What to know before touching it:
+
+* **At rest it is a null candidate** — `src/{field,univariate,multilinear}.rs`
+  byte-identical to `cpoly/src/` (`harness.py check-candidate`, part of
+  `make bench-check`). The loop overwrites it inside its own worktree, benches,
+  and discards the worktree; after a champion lands, the slot is re-synced in
+  the same change. `lib.rs` is the slot's own documentation and is exempt,
+  exactly like genesis's.
+* **Variant order is `now`, `candidate`, `genesis`** — the accept column
+  (`cand vs now`) is the tightest-spaced pair, and with the feature off the
+  expansion is exactly the pre-slot macro (verified token-identical in the
+  introduction review).
+* **The accept column is recentered, and that is not optional.** The
+  candidate variant sits at a fixed position in every case, so `cand vs now`
+  carries a *signed, systematic* layout/order lean — measured at
+  **−3.6% to −3.8% on byte-identical code** the day the slot landed
+  (2026-08-11, null candidate, `univariate/eval|_control`). Adversarial
+  review computed what a symmetric threshold does with that: a null
+  candidate crosses a 5% "faster" bar with ~20% probability per row, and a
+  true +8% regression reads as noise. The lean is no one-off: the post-fix
+  re-validation run measured it independently in all three binaries (field
+  −3.5%, multilinear −4.1%, univariate −3.4%). So each binary's `_control`
+  measures its lean in the same run, `report` divides it out
+  (`cand_vs_now_adj`), and the 5% floor applies to the recentered value.
+  Verdicts come from `cand_vs_now_verdict` only; the raw ratio is exported
+  for transparency, never for decisions. All raw pairwise control magnitudes
+  still feed the 10% run veto.
+* **Controls are enforced for candidates, not advised**: a candidate case in
+  a binary whose `_control` did not run this pass gets verdict
+  `unvalidated` and the report exits 2. (For plain `vs genesis` a missing
+  control still only downgrades the print — pre-existing behavior.) Write
+  the filter as `BENCH='<op>|_control'`; `CANDIDATE` must be exactly `1`.
+* **The report fingerprints the slot** (`candidate_slot` in the JSON: per-
+  module sha, diverged-from-src list), so a number is attributable to the
+  diff the slot actually held — the at-rest `check-candidate` gate cannot
+  see inside a loop worktree, this can.
+* **`check-candidate` pins everything that compiles**: module files byte-
+  equal to `cpoly/src`, exactly four files, no symlinks (a symlinked module
+  passes any self-compare forever, and the loop's overwrite would write
+  through it into the champion), and `lib.rs` + `Cargo.toml` byte-equal to
+  their git-pinned content — `lib.rs` is the module-graph root, one
+  `#[path]` line there swaps out every checked byte.
+* **The digest assert extends to the slot**: a candidate that computes a
+  different result panics the run before any timing (`support/mod.rs`,
+  `case!`). The loop's semantics tests run first; this is the last line, not
+  the filter.
+* **A default run is untouched by all of this**: the slot compiles (a path
+  dependency must resolve — so a broken slot does fail `cargo test`/`cargo
+  bench` builds; `check-candidate` is what keeps it healthy at rest) but
+  adds no timed rows, and a leftover candidate measurement from an earlier
+  `CANDIDATE=1` run is cut per-variant by the now-required `--since`, so it
+  can neither hide a case nor republish itself.
+
 ## Failure modes with teeth
 
 **`cargo bench` handing criterion's flags to libtest.** `--benches` selects every
@@ -320,7 +385,8 @@ not against what the benchmarks need.
 
 ## Invariants to keep green
 
-* `make bench-check` passes — genesis verified against git, coverage complete.
+* `make bench-check` passes — genesis verified against git, the candidate slot
+  byte-identical to `cpoly/src`, coverage complete.
 * `cargo clippy --all-targets` clean under `pedantic`, benches included.
 * `make extract` still reports `unchanged` — dev-dependencies must never reach
   `lean/Generated.lean`. (`cargo build --lib` does not build them; this is

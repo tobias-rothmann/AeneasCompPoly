@@ -1,0 +1,20 @@
+[package]
+name = "cpoly-candidate"
+version = "0.0.0"
+edition = "2021"
+publish = false
+license = "Apache-2.0"
+description = "The bench harness's candidate slot: at rest a byte-copy of cpoly/src (a null candidate), overwritten by the optimization loop inside its worktree so a candidate and the current champion can be measured in the same criterion session"
+
+[lib]
+name = "cpoly_candidate"
+path = "src/lib.rs"
+# Same reasoning as cpoly-genesis: the module files are copies of
+# `cpoly/src/*.rs`, whose doc examples say `use cpoly::…` and are compiled and
+# checked in the real crate.
+doctest = false
+
+# No dependencies, ever — the slot must reach the bench binary through the
+# identical compilation path as `cpoly` and `cpoly-genesis` (same profile, same
+# LTO decision), and a dependency of its own would break that symmetry.
+[dependencies]

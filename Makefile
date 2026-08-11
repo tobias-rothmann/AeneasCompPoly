@@ -108,6 +108,7 @@ help:
 	@echo '  Variables:'
 	@echo '    AENEAS=<path>  aeneas binary for `extract` (default ./toolchain/aeneas)'
 	@echo '    BENCH=<regex>  bench only the cases whose id matches this regex'
+	@echo '    CANDIDATE=1    also time the candidate slot, for the optimization loop'
 	@echo '    CHARON=<path>  charon binary for `extract` (default ./toolchain/charon)'
 	@echo '    JSON=<path>    also write the bench report as JSON, for an agent'
 	@echo ''
@@ -299,6 +300,7 @@ HARNESS         := $(PKG)/benches/harness.py
 bench-check:
 	@set -euo pipefail; \
 	python3 '$(HARNESS)' check-genesis; \
+	python3 '$(HARNESS)' check-candidate; \
 	python3 '$(HARNESS)' coverage --strict
 
 # Re-derive the `// @genesis <sha> <date>` annotations from git history. Run
@@ -324,6 +326,16 @@ bench-toolchain:
 #   make run-bench                  every bench, one full-rigour pass (~18 min)
 #   make run-bench BENCH=univariate only cases whose id matches this regex
 #   make run-bench JSON=out.json    also write the report as JSON, for an agent
+#   make run-bench CANDIDATE=1      also time the candidate slot (benches/candidate)
+#
+# CANDIDATE=1 (exactly `1`: any other value, including 0, disables) is the
+# optimization loop's mode: the slot holds a candidate's code (in the loop's
+# worktree; at rest it is a byte-copy of cpoly/src) and the report gains
+# `candidate` and `cand vs now` columns — the accept decision is made on the
+# recentered `cand vs now`, within this run. Pass BENCH='<op>|_control' with
+# it: each binary's `_control` measures the slot's signed lean, the verdicts
+# are recentered by it, and the report exits 2 if a candidate case ran in a
+# binary whose control did not — the filter advice is enforced, not hoped for.
 #
 # There is one mode and one pass. Two levers are deliberately not offered:
 #
@@ -353,7 +365,8 @@ run-bench: bench-toolchain | $(STAMPS)
 	python3 '$(HARNESS)' coverage || true
 	@set -euo pipefail; \
 	started=$$(date +%s); \
-	( cd $(PKG) && rustup run '$(BENCH_TOOLCHAIN)' cargo bench --benches -- \
+	( cd $(PKG) && rustup run '$(BENCH_TOOLCHAIN)' cargo bench --benches \
+	    $(if $(filter 1,$(CANDIDATE)),--features candidate,) -- \
 	    $(if $(BENCH),'$(BENCH)',) ); \
 	python3 '$(HARNESS)' report \
 	  --toolchain '$(BENCH_TOOLCHAIN)' \
