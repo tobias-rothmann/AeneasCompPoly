@@ -1,6 +1,6 @@
 ---
 name: lean-to-rust
-description: Translating a targeted Lean definition (CompPoly spec or optimized variant) into Rust in cpoly/src — the conventions table and the trivial-grade checklist v1, idiomatic shell (newtypes, core::ops, methods) around a trivial body (counter loops, named intermediates, bind-order-preserving straight-line code)
+description: Translating a targeted Lean definition (CompPoly spec or optimized variant) into Rust in cpoly/src — the conventions table and the trivial-grade checklist, idiomatic shell (newtypes, core::ops, methods) around a trivial body (counter loops, named intermediates, bind-order-preserving straight-line code)
 ---
 
 # Translating a Lean Definition to Rust
@@ -24,8 +24,8 @@ precomputation — is an *optimization*, and optimizations belong in Lean (an
 you catch yourself improving the code while translating: stop, file the idea
 for the Lean side, translate the definition you were given.
 
-The checklist is v1 of the trivial-grade dial (open unknown ?1). It moves on
-ledger evidence from P3 proof effort, not on taste.
+The checklist is a dial, not a doctrine: it moves on ledger evidence of proof
+effort — how hard the equivalence proofs turn out to be — not on taste.
 
 ## Conventions: types
 
@@ -83,7 +83,7 @@ measured free in `aeneas-idiomatic-rust`'s verdict tables:
   and — whenever new word arithmetic appears — the overflow-headroom bounds
   written out numerically, in the style of `field.rs`'s module doc.
 
-## Trivial-grade checklist v1 — the enumerated moves
+## Trivial-grade checklist — the enumerated moves
 
 A translation may do exactly these, and nothing else:
 
@@ -98,7 +98,7 @@ A translation may do exactly these, and nothing else:
    stated (`a * b ≤ (P-1)² < 2^64` and its friends).
 
 If the improvement you want is not on this list, it is an optimization:
-return it to the Lean side (P2's `opt-*` + `opt_eq_spec`), then translate
+return it to the Lean side (an `opt-*` rewrite + its `opt_eq_spec` lemma), then translate
 *that* definition with these same six moves.
 
 ## What a translation owes before it is done
@@ -153,5 +153,5 @@ that skill is the source of truth for all four:
   CompPoly rev.
 * Zero axioms and zero `sorry` after the extraction pass.
 * The spec debt of a new public op is flagged, never silent.
-* This checklist changes only with ledger evidence (P3 proof-effort rows),
+* This checklist changes only with ledger evidence (proof-effort rows),
   and the change lands here, in this file.

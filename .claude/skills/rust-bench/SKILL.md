@@ -228,9 +228,9 @@ verdict; neither is "this could theoretically be optimized away".
   a rigged race.
 * Did the `_control/*` rows come out near 0% in the run being used as evidence?
   Read the harness self-test block before believing any margin. It is the only
-  error bar there is — everything is compared within one run, because comparing
-  across runs was measured to be worse than useless (75% and 373% drift on frozen
-  code) and was removed.
+  error bar there is — everything is compared within one run, because cross-run
+  comparison is worse than useless (75% and 373% drift measured on frozen
+  code).
 * Is the reported change larger than the printed threshold? A "win" at or below
   the A/B bias is not a win.
 * Is the margin an *absolute* time or a `vs genesis` delta? Only the delta is
@@ -404,5 +404,5 @@ not against what the benchmarks need.
   Makefile comment above the target. Leave it unlisted only if it is a
   prerequisite nobody invokes, like `bench-toolchain`.
 * Nothing about a run is persisted by the harness. Do not add a store of past
-  timings back without a consumer that can defend comparing across runs — the
-  last one was removed for being unable to.
+  timings without a consumer that can defend comparing across runs — the
+  measured drift on frozen code (75% and 373%) says none can.

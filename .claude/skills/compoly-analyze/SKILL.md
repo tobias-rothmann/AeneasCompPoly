@@ -20,7 +20,7 @@ it is allowed to drift from the pin, and it does.
 
 The brief is what the optimization agents act on. An asymptotic bound, a "this
 cannot overflow", or a "the inner sum is the hot path" that was guessed rather
-than read sends P2 agents optimizing fiction — and unlike a wrong benchmark, a
+than read sends the optimization agents optimizing fiction — and unlike a wrong benchmark, a
 wrong brief fails silently twice (the candidates it inspires still measure
 honestly, but the strategies never aim at the real cost). Cite
 `file:line` of the pinned copy for every claim; if a claim needs a lemma (a
@@ -58,9 +58,9 @@ value range, an invariant), name the lemma.
    apply (tail-recursion shaping, list→array, word arithmetic, algorithm
    substitution, in-place buffers) and *why*, one line each. Pointers only:
    the strategies themselves live in their skills, and the brief must not
-   duplicate them. While the `opt-*` roster is still empty (they are P2
-   deliverables), name the *direction* in the same one-line form and mark it
-   `(no skill yet)` — never invent a pointer to a skill that does not exist.
+   duplicate them. A promising direction that matches no existing `opt-*`
+   skill is still named, in the same one-line form, marked `(no skill yet)` —
+   never invent a pointer to a skill that does not exist.
 5. **Representation notes.** Which existing Rust types the translation slots
    into (`Fp`, `Ext4`, the poly newtypes) — or, for a genuinely new carrier,
    a proposal with the reasoning pattern of `field.rs`: small fixed dimension
@@ -69,7 +69,7 @@ value range, an invariant), name the lemma.
 
 ## Brief format
 
-One markdown block, fixed headings, handed verbatim to `lean-opt` (P2) and
+One markdown block, fixed headings, handed verbatim to `lean-opt` and
 `lean-to-rust`:
 
 ```markdown

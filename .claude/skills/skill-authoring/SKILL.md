@@ -72,6 +72,29 @@ session, the pattern `prove-sorry` already uses on itself.
   agent in every session. A stale parallel version is not an archive, it is an
   alternative trigger target.
 
+## Cleanliness: present tense, no archaeology
+
+* **A skill never mentions its own previous versions.** No version labels in
+  prose, headings, or `description:` ("checklist v1"); no "was removed", "used
+  to, then we switched", no changelog framing. The live text describes only
+  what is true now — what changed and when is git's job, same as the
+  versioning rule above, and provenance is pinned as `skill@commit`, never as
+  a label in the text.
+* This does not touch lessons — failure modes with teeth are the point of a
+  skill. The test is whether the sentence binds the reader *today*:
+  "cross-run comparison drifts 75–373% on frozen code, so everything compares
+  within one run" binds and stays; "the store of past timings was removed"
+  is history and goes. When a removed mechanism must be warned against,
+  restate it as the present-tense reason it is absent.
+* **Concise and intelligible, in that order of repair.** Every sentence
+  states a rule, its reason, or its evidence; anything else dilutes the file
+  for the agent that loads it. And the reader is an agent with none of this
+  repo's session history: plan-phase codenames (`P2`, `?1`) and other
+  shorthand never stand alone — name the thing itself ("until
+  `verify-campaign` exists", "the maps in `cpoly/lean/Field.lean`") and let a
+  codename at most trail it as a pointer into `skills-plan.html`. The fixed
+  ledger tag `TODO(P3)` is a tag, not prose, and stays as-is.
+
 ## Compositions are skills
 
 * A named pipeline (the plan's `R1`, `R2`, `R3-a`) is itself a skill —
@@ -128,6 +151,9 @@ session, the pattern `prove-sorry` already uses on itself.
   `name` equals the directory name, with a `description` that names a task.
 * No `-v2` / `-candidate` variant directory exists at rest; none is ever
   committed. End of session means settled.
+* Skill prose is present-tense and self-history-free: no version labels, no
+  narration of removed or superseded versions, no bare plan codenames — the
+  binds-today test from the cleanliness section decides every borderline.
 * Every vendored file keeps its provenance header current, and a local edit to
   one lands only after a refresh against upstream.
 * `README.md`'s one-line description of `.claude/skills/` stays truthful.

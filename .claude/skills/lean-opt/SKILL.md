@@ -37,7 +37,8 @@ a candidate note. In full:
 2. **The lemma.** Same carrier: `Foo.opt_eq_spec : ∀ …, Foo.opt … = Foo …`.
    Word carrier (`opt-word-arith`): the commutes-through-representation form
    `toK (Foo.opt w) = Foo (toK w)` under `Red`/`Reduced`, using only the
-   representation maps the P1 layer already owns (`toK`, `toExt`, `toRaw`).
+   representation maps the spec files already own (`toK`, `toExt`, `toRaw`
+   in `cpoly/lean/`).
 3. **Proof discipline.** Sorry-free; `#print axioms Foo.opt_eq_spec` shows at
    most `[propext, Classical.choice, Quot.sound]`. `native_decide`
    (`Lean.ofReduceBool`/`Lean.trustCompiler`) is banned — it would add the

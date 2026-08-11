@@ -81,7 +81,7 @@ says `unusable`. Every shortcut here converts machine noise into a
      `Generated.lean` + broken `_spec`s are proof debt that must not reach
      main — prepare them as a `champion/<op>` branch in the commit plan and
      mark the row `TODO(P3)`. Once the outer pass exists, debt is paid per
-     accept (K=1 until the P3 ledger says otherwise).
+     accept (K=1 until the ledger says otherwise).
 8. **Iterate** — next `lean-opt` tier on the (possibly new) champion — until
    a full round yields no accept, or the user stops the loop.
 

@@ -11,7 +11,8 @@ the opt-contract that `lean-opt` owns: `Foo.opt` in `cpoly/lean/Opt.lean`
 plus the proved `Foo.opt_eq_spec`. A word-level variant usually lives on a
 word carrier, so its lemma takes the commutes-through-representation form the
 opt-contract allows (`toK (Foo.opt w) = Foo (toK w)` under `Red`), using the
-representation maps the P1 layer already owns (`toK`, `toExt`, `toRaw`).
+representation maps the spec files already own (`toK`, `toExt`, `toRaw` in
+`cpoly/lean/`).
 
 ## The one rule: the representation invariant is global; arithmetic under it is local
 
@@ -20,9 +21,10 @@ representatives, `Red`/`Reduced` as invariants of the type. A variant may
 restructure arithmetic **under** that invariant — that is this strategy's
 mandate. A variant that changes what the words *mean* (Montgomery form,
 Barrett with a different stored range) changes `Red` and `toK` for every
-operation of the module at once: that is a corpus-wide migration needing the
-P3 bridge layer, not a per-op candidate. Propose it only as a flagged,
-driver-gated proposal (TODO(P3)) — never as a normal candidate.
+operation of the module at once: that is a corpus-wide migration needing its
+own bridge layer and campaign, not a per-op candidate. Propose it only as a
+flagged, driver-gated proposal (ledger tag `TODO(P3)`) — never as a normal
+candidate.
 
 ## Measured headroom facts for the Hachi prime (verified 2026-08-11)
 
