@@ -127,7 +127,7 @@ impl Mul for Fp {
     type Output = Fp;
 
     /// `a * b <= (P-1)^2 < 2^64` because `P < 2^32`; this is the tightest of the
-    /// no-overflow bounds, with about `859 * 2^32` to spare.
+    /// no-overflow bounds, with about `200 * 2^32` to spare.
     fn mul(self, rhs: Fp) -> Fp {
         Fp((self.0 * rhs.0) % P)
     }

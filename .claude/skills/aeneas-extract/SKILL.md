@@ -108,6 +108,13 @@ env) green:
 | `a.wrapping_mul(b)` | `ok (core.num.U64.wrapping_mul a b)` — **pure** | wrap-around arithmetic without `Result` friction |
 | `u128` intermediates: cast, `*`, `>> 64`, cast back | `UScalar.cast .U128` + U128 scalar ops | Barrett/Montgomery high-half pattern available |
 | `a.checked_add(b)` + `match` on the `Option` | `U64.checked_add` | `checked_shl` is the axiom, not the whole `checked_*` family |
+| self-recursive `fn` (probed 2026-08-12) | `def … partial_fixpoint` | extracts clean, zero axioms — but it is a **different proof shape**: fixpoint unfold/induction, not the `@[rust_loop]` template |
+| `a + b` on `u128` (probed 2026-08-12) | monadic `Std.U128` add in `Result` | standard overflow-checked shape |
+| `<` / `>=` on `u128` (probed 2026-08-12) | **pure** boolean comparisons | no `Result` friction in guards |
+| `a & mask`, `a >> 32` on `u128` (probed 2026-08-12) | pure lifted `&&&` + monadic `>>>` (shift RHS is an `#i32` literal) | mid-shifts work, not just `>> 64` |
+| `a % b` on `u128`, constant divisor (probed 2026-08-12) | monadic `%` with `#u128` literal | divisor-nonzero side condition trivially dischargeable |
+| guarded `usize` sub in a counter loop: `if j <= k { k - j }` (probed 2026-08-12) | monadic sub under a pure guard; loop state stays a **2-tuple** | the k-outer convolution shape is safe |
+| range subslices `&p[..end]`, `&p[start..]` (probed 2026-08-12) | `core.slice.index.SliceIndexRange{To,From}UsizeSlice.index` | modelled instances with `step_spec` lemmas in the Aeneas Std (`Slice.lean:490`, `:990`); out-of-range indices `fail` in the model where Lean's `Array.extract` clamps — clamp explicitly first |
 
 Unprobed (add a measured row on first contact — closures, const generics,
 generic functions, `match` on custom enums, `u128` division, trait objects,

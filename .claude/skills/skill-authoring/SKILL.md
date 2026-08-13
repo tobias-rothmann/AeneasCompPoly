@@ -95,6 +95,34 @@ session, the pattern `prove-sorry` already uses on itself.
   codename at most trail it as a pointer into `skills-plan.html`. The fixed
   ledger tag `TODO(P3)` is a tag, not prose, and stays as-is.
 
+## `INSTRUCTIONS.md` is part of every skill change
+
+`INSTRUCTIONS.md` at the repo root is the catalogue: a user-facing overview of
+the skills a human invokes and the options they take, then a complete
+agent-facing table of every skill in `.claude/skills/`. It is the only
+skill-related file written for readers outside this directory, and it is
+**derived** — the SKILL.md files are the source of truth, so a claim there
+that contradicts a skill is a bug in the catalogue, not in the skill.
+
+* **A skill change is not done until the catalogue matches it.** Adding,
+  renaming, deleting, or re-scoping a skill — anything that changes what a
+  reader would need to know to invoke it — updates `INSTRUCTIONS.md` in the
+  same change. The table has one row per directory under `.claude/skills/`,
+  so a new directory without a new row is an incomplete change, the same way
+  a missing status pill in `skills-plan.html` is.
+* **Edits confined to a skill's interior need no catalogue edit.** Growing a
+  failure mode, adding a measured table row, tightening a procedure — none of
+  that reaches the catalogue unless it changes the skill's audience, its
+  inputs, its options, or what it produces.
+* **The cleanliness rules above apply to it verbatim**: present tense, no
+  narration of removed or superseded versions, no version labels, no bare
+  plan codenames, every sentence stating a rule, its reason, or its evidence.
+  The binds-today test decides every borderline sentence there too.
+* Keep the two halves distinct in kind, not just in position: the user
+  overview explains *what work each entry point starts and what it will ask
+  of you*; the agent table is a lookup keyed by situation. Neither duplicates
+  a skill's procedure — both point at it.
+
 ## Compositions are skills
 
 * A named pipeline (the plan's `R1`, `R2`, `R3-a`) is itself a skill —
@@ -157,6 +185,9 @@ session, the pattern `prove-sorry` already uses on itself.
 * Every vendored file keeps its provenance header current, and a local edit to
   one lands only after a refresh against upstream.
 * `README.md`'s one-line description of `.claude/skills/` stays truthful.
+* `INSTRUCTIONS.md` has exactly one table row per directory under
+  `.claude/skills/`, and every user-invocable entry point it lists still
+  accepts the inputs and options it claims.
 * A new skill flips its status pill in `skills-plan.html`'s catalog (§4) the
   same day it lands, and a surprising result amends the responsible skill in
   the same session it surprised.

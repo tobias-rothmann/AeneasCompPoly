@@ -30,9 +30,13 @@ says `unusable`. Every shortcut here converts machine noise into a
 ## The procedure, per iteration
 
 1. **Brief** — `compoly-analyze` on the target.
-2. **Candidates** — `lean-opt`: tiered strategy fan-out (one Opus agent per
-   strategy, worktree-isolated), opt-contract enforced. Contract failures are
-   already ledger rows; only contract-ok candidates continue.
+2. **Candidates** — the route's candidate stage. Default (`route-r1`/`route-r3`):
+   `lean-opt`, tiered strategy fan-out (one Opus agent per strategy,
+   worktree-isolated), opt-contract enforced. Under `route-r2` the stage is
+   `rust-direct`: candidates arrive as Rust diffs, skip step 3's translation,
+   and their pre-bench contract is that skill's ceiling audit instead of the
+   opt-contract. Either way, contract failures are already ledger rows; only
+   contract-ok candidates continue.
 3. **Per candidate, in its worktree**, in this order:
    * apply the translation (`lean-to-rust`) of the opt def to `cpoly/src`;
    * `cargo test` — the cheap semantics filter; failure → row
@@ -77,19 +81,22 @@ says `unusable`. Every shortcut here converts machine noise into a
      (deterministic, zero axioms, loop shapes); its result goes in the row;
    * ledger row, then **stage — never commit** (user settings enforce it):
      the loop ends by handing the user an ordered commit plan.
-   * *Until `verify-campaign` exists (P3):* the Rust swap + regenerated
-     `Generated.lean` + broken `_spec`s are proof debt that must not reach
-     main — prepare them as a `champion/<op>` branch in the commit plan and
-     mark the row `TODO(P3)`. Once the outer pass exists, debt is paid per
-     accept (K=1 until the ledger says otherwise).
+   * The Rust swap + regenerated `Generated.lean` + broken `_spec`s are
+     proof debt that must not reach main — prepare them as a
+     `champion/<op>` branch in the commit plan. The `verify-campaign` skill
+     pays the debt per accept (K=1 until the ledger says otherwise) before
+     the next target is taken up.
 8. **Iterate** — next `lean-opt` tier on the (possibly new) champion — until
    a full round yields no accept, or the user stops the loop.
 
-## The ledger (owned here until `skill-lab` exists)
+## The ledger (candidate-row schema; the file is `skill-lab`'s)
 
-`ledger.jsonl` at the repo root. Append-only; one JSON object per line per
-candidate verdict, accepted or not — rejects are the cheap lessons the
-strategy skills grow from. The numbers in a row are copies of one run's
+`ledger.jsonl` at the repo root — file conventions, ownership, and the full
+`kind` table live in the `skill-lab` skill; this section owns only the
+candidate-verdict row. One JSON object per line per candidate verdict,
+accepted or not — rejects are the cheap lessons the strategy skills grow
+from. Rows without a `kind` field are this loop's candidate verdicts; any
+tooling over the ledger filters on `kind` first. The numbers in a row are copies of one run's
 within-run deltas and are valid **only as that run's claim**: no tooling may
 subtract two rows' numbers, and nothing here justifies a cross-run
 comparison (the attempt that failed is documented in `benches/genesis`).
@@ -138,9 +145,28 @@ actually held, the lean records what was divided out of the accept column.
 * **A landed run that forgot the restore step.** `cpoly/src` still carrying a
   candidate diff, or the slot left divergent — `make bench-check`
   (`check-candidate`) is the tripwire; run it before writing the commit plan.
+* **Benching a slot nobody filled.** `make run-bench CANDIDATE=1` runs
+  `check-genesis` and the coverage audit but **not** `check-candidate`, and
+  the report's slot witness only says which modules differ from `cpoly/src`
+  — which they do as soon as `src` holds the candidate, so an untouched slot
+  still prints a plausible `diverged: [univariate]`. The candidate column
+  then measures the *champion*, every row reads ~0%, and the verdict is a
+  silent false reject. Step 3's order exists for this reason: copy `src` →
+  slot **first**, then `git restore cpoly/src`, and confirm the slot's
+  per-module sha in the report is not the champion's before reading any
+  verdict.
 * **Two loops at once.** Worktrees isolate files, not the machine: a lake
   build or second bench during a criterion session lands asymmetrically on
   the variants. Lean building and benching never overlap.
+* **A busy machine this repo cannot see.** The serialization rule binds work
+  *this* project starts; other projects on the same hardware are invisible to
+  every worktree check. Measured: a foreign Lean build (load average 36) drove
+  a candidate run to an A/B bias of 64%, and the rows it would have published
+  read −6.5% and +136% for one candidate. So check the machine, not the repo,
+  before a run — `ps -eo command | grep -c "[b]in/lean"` plus the load average
+  — and when the competition is someone else's work, wait for it or hand the
+  run back. Never free the slot by killing it, and never lower a threshold to
+  make a contended run count.
 * **A worktree freezes the harness at creation time.** The first supervised
   run benched through a worktree whose `harness.py` predated the same-day
   review fixes — the measurements were fine, the report semantics were not.

@@ -56,6 +56,7 @@ kept elsewhere.
 
 ```
 Makefile              setup, build, test, extraction, benchmarks
+INSTRUCTIONS.md       the skill catalogue: what to invoke, and the full reference
 toolchain/            charon and aeneas, put there by `make setup`; not in git
 .claude/skills/       local skills and the vendored upstream Aeneas suite
 
