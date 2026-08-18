@@ -104,6 +104,7 @@ help:
 	@echo '  Advanced targets (driven by the optimization loop, rarely by hand):'
 	@echo '    bench-check    check the frozen baseline against git, and bench coverage'
 	@echo '    bench-stamp    re-derive the @genesis stamps after adding a function'
+	@echo '    ledger-check   validate ledger.jsonl rows and append-only history'
 	@echo ''
 	@echo '  Variables:'
 	@echo '    AENEAS=<path>  aeneas binary for `extract` (default ./toolchain/aeneas)'
@@ -291,7 +292,15 @@ extract: check-toolchain | $(STAMPS)
 BENCH_TOOLCHAIN := nightly-2026-06-01
 HARNESS         := $(PKG)/benches/harness.py
 
-.PHONY: run-bench bench-check bench-stamp bench-toolchain
+.PHONY: run-bench bench-check bench-stamp bench-toolchain ledger-check
+
+# The ledger's gate: per-kind row schema, `run` ids on measurement rows, the
+# notes discipline, and append-only against the last committed state (set
+# containment, because union merges may reorder rows). The checker and the
+# discipline it enforces are owned by the skill-lab skill; run this before
+# writing any commit plan that touches ledger.jsonl.
+ledger-check:
+	@python3 .claude/skills/skill-lab/references/ledger_check.py --against HEAD
 
 # Statistics cannot rescue a corrupted baseline, so this runs before any
 # measurement and is a hard gate. Coverage is reported by `run-bench` but does

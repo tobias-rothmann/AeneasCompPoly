@@ -148,6 +148,7 @@ make clean            drop build output, keeping fetched dependencies
 make check-toolchain  verify the charon/aeneas pin in both directions
 make bench-check      verify the frozen baseline against git, and bench coverage
 make bench-stamp      re-derive the @genesis stamps after adding a function
+make ledger-check     validate ledger.jsonl rows and append-only history
 ```
 
 Useful variables: `BENCH=<regex>` to bench a subset, `JSON=<path>` to write a

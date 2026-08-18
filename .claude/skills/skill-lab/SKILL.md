@@ -25,12 +25,44 @@ skill invalidates the arm.
 
 ## The ledger — `ledger.jsonl`, owned here
 
-File conventions, unchanged from the day the file was born: append-only at
-the repo root, one JSON object per line per event, `pins.repo` = short HEAD
-with `dirty: true` when the machinery under test is staged but uncommitted.
-The numbers in a row are one run's within-run claims — no tooling may
-subtract two rows' numbers (cross-run comparison drifted 75–373% on frozen
-code when it was tried; the full argument lives in `cpoly/benches/genesis`).
+File conventions: append-only at the repo root, one JSON object per line per
+event, `pins.repo` = the short base commit the work was built on (with
+`dirty: true` when measured against uncommitted state). The numbers in a row
+are one run's within-run claims — no tooling may subtract two rows' numbers
+(cross-run comparison drifted 75–373% on frozen code when it was tried; the
+full argument lives in `cpoly/benches/genesis`).
+
+How rows enter history — the discipline that makes every row's provenance
+resolvable and the no-cross-run rule mechanical:
+
+* **A row rides the work it describes.** Append the row to the
+  `ledger.jsonl` *of the worktree the work lives in* and stage them together,
+  so they enter history in the same commit and the row's introducing commit
+  (git blame) contains the state it pins. `pins.repo` alone cannot do this —
+  a dirty pin names a base, not the state. Two shapes have no landing work by
+  design and are the row's own record: rejected candidates and bench-only
+  references (the `slot_sha` fingerprints their discarded diff). A loop run
+  that lands no champion ends with a ledger-only commit in its plan.
+* **Measurement rows name their criterion session.** Every candidate row
+  carrying a `rows` array has `"run": "<compact ISO time with offset>-<machine
+  id>"`, minted once when `make run-bench` is invoked and shared by every row
+  copied from that report. Numbers from rows with different `run` are never
+  compared — the rule tooling can now refuse on, instead of a sentence in
+  `notes` hoping to be read.
+* **Rows cite by `run`/`ts`, never by position.** The file merges `union`
+  (`.gitattributes`), so concurrent branches append without conflict and
+  committed order may interleave — "row 3" and "the row above" are
+  meaningless after the first union merge.
+* **`notes` hold durable facts and caveats, a few sentences (≤1200 chars).**
+  The skill cleanliness rules apply verbatim: present tense, no session
+  narrative, no bare plan codenames. Analysis lives in the responsible skill
+  or document; the note points there.
+* **`make ledger-check` is the gate** — per-kind schema, `run` format, the
+  notes bounds, the positional-citation ban, and append-only against the last
+  committed state (set-containment, since union merges reorder). It runs
+  before any commit plan that touches the ledger. Rows older than the
+  checker's pinned cutoff predate the discipline and are exempt from the
+  field checks; append-only outranks retrofitting them.
 
 Rows are discriminated by `kind`; any tooling over the ledger filters on it
 first:

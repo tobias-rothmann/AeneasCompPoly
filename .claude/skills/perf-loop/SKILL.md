@@ -91,12 +91,20 @@ says `unusable`. Every shortcut here converts machine noise into a
 
 ## The ledger (candidate-row schema; the file is `skill-lab`'s)
 
-`ledger.jsonl` at the repo root — file conventions, ownership, and the full
-`kind` table live in the `skill-lab` skill; this section owns only the
+`ledger.jsonl` — file conventions, ownership, the entry discipline, and the
+full `kind` table live in the `skill-lab` skill; this section owns only the
 candidate-verdict row. One JSON object per line per candidate verdict,
 accepted or not — rejects are the cheap lessons the strategy skills grow
 from. Rows without a `kind` field are this loop's candidate verdicts; any
-tooling over the ledger filters on `kind` first. The numbers in a row are copies of one run's
+tooling over the ledger filters on `kind` first.
+
+<!-- ⚠️ SYNC RULE: source of truth is skill-lab "The ledger" -->
+Three duties this loop owes that discipline: append each row to the
+**worktree's** `ledger.jsonl` and stage it with the work it describes (a run
+that lands no champion puts a ledger-only commit in its plan); mint one
+`"run": "<compact ISO time with offset>-<machine id>"` per `make run-bench`
+invocation and stamp it on every row copied from that report; and run
+`make ledger-check` before writing the commit plan. The numbers in a row are copies of one run's
 within-run deltas and are valid **only as that run's claim**: no tooling may
 subtract two rows' numbers, and nothing here justifies a cross-run
 comparison (the attempt that failed is documented in `benches/genesis`).
@@ -108,6 +116,7 @@ comparison (the attempt that failed is documented in `benches/genesis`).
  "strategy": "opt-algo-swap",
  "candidate": "mul.opt — karatsuba, 1 level",
  "verdict": "accepted",
+ "run": "20260811T1403+0200-bc98c73c0206",
  "rows": [{"case": "univariate/mul/256", "cand_vs_now": -0.33,
            "cand_vs_now_adj": -0.31, "cand_vs_genesis": -0.31,
            "verdict": "faster"}],

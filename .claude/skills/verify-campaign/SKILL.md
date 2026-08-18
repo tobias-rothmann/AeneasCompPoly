@@ -62,7 +62,10 @@ numbers are what may later relax K, not convenience in the moment.
    `sorry|native_decide|axiom|implemented_by|unsafe|maxHeartbeats`; new
    Check entries for anything the campaign introduced.
 6. **Ledger row, then stage — never commit.** Append the campaign row
-   (below), stage the branch state, and end by handing the user an ordered
+   (below) to the **worktree's** `ledger.jsonl` so it rides the champion
+   branch and enters history in the same commit as the proofs it describes
+   (the entry discipline is `skill-lab`'s; `make ledger-check` gates the
+   plan). Stage the branch state, and end by handing the user an ordered
    plan: the champion-branch commits, the merge to main, and any post-merge
    step the landing owes (e.g. `make bench-stamp` when the merge freezes
    new genesis items).

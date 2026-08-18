@@ -1,0 +1,6 @@
+# ledger.jsonl is an append-only log of independent one-line JSON rows, written
+# concurrently from several worktrees. Union merge keeps every side's rows and
+# never conflicts; the price is that ROW ORDER carries no meaning, which the
+# ledger discipline (skill-lab) already requires: rows cite each other by
+# `run`/`ts`, never by position.
+ledger.jsonl merge=union
