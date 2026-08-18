@@ -13,6 +13,23 @@ routines and CI triggers have no procedure here on purpose: they get one
 only after the loop has proved itself under supervision, and the ledger
 rows from these runs are that proof.
 
+## Invocation
+
+**Human invocation:** start with `/autonomy-harness` alone. Ask: **“Use the
+default `route-r3`, or pin `route-r1` or `route-r2` for this session?”** Record
+the answer before the first iteration; choosing the target remains the
+harness's job. A default is an explicit answer, not an unstated assumption.
+
+**Agent invocation:** bypass the dialogue with this named request; omitting
+`route` explicitly selects the default:
+
+```yaml
+agent_request:
+  route: route-r1 | route-r2 | route-r3 # optional; route-r3 when omitted
+```
+
+Return an invalid route to the invoking agent rather than asking the human.
+
 ## The one rule: the loop never outruns its debt
 
 K=1 holds inside the loop: an iteration is target → accepted champion →

@@ -74,6 +74,11 @@ target/
 # pinned along with the toolchain.
 /cpoly/benches/genesis/Cargo.lock
 
+# Aristotle's downloaded archives, snapshots, and pre-integration backups are
+# machine-local evidence. The compact, append-only session log under `logs/`
+# remains trackable and never contains an API key.
+/.aristotle-artifacts/
+
 
 # --- Editor, tooling and OS noise --------------------------------------------
 

@@ -5,11 +5,27 @@ description: The Rust-first route — optimize a targeted CompPoly definition di
 
 # Route R2 — Rust-first, prove the gap directly
 
-Pure composition; every procedure lives in the stage skill named. The target
-definition is handed in. What makes this route R2: candidates are Rust
+Pure composition; every procedure lives in the stage skill named. Invocation
+resolves the target definition. What makes this route R2: candidates are Rust
 diffs, and the verification carries no `opt_eq_spec` — the campaign's
 effort numbers on this route are the price of skipping the Lean lemma
 layer, which is exactly the bake-off's question.
+
+## Invocation
+
+**Human invocation:** start with `/route-r2` alone. Ask: **“Which CompPoly
+operation should route R2 optimize and verify?”** Resolve and confirm that
+single target, then run the fixed route; its Rust-first candidate stage is not
+a separate user parameter.
+
+**Agent invocation:** bypass the dialogue with:
+
+```yaml
+agent_request:
+  target: CompPoly.<fully-qualified-definition>
+```
+
+Return an invalid or missing target to the invoking agent, never to the human.
 
 1. `compoly-analyze` — target definition in → optimization brief out (its
    cost model reads on the Rust hot path).

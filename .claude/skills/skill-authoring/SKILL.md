@@ -55,6 +55,34 @@ session, the pattern `prove-sorry` already uses on itself.
   derived copy (upstream's `⚠️ SYNC RULE` marker) and re-check it when the
   source changes.
 
+## Invocation contracts
+
+Human-facing entry points are **conversations, not parameterized commands**.
+Their human interface is the bare slash name — `/perf-loop`, not
+`/perf-loop CompPoly.…` — followed by a short intake that asks one direct
+question at a time for every decision the procedure cannot safely infer.
+Use the supplied context when it resolves a value, never re-ask it, and
+confirm the resolved request before irreversible work. Defaults are stated as
+choices; a default is never silently assumed. Do not expose an internal
+artifact, flag, or positional-argument syntax to the human interface.
+
+Every human-invocable `SKILL.md` carries an `## Invocation` section before
+its one rule or procedure. It states the bare command, the first question and any
+conditional follow-ups, then its exact agent packet. A complete agent packet
+is the non-interactive interface: the invoking agent supplies named fields
+under `agent_request`, the callee validates them, and it proceeds without
+asking the human. A missing or invalid packet field goes back to the invoking
+agent as a missing-input result; it never leaks into an unrelated human
+dialogue. Approval gates that deliberately require human authorization remain
+in force in either mode.
+
+Stages and reference skills are agent-only unless the catalogue designates
+them as entry points. An agent calling any such skill also supplies its
+declared input artifacts explicitly, rather than expecting the callee to
+interview a human. Keep the packet names aligned with the skill's input/output
+contract, so compositions can pass artifacts directly and a value is never
+lost in prose.
+
 ## Versioning: git-only, one exception
 
 * **No version fields, no variant directories at rest.** The live version of
@@ -98,7 +126,7 @@ session, the pattern `prove-sorry` already uses on itself.
 ## `INSTRUCTIONS.md` is part of every skill change
 
 `INSTRUCTIONS.md` at the repo root is the catalogue: a user-facing overview of
-the skills a human invokes and the options they take, then a complete
+the skills a human invokes and the questions they ask, then a complete
 agent-facing table of every skill in `.claude/skills/`. It is the only
 skill-related file written for readers outside this directory, and it is
 **derived** — the SKILL.md files are the source of truth, so a claim there
@@ -119,9 +147,9 @@ that contradicts a skill is a bug in the catalogue, not in the skill.
   plan codenames, every sentence stating a rule, its reason, or its evidence.
   The binds-today test decides every borderline sentence there too.
 * Keep the two halves distinct in kind, not just in position: the user
-  overview explains *what work each entry point starts and what it will ask
-  of you*; the agent table is a lookup keyed by situation. Neither duplicates
-  a skill's procedure — both point at it.
+  overview explains *what work each bare entry point starts and what it will
+  ask of you*; the agent table records the corresponding named packets. Neither
+  duplicates a skill's procedure — both point at it.
 
 ## Compositions are skills
 
@@ -186,8 +214,8 @@ that contradicts a skill is a bug in the catalogue, not in the skill.
   one lands only after a refresh against upstream.
 * `README.md`'s one-line description of `.claude/skills/` stays truthful.
 * `INSTRUCTIONS.md` has exactly one table row per directory under
-  `.claude/skills/`, and every user-invocable entry point it lists still
-  accepts the inputs and options it claims.
+  `.claude/skills/`, and every user-invocable entry point it lists still asks
+  the questions and accepts the agent packet it claims.
 * A new skill flips its status pill in `skills-plan.html`'s catalog (§4) the
   same day it lands, and a surprising result amends the responsible skill in
   the same session it surprised.

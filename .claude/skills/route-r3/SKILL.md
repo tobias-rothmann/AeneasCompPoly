@@ -5,9 +5,25 @@ description: The hybrid route (the default) — optimize a targeted CompPoly def
 
 # Route R3 — Lean-side optimization, bench-steered (the default)
 
-Pure composition; every procedure lives in the stage skill named. The target
-definition is handed in — choosing targets is the caller's job
+Pure composition; every procedure lives in the stage skill named. Invocation
+resolves the target definition — choosing targets is the caller's job
 (`autonomy-harness` or the user).
+
+## Invocation
+
+**Human invocation:** start with `/route-r3` alone. Ask: **“Which CompPoly
+operation should route R3 optimize and verify?”** Resolve and confirm that
+single target, then run the fixed default route; its Lean-side candidate stage
+is not a tuning parameter.
+
+**Agent invocation:** bypass the dialogue with:
+
+```yaml
+agent_request:
+  target: CompPoly.<fully-qualified-definition>
+```
+
+Return an invalid or missing target to the invoking agent, never to the human.
 
 1. `compoly-analyze` — target definition in → optimization brief out.
 2. `perf-loop`, candidate stage `lean-opt` (+ the `opt-*` strategies) —

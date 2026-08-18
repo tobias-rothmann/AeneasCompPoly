@@ -1,6 +1,6 @@
 ---
 name: skill-lab
-description: Running measured experiments over the loop's skills — the route bake-off (route-r1/r2/r3 arms on the same target, metered not capped), skill-version A/Bs (session-scoped variants, exactly one skill bumped per experiment), ownership of ledger.jsonl and its kind-discriminated row schemas, and folding each verdict back into the responsible skill; use when comparing routes or skill versions, when appending bakeoff or ab rows, or when deciding whether ledger variance justifies an A/B
+description: Running measured experiments over the loop's skills — the route bake-off (route-r1/r2/r3 arms on the same target, metered not capped), skill-version A/Bs (session-scoped variants, exactly one skill bumped per experiment), ownership of logs/ledger.jsonl and its kind-discriminated row schemas, and folding each verdict back into the responsible skill; use when comparing routes or skill versions, when appending bakeoff or ab rows, or when deciding whether ledger variance justifies an A/B
 ---
 
 # The Skill Lab
@@ -13,6 +13,34 @@ campaign row. Variant mechanics (session-scoped `-v2` directories, git-only
 versioning) are `skill-authoring`'s; this file owns *when* an experiment
 runs and *how its result is recorded*.
 
+## Invocation
+
+**Human invocation:** start with `/skill-lab` alone. Ask one question at a
+time: first **“Do you want a route bake-off or a skill A/B?”** For a bake-off,
+ask for the target and route arms. For an A/B, ask for the skill and the exact
+sentence or rule under test; do not start from a vague suspicion. Confirm the
+complete experiment before creating a variant or a worktree.
+
+**Agent invocation:** bypass the dialogue with one complete named request:
+
+```yaml
+agent_request:
+  kind: bakeoff
+  target: CompPoly.<fully-qualified-definition>
+  arms: [route-r1, route-r2, route-r3]
+```
+
+```yaml
+agent_request:
+  kind: ab
+  skill: <skill name>
+  hypothesis: <exact sentence or rule under test>
+  input: <fixed target or other fixed input>
+```
+
+Validate the form and return any missing field to the invoking agent instead
+of asking the human.
+
 ## The one rule: an experiment varies exactly one thing
 
 One route per arm on the same target; one skill per A/B, everything else at
@@ -23,9 +51,9 @@ routes: route skills contain no procedure, so an arm's outcome is
 attributable to the composition itself; a procedure smuggled into a route
 skill invalidates the arm.
 
-## The ledger — `ledger.jsonl`, owned here
+## The ledger — `logs/ledger.jsonl`, owned here
 
-File conventions: append-only at the repo root, one JSON object per line per
+File conventions: append-only at `logs/ledger.jsonl`, one JSON object per line per
 event, `pins.repo` = the short base commit the work was built on (with
 `dirty: true` when measured against uncommitted state). The numbers in a row
 are one run's within-run claims — no tooling may subtract two rows' numbers
@@ -36,7 +64,7 @@ How rows enter history — the discipline that makes every row's provenance
 resolvable and the no-cross-run rule mechanical:
 
 * **A row rides the work it describes.** Append the row to the
-  `ledger.jsonl` *of the worktree the work lives in* and stage them together,
+  `logs/ledger.jsonl` *of the worktree the work lives in* and stage them together,
   so they enter history in the same commit and the row's introducing commit
   (git blame) contains the state it pins. `pins.repo` alone cannot do this —
   a dirty pin names a base, not the state. Two shapes have no landing work by
@@ -172,7 +200,7 @@ the same rule `prove-sorry` applies to itself.
 
 ## Invariants to keep green
 
-* `ledger.jsonl` is append-only; every row carries a valid `kind` (or none,
+* `logs/ledger.jsonl` is append-only; every row carries a valid `kind` (or none,
   for candidate verdicts) and honest pins.
 * No experiment varies more than one thing; no arm reads a sibling arm's
   artifacts.

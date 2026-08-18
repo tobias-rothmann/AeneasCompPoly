@@ -8,8 +8,8 @@ original definition. The skills in `.claude/skills/` are how that work is
 carried out — each one is a written procedure an agent follows.
 
 This file is the catalogue. The first half is for **you**, the human: the
-handful of skills you would invoke to start a piece of work, and what you can
-tell them. The second half is a **complete reference table** of every skill,
+handful of skills you would invoke to start a piece of work, and what they
+will ask you. The second half is a **complete reference table** of every skill,
 for agents to look up mid-task. The skills themselves are the source of truth;
 if this file ever disagrees with one, the skill is right and this file is a
 bug.
@@ -18,30 +18,45 @@ bug.
 
 ## Part 1 · The skills you invoke
 
-Invoke a skill by naming it (`/perf-loop`, or "run the perf loop on
-`CPolynomial.Raw.mul`"). Everything else in `.claude/skills/` is machinery the
-skills invoke, or reference an agent consults mid-task.
+### How human invocation works
+
+Start every skill with its **bare slash command**: `/perf-loop`, not
+`/perf-loop CPolynomial.Raw.mul`. The command starts a short intake: the skill
+asks one direct question at a time, uses information already established in the
+conversation, and confirms the resolved request before it begins work. This
+keeps a target, route, trigger, or experiment detail from silently disappearing
+from the request.
+
+The fields below are questions for humans, not command-line arguments. An agent
+calling another skill instead supplies the named `agent_request` packet in that
+skill's reference entry; a complete packet skips human intake. An approval gate
+that needs your authorization still asks you, whichever way the skill started.
+
+Everything else in `.claude/skills/` is machinery the skills invoke, or
+reference an agent consults mid-task.
 
 ### Choosing one
 
-| You want to… | Invoke | Hand it |
+| You want to… | Invoke | It first asks |
 |---|---|---|
-| Bring a CompPoly definition into the pipeline for the first time | `op-genesis` | the definition |
-| Make an existing operation faster (and prove it after) | `perf-loop` | the operation |
-| Run one optimization route end to end | `route-r1` · `route-r2` · `route-r3` | the operation |
-| Prove an accepted optimization correct, or verify a module from scratch | `verify-campaign` | the champion branch, or the module |
-| Fill in one unproved `sorry` | `prove-sorry` | the theorem (or let it list them) |
-| Compare routes, or two versions of a skill | `skill-lab` | the target and the arms |
-| Run the whole pipeline unattended | `autonomy-harness` | nothing; optionally pin a route |
+| Bring a CompPoly definition into the pipeline for the first time | `/op-genesis` | Which definition should I onboard? |
+| Make an existing operation faster (and prove it after) | `/perf-loop` | Which operation should I optimize? Then choose the direct candidate stage. |
+| Run one optimization route end to end | `/route-r1` · `/route-r2` · `/route-r3` | Which operation should this fixed route optimize and verify? |
+| Prove an accepted optimization correct, or verify a module from scratch | `/verify-campaign` | What should I verify: a champion branch, regenerated extraction, or module? |
+| Fill in one unproved `sorry` | `/prove-sorry` | Which theorem should I prove, or should I list open `sorry`s? |
+| Send substantial Lean proof debt to Aristotle | `/aristotle-prove` | Which files contain the large or genuinely hard proof backlog? |
+| Check Aristotle proof sessions | `/aristotle-check` | It checks only recorded sessions; it asks for a fresh key only when a session is active. |
+| Compare routes, or two versions of a skill | `/skill-lab` | Do you want a route bake-off or a skill A/B? |
+| Run the whole pipeline unattended | `/autonomy-harness` | Use default `route-r3`, or pin another route? |
 
-### What each one does, and what you can tell it
+### What each one does, and what it asks
 
 **`op-genesis` — onboard a new operation.** Writes a deliberately *naive* first
 translation of a definition into `cpoly/src`, tests it, extracts it, and
 freezes that first version as the permanent baseline every future speed-up is
-measured against. Hand it a definition; it onboards the whole dependency chain
-in one pass, dependencies first. Optimizing is explicitly *not* its job — the
-first translation is meant to be slow and obvious.
+measured against. It asks which definition to onboard, then onboards the whole
+dependency chain in one pass, dependencies first. Optimizing is explicitly
+*not* its job — the first translation is meant to be slow and obvious.
 
 *What it asks of you*: the plan is interleaved, because the stamps record a
 commit that must already exist. You commit the translation and the frozen
@@ -59,7 +74,9 @@ translates them, and measures each against the current champion inside a single
 benchmark session, accepting only what is measurably faster at every measured
 size. Repeats until a full round of strategies yields nothing.
 
-- *Hand it*: the operation. It never picks a target itself.
+- *It asks*: which operation to optimize, then, when invoked directly, whether
+  candidates come from Lean-side or direct Rust optimization. A route supplies
+  that second choice and it is not re-asked.
 - *Accept rule you can rely on*: a candidate is accepted only if every measured
   size reads faster by at least 5% after the harness divides out its own
   measured bias (measured noise reaches 6%, so a verdict just over the line is
@@ -82,15 +99,16 @@ the result to `verify-campaign`; `route-r3` is the default.
 | `route-r2` | Optimizes the Rust directly, within what Aeneas can extract | −83.4% vs genesis at n=256, verified; 5.33M tokens and 300 minutes for the whole arm, and it needed no approval gate |
 | `route-r1` | Stacks every Lean optimization first, benchmarks once at the end | No champion: its one benchmark read faster at 256 and 17.5% slower at 64, so a proved lemma chain bought code that will not ship; 1.04M tokens |
 
-Hand any of them the operation. Their behaviour is otherwise fixed — the point
-of having three is that they are comparable, so they take no tuning knobs.
+Each asks for the operation. Their behaviour is otherwise fixed — the point of
+having three is that they are comparable, so they take no tuning knobs.
 
 **`verify-campaign` — prove an optimization correct.** Takes a champion branch
 and drives it to a module where every equivalence spec is proved and audited,
-so it can merge. Hand it the champion branch (or any regenerated
-`Generated.lean` whose specs broke). It re-extracts, checks the extraction is
-deterministic, repairs the specs, proves them, audits that nothing depends on
-an unexpected axiom, and records what the campaign cost.
+so it can merge. It first identifies whether the subject is a champion branch,
+a regenerated `Generated.lean`, or a module from scratch, then asks for that
+subject if needed. It re-extracts, checks the extraction is deterministic,
+repairs the specs, proves them, audits that nothing depends on an unexpected
+axiom, and records what the campaign cost.
 
 > **It may stop and ask for your approval.** Any change to a theorem's
 > statement that makes it assume more or assert less — a new or strengthened
@@ -101,23 +119,39 @@ an unexpected axiom, and records what the campaign cost.
 
 **`prove-sorry` — fill in one unproved theorem.** Audits whether the statement
 is even true before trying, decomposes the proof, proves the pieces with
-parallel agents, then adversarially attacks its own result. Hand it a specific
-`sorry`, or invoke it and let it list what is open. Same approval gate as
-above: it never weakens a statement without asking.
+parallel agents, then adversarially attacks its own result. It asks for a
+specific theorem or whether to list what is open. Same approval gate as above:
+it never weakens a statement without asking.
+
+**`aristotle-prove` / `aristotle-check` — long-running remote proof work.** The
+prove skill starts an asynchronous Aristotle run only for a substantial backlog
+or genuinely hard scope, logs it, and returns immediately. The check skill
+polls only logged sessions; a verified complete or no-progress result is
+integrated, while verified partial progress is resubmitted on its remaining
+holes. Each human-requested API operation asks for a fresh, one-time key and
+never stores it.
+
+### Logs
+
+`logs/ledger.jsonl` is the append-only optimization and verification ledger.
+`logs/aristotle-sessions.jsonl` is the append-only record of asynchronous
+Aristotle proof sessions. Both are tracked; bulky Aristotle downloads and
+snapshots remain ignored under `.aristotle-artifacts/`.
 
 **`skill-lab` — run an experiment.** Two kinds: a *bake-off* comparing whole
 routes on one operation, and an *A/B* comparing two versions of a single
-skill. For a bake-off, hand it the target and the arms. An A/B takes the skill
-and the sentence in it you suspect, and runs only when ledger rows already
-attribute divergent outcomes to that skill — not curiosity. Arms are metered, never
-capped — each runs to its natural finish and the effort is measured, because
-the cost difference between approaches is itself the result. It answers with a
-pair, speed *and* effort, never a single score.
+skill. It asks which experiment to run; a bake-off then collects the target
+and arms, while an A/B collects the skill and its exact suspect sentence. It
+runs only when ledger rows already attribute divergent outcomes to that skill
+— not curiosity. Arms are metered, never capped — each runs to its natural
+finish and the effort is measured, because the cost difference between
+approaches is itself the result. It answers with a pair, speed *and* effort,
+never a single score.
 
 **`autonomy-harness` — run unattended.** Under `/loop`, each iteration picks the
 next operation by how much headroom it has, runs a route end to end, proves the
-result, and extends one commit plan. You can pin a route for the session;
-otherwise it uses `route-r3`. It halts loudly rather than degrading: on a
+result, and extends one commit plan. It asks whether to pin a route; an explicit
+default selects `route-r3`. It halts loudly rather than degrading: on a
 failed proof, on an approval gate, on anything needing a commit you have not
 made, when a benchmark reads unusable twice running or the machine looks
 contended, or when the corpus is exhausted. New operations never enter the
@@ -148,7 +182,7 @@ make clean            drop build output, keeping fetched dependencies
 make check-toolchain  verify the charon/aeneas pin in both directions
 make bench-check      verify the frozen baseline against git, and bench coverage
 make bench-stamp      re-derive the @genesis stamps after adding a function
-make ledger-check     validate ledger.jsonl rows and append-only history
+make ledger-check     validate logs/ledger.jsonl rows and append-only history
 ```
 
 Useful variables: `BENCH=<regex>` to bench a subset, `JSON=<path>` to write a
@@ -175,23 +209,30 @@ verdict tables while doing something else; some carry a procedure of their own,
 but nothing invokes them as a pipeline stage. **Meta** = about the skills
 themselves.
 
+In the tables below, an **agent packet** is the named content placed under
+`agent_request` when one agent invokes another. A complete packet uses the
+non-interactive path; missing fields are returned to the caller, not asked of
+the human.
+
 ### Entry points
 
-| Skill | Use it when | Takes | Produces |
+| Skill | Use it when | Agent packet | Produces |
 |---|---|---|---|
-| `op-genesis` | A definition has no Rust counterpart yet | The definition; onboards its whole chain | Naive translation, semantics tests, frozen genesis baseline + `@genesis` stamps, birth bench case, interleaved commit plan. No ledger row — the stamp is the provenance |
-| `perf-loop` | An operation should get faster | Target operation; the route in force picks the candidate stage | Candidate ledger row per verdict, accepted champion staged on a `champion/<op>` branch, extraction check recorded |
-| `route-r3` | Default optimization of one target | Target | Champion + campaign, benchmark deciding each accept |
-| `route-r2` | Rust-first optimization of one target | Target | Champion via `rust-direct` candidates; specs prove the extraction directly against the definition, with no Lean lemma chain |
-| `route-r1` | Lean-first optimization of one target | Target | One stacked variant, one benchmark at the end; a rejection ends the route |
-| `verify-campaign` | A champion awaits proof, an extraction regenerated and broke specs, or a module needs verifying end to end | Champion branch, a regenerated `Generated.lean`, or a module with no specs yet; trigger kind (`champion-accept` · `regeneration` · `from-scratch`) | Proved + audited module, campaign ledger row with its metered effort, ordered merge plan |
-| `prove-sorry` | A `sorry` needs filling | The target theorem, or none (it lists them) | Proved theorem, integrated and axiom-audited; folds its own lessons back into itself |
-| `skill-lab` | Comparing routes or skill versions | Bake-off: target + arms. A/B: the skill and the sentence under test | `bakeoff` / `ab` ledger rows; owns `ledger.jsonl` and its `kind` schemas; requires a fold-back edit into the responsible skill |
-| `autonomy-harness` | Running unattended under `/loop` | Nothing per iteration; optional route pin | One iteration per target: rows, verified champion, extended commit plan; halts loudly |
+| `op-genesis` | A definition has no Rust counterpart yet | `target` | Naive translation, semantics tests, frozen genesis baseline + `@genesis` stamps, birth bench case, interleaved commit plan. No ledger row — the stamp is the provenance |
+| `perf-loop` | An operation should get faster | `target`, `candidate_stage` (`lean-opt` or `rust-direct`; inherited inside a route) | Candidate ledger row per verdict, accepted champion staged on a `champion/<op>` branch, extraction check recorded |
+| `route-r3` | Default optimization of one target | `target` | Champion + campaign, benchmark deciding each accept |
+| `route-r2` | Rust-first optimization of one target | `target` | Champion via `rust-direct` candidates; specs prove the extraction directly against the definition, with no Lean lemma chain |
+| `route-r1` | Lean-first optimization of one target | `target` | One stacked variant, one benchmark at the end; a rejection ends the route |
+| `verify-campaign` | A champion awaits proof, an extraction regenerated and broke specs, or a module needs verifying end to end | `trigger` (`champion-accept` · `regeneration` · `from-scratch`), `subject` | Proved + audited module, campaign ledger row with its metered effort, ordered merge plan |
+| `prove-sorry` | A `sorry` needs filling | Exactly one: `target`, or `list_open: true` | Proved theorem, integrated and axiom-audited; folds its own lessons back into itself |
+| `aristotle-prove` | A Lean proof backlog is large or genuinely hard | `targets`, with `complex: true` for <=3 hard holes | Asynchronous Aristotle session ID and a `logs/aristotle-sessions.jsonl` record |
+| `aristotle-check` | A user asks for a recorded Aristotle session's status | Optional `session_ids` | Status records; verified integration or an asynchronous restart after partial progress |
+| `skill-lab` | Comparing routes or skill versions | Bake-off: `kind`, `target`, `arms`. A/B: `kind`, `skill`, `hypothesis`, `input` | `bakeoff` / `ab` ledger rows; owns `logs/ledger.jsonl` and its `kind` schemas; requires a fold-back edit into the responsible skill |
+| `autonomy-harness` | Running unattended under `/loop` | Optional `route`; omission explicitly selects `route-r3` | One iteration per target: rows, verified champion, extended commit plan; halts loudly |
 
 ### Stages
 
-| Skill | Invoked when | Takes | Produces |
+| Skill | Invoked when | Agent inputs | Produces |
 |---|---|---|---|
 | `compoly-analyze` | A target needs its optimization brief | The target definition (never chosen here) | Brief: definition chain, semantics risks, cost model, applicable `opt-*` strategies with one line of why each, and representation notes |
 | `lean-opt` | Lean-side candidates are wanted | Brief + strategies already tried | Contract-checked candidates (`Foo.opt` + proved `Foo.opt_eq_spec`, axiom-clean, `Check.lean` line). Selects and sequences strategies; contains none itself |

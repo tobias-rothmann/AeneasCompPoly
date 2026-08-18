@@ -1,0 +1,4 @@
+interface:
+  display_name: "Aristotle Check"
+  short_description: "Check and integrate Aristotle proof runs"
+  default_prompt: "Use $aristotle-check to check all recorded Aristotle proof sessions."

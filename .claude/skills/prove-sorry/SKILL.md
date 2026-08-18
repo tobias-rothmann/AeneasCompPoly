@@ -17,6 +17,31 @@ output (through a representation function) to a reference implementation. The
 triple is `Aeneas.Std.spec`, definitionally `∃ r, f args = ok r ∧ post r` —
 TOTAL correctness: every reachable `fail`/`div` falsifies the theorem.
 
+## Invocation
+
+**Human invocation:** start with `/prove-sorry` alone. Ask: **“Which theorem
+should I prove, or should I list the open `sorry`s?”** If listing is chosen,
+show the candidates and ask the next single selection question. Resolve the
+file and declaration before Phase 0; do not silently choose among several
+open theorems.
+
+**Agent invocation:** bypass the dialogue with exactly one of these named
+requests:
+
+```yaml
+agent_request:
+  target: <file path and theorem declaration>
+```
+
+```yaml
+agent_request:
+  list_open: true
+```
+
+Validate the selected form. Return a missing, ambiguous, or nonexistent target
+to the invoking agent rather than asking the human. The statement-change
+approval gate below remains a human interaction even in agent mode.
+
 ## Division of labor (fixed)
 
 - **You (the main model)** do all the thinking: scoping, statement audit,
@@ -27,14 +52,15 @@ TOTAL correctness: every reachable `fail`/`div` falsifies the theorem.
 - **Workflow subagents** do the grinding: sub-lemma proofs and adversarial
   verification run with `model: 'opus'` — provers and audit lenses at
   `effort: 'xhigh'`, repair agents and the completeness critic at `effort: 'max'`.
-- **The approval gate — the ONE mandatory user interaction.** Any change to the
-  target theorem's statement that makes it assume MORE or assert LESS (a new or
-  strengthened hypothesis, a weakened or dropped conclusion, a binder change
-  that alters meaning) requires explicit approval via `AskUserQuestion` BEFORE
-  it is introduced — in any phase, including verification triage. A purely
-  additive strengthening of the conclusion (extra conjunct, hypotheses
-  unchanged) may be applied autonomously but must be flagged prominently in
-  the report. Everything else runs without asking.
+- **The approval gate — the ONE mandatory authorization interaction after the
+  target is resolved.** Any change to the target theorem's statement that makes
+  it assume MORE or assert LESS (a new or strengthened hypothesis, a weakened
+  or dropped conclusion, a binder change that alters meaning) requires explicit
+  approval via `AskUserQuestion` BEFORE it is introduced — in any phase,
+  including verification triage. A purely additive strengthening of the
+  conclusion (extra conjunct, hypotheses unchanged) may be applied
+  autonomously but must be flagged prominently in the report. Everything else
+  runs without asking.
 
 ## Phase 0 — Scope (main loop)
 

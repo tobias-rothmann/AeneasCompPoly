@@ -11,14 +11,36 @@ This is the stage *before* `perf-loop` — §5 of `skills-plan.html` opens with
     champion ← trivial translation of the CompPoly def
     baseline ← criterion(champion)
 
-and this skill owns those two lines. The target is handed in (user or route
-skill); choosing it is not this skill's job. An orchestrator in the
+and this skill owns those two lines. A human dialogue resolves the target; an
+upstream route supplies it. Choosing a target is not this skill's job. An
+orchestrator in the
 `perf-loop` mold: every stage procedure lives in its own skill —
 `compoly-analyze` (the brief), `lean-to-rust` (the translation), `rust-bench`
 (freeze, case, audit, runs), `aeneas-extract` (the extraction pass) — this
 file holds only the ordering, the artifact contract each stage hands the
 next, and the two things that exist only at the composition level: the
 validate-before-freeze discipline and the stage-only commit choreography.
+
+## Invocation
+
+**Human invocation:** start with the bare command `/op-genesis`; do not put
+the definition on the command line. Ask, first and only as needed: **“Which
+CompPoly definition should I onboard?”** Resolve the name in the checked-out
+source, ask one follow-up only when it remains ambiguous, confirm the resolved
+definition, then begin the procedure. Do not ask for optimization choices:
+this skill always creates the deliberately naive baseline.
+
+**Agent invocation:** bypass that dialogue by passing this complete named
+request to the skill:
+
+```yaml
+agent_request:
+  target: CompPoly.<fully-qualified-definition>
+```
+
+Validate that `target` resolves before work starts. If the packet is missing
+or incomplete, return the missing field to the invoking agent; do not turn an
+agent-to-agent call into a question for the human.
 
 ## The one rule: everything is validated before the freeze, because after it nothing can be repaired
 

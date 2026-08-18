@@ -5,10 +5,26 @@ description: The Lean-first route — optimize a targeted CompPoly definition en
 
 # Route R1 — Lean-first, translate once
 
-Pure composition; every procedure lives in the stage skill named. The target
-definition is handed in. What makes this route R1: **the bench appears
+Pure composition; every procedure lives in the stage skill named. Invocation
+resolves the target definition. What makes this route R1: **the bench appears
 exactly once, at the end** — selection among Lean variants uses only the
 opt-contract and the brief's operation counts, never a measurement.
+
+## Invocation
+
+**Human invocation:** start with `/route-r1` alone. Ask: **“Which CompPoly
+operation should route R1 optimize and verify?”** Resolve and confirm that
+single target, then run the fixed route; route choices are deliberately not
+tuning parameters.
+
+**Agent invocation:** bypass the dialogue with:
+
+```yaml
+agent_request:
+  target: CompPoly.<fully-qualified-definition>
+```
+
+Return an invalid or missing target to the invoking agent, never to the human.
 
 1. `compoly-analyze` — target definition in → optimization brief out.
 2. `lean-opt`, run to a fixpoint — all applicable `opt-*` strategies,

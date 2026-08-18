@@ -1,6 +1,6 @@
 ---
 name: verify-campaign
-description: Driving the outer verification pass for a champion or a regenerated extraction — scope the proof debt on the champion branch, champion idiomatic review, re-extraction and determinism check, spec repair/authoring stubs, prove-sorry runs per sorry, Check.lean audit, metered effort into a campaign ledger row, merge plan; use when an accepted optimization awaits its equivalence proofs (K=1: every accepted champion), when Generated.lean regenerated for any reason (Rust edits, aeneas/charon bump) and specs broke, or when asked to verify a module end-to-end
+description: "Driving the outer verification pass for a champion or a regenerated extraction — scope the proof debt on the champion branch, champion idiomatic review, re-extraction and determinism check, spec repair/authoring stubs, prove-sorry runs per sorry, Check.lean audit, metered effort into a campaign ledger row, merge plan; use when an accepted optimization awaits its equivalence proofs (K=1: every accepted champion), when Generated.lean regenerated for any reason (Rust edits, aeneas/charon bump) and specs broke, or when asked to verify a module end-to-end"
 ---
 
 # The Outer Verification Pass
@@ -15,6 +15,27 @@ champion review → `aeneas-extract` → `aeneas-spec-author` (with
 breakage (>~5 files red, from-scratch primitives); this skill is the
 project-local orchestration around it. The inner optimization loop
 (`perf-loop`) never proves; this pass never benches.
+
+## Invocation
+
+**Human invocation:** start with `/verify-campaign` alone. Ask one question at
+a time: first **“What should I verify: a champion branch, a regenerated
+extraction, or a module from scratch?”** Then ask for the corresponding branch,
+`Generated.lean`/module, or module name if it was not already identified.
+Resolve the trigger (`champion-accept`, `regeneration`, or `from-scratch`) and
+scope before planning work.
+
+**Agent invocation:** bypass the dialogue with:
+
+```yaml
+agent_request:
+  trigger: champion-accept | regeneration | from-scratch
+  subject: <champion branch | generated-model path | module>
+```
+
+Validate that the subject matches the trigger. Send missing or invalid fields
+back to the invoking agent, not to the human. The separate approval gates for
+theorem weakening and large campaign structure still apply.
 
 ## The one rule: main only ever receives a green module
 
@@ -62,7 +83,7 @@ numbers are what may later relax K, not convenience in the moment.
    `sorry|native_decide|axiom|implemented_by|unsafe|maxHeartbeats`; new
    Check entries for anything the campaign introduced.
 6. **Ledger row, then stage — never commit.** Append the campaign row
-   (below) to the **worktree's** `ledger.jsonl` so it rides the champion
+   (below) to the **worktree's** `logs/ledger.jsonl` so it rides the champion
    branch and enters history in the same commit as the proofs it describes
    (the entry discipline is `skill-lab`'s; `make ledger-check` gates the
    plan). Stage the branch state, and end by handing the user an ordered
@@ -87,7 +108,7 @@ value. Meter **as you go** — post-hoc estimates are fiction:
 * `interventions` — approval-gate hits and any other point a human had to
   unblock the run.
 
-The row goes in `ledger.jsonl` at the repo root (file conventions —
+The row goes in `logs/ledger.jsonl` (file conventions —
 append-only, one line per event, `pins.repo` honesty — and the full `kind`
 table are owned by the `skill-lab` skill; campaign rows are distinguished
 by `"kind": "campaign"`, rows without a `kind` are the inner loop's):

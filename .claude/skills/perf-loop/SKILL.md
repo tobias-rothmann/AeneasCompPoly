@@ -6,11 +6,34 @@ description: Orchestrating the inner optimization loop for a targeted CompPoly d
 # The Inner Performance Loop
 
 Drives the inner loop of `skills-plan.html` §2/§5 for **one target definition**
-(handed in; choosing targets is a route/user decision). Stages, each owned by
+(resolved by its human dialogue or supplied by a route; choosing targets is a
+route/user decision). Stages, each owned by
 its own skill: `compoly-analyze` → `lean-opt` (+ the `opt-*` strategies) →
 `lean-to-rust` → the `rust-bench` candidate mode → this skill's accept rule
 and ledger. Aeneas is never touched per candidate; the accepted champion owes
 one extraction check before landing, and the proofs belong to the outer pass.
+
+## Invocation
+
+**Human invocation:** start with the bare command `/perf-loop`; do not put
+parameters on the command line. Ask one question at a time: first **“Which
+CompPoly operation should I optimize?”**, then, for a direct invocation,
+**“Should candidates come from Lean-side optimization or direct Rust
+optimization?”** A route supplies the latter choice, so do not ask it again
+when a route calls this skill.
+Confirm the resolved target and candidate stage before benchmarking.
+
+**Agent invocation:** bypass the dialogue with a named request:
+
+```yaml
+agent_request:
+  target: CompPoly.<fully-qualified-definition>
+  candidate_stage: lean-opt | rust-direct
+```
+
+`candidate_stage` is required for a direct agent call and is inherited from a
+route composition. Validate the packet; report missing or invalid fields to
+the invoking agent instead of asking the human.
 
 ## The one rule: only a within-run measurement accepts a candidate
 
@@ -91,7 +114,7 @@ says `unusable`. Every shortcut here converts machine noise into a
 
 ## The ledger (candidate-row schema; the file is `skill-lab`'s)
 
-`ledger.jsonl` — file conventions, ownership, the entry discipline, and the
+`logs/ledger.jsonl` — file conventions, ownership, the entry discipline, and the
 full `kind` table live in the `skill-lab` skill; this section owns only the
 candidate-verdict row. One JSON object per line per candidate verdict,
 accepted or not — rejects are the cheap lessons the strategy skills grow
@@ -100,7 +123,7 @@ tooling over the ledger filters on `kind` first.
 
 <!-- ⚠️ SYNC RULE: source of truth is skill-lab "The ledger" -->
 Three duties this loop owes that discipline: append each row to the
-**worktree's** `ledger.jsonl` and stage it with the work it describes (a run
+**worktree's** `logs/ledger.jsonl` and stage it with the work it describes (a run
 that lands no champion puts a ledger-only commit in its plan); mint one
 `"run": "<compact ISO time with offset>-<machine id>"` per `make run-bench`
 invocation and stamp it on every row copied from that report; and run
@@ -195,5 +218,5 @@ actually held, the lean records what was divided out of the accept column.
 * Every candidate that reached step 3 has a ledger row, whatever its fate.
 * No champion lands without: tests green, an `accepted` row, the extraction
   check recorded, `make bench-check` green, `Mirrors` lines truthful.
-* At rest, slot ≡ `cpoly/src` byte-for-byte, and `ledger.jsonl` is
+* At rest, slot ≡ `cpoly/src` byte-for-byte, and `logs/ledger.jsonl` is
   append-only — a rewritten row is a falsified history.

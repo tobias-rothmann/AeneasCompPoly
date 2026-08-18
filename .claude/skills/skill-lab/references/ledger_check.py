@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate ledger.jsonl: per-kind schema, run ids, notes discipline, and
+"""Validate logs/ledger.jsonl: per-kind schema, run ids, notes discipline, and
 append-only history. Owned by the skill-lab skill; invoked as `make ledger-check`.
 
 Checks, per row:
@@ -29,7 +29,8 @@ import re
 import subprocess
 import sys
 
-LEDGER = "ledger.jsonl"
+LEDGER = "logs/ledger.jsonl"
+LEGACY_LEDGER = "ledger.jsonl"
 EXEMPT_BEFORE = "2026-08-14"
 NOTES_MAX = 1200
 RUN_RE = re.compile(r"^\d{8}T\d{4}(\d{2})?([+-]\d{4}|Z)-[0-9a-f]{8,}$")
@@ -117,13 +118,18 @@ def check_rows(lines):
 
 
 def check_append_only(lines, rev):
-    try:
-        committed = subprocess.run(
-            ["git", "show", f"{rev}:{LEDGER}"],
-            capture_output=True, text=True, check=True,
-        ).stdout.splitlines()
-    except subprocess.CalledProcessError:
-        return []  # not present at REV: nothing to preserve
+    committed = None
+    for ledger_path in (LEDGER, LEGACY_LEDGER):
+        try:
+            committed = subprocess.run(
+                ["git", "show", f"{rev}:{ledger_path}"],
+                capture_output=True, text=True, check=True,
+            ).stdout.splitlines()
+            break
+        except subprocess.CalledProcessError:
+            continue
+    if committed is None:
+        return []  # no ledger present at REV: nothing to preserve
     current = {l for l in lines if l.strip()}
     return [f"  committed row vanished or was edited (append-only): {l[:100]}…"
             for l in committed if l.strip() and l not in current]

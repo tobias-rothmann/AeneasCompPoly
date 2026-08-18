@@ -1,0 +1,4 @@
+interface:
+  display_name: "Aristotle Prove"
+  short_description: "Start async Aristotle Lean proof runs"
+  default_prompt: "Use $aristotle-prove to submit substantial Lean proof debt to Aristotle."
