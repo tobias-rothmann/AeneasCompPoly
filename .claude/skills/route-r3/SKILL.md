@@ -13,8 +13,9 @@ resolves the target definition — choosing targets is the caller's job
 
 **Human invocation:** start with `/route-r3` alone. Ask: **“Which CompPoly
 operation should route R3 optimize and verify?”** Resolve and confirm that
-single target, then run the fixed default route; its Lean-side candidate stage
-is not a tuning parameter.
+single target, then run this supplied default composition; its Lean-side
+candidate stage is not a tuning parameter. A different composition is a
+distinct named route skill.
 
 **Agent invocation:** bypass the dialogue with:
 

@@ -40,12 +40,12 @@ reference an agent consults mid-task.
 | You want to… | Invoke | It first asks |
 |---|---|---|
 | Bring a CompPoly definition into the pipeline for the first time | `/op-genesis` | Which definition should I onboard? |
-| Make an existing operation faster (and prove it after) | `/perf-loop` | Which operation should I optimize? Then choose the direct candidate stage. |
-| Run one optimization route end to end | `/route-r1` · `/route-r2` · `/route-r3` | Which operation should this fixed route optimize and verify? |
-| Prove an accepted optimization correct, or verify a module from scratch | `/verify-campaign` | What should I verify: a champion branch, regenerated extraction, or module? |
-| Fill in one unproved `sorry` | `/prove-sorry` | Which theorem should I prove, or should I list open `sorry`s? |
+| Define unproved Aeneas theorem stubs after extraction | `/aeneas-spec-author` | Which extracted CompPoly operation should I specify? |
 | Send substantial Lean proof debt to Aristotle | `/aristotle-prove` | Which files contain the large or genuinely hard proof backlog? |
 | Check Aristotle proof sessions | `/aristotle-check` | It checks only recorded sessions; it asks for a fresh key only when a session is active. |
+| Fill in one unproved `sorry` | `/prove-sorry` | Which theorem should I prove, or should I list open `sorry`s? |
+| Make an existing operation faster (and prove it after) | `/perf-loop` | Which operation should I optimize? Then choose the direct candidate stage. |
+| Run a supplied optimization route, or define a new one | `/route-r1` · `/route-r2` · `/route-r3` (or request a new `route-<name>`) | Which operation should it optimize? For a new route: which skills, constraints, or strategy should shape it? |
 | Compare routes, or two versions of a skill | `/skill-lab` | Do you want a route bake-off or a skill A/B? |
 | Run the whole pipeline unattended | `/autonomy-harness` | Use default `route-r3`, or pin another route? |
 
@@ -69,6 +69,32 @@ sha — and only then can the birth benchmark run.
 > body would silently report all its gains as zero, forever. This is why
 > onboarding and optimizing are separate steps.
 
+**`aeneas-spec-author` — state the extracted operation's proof interface.**
+Use this after `/op-genesis` has extracted a new operation, or after a
+regeneration makes an existing operation's specs stale. It resolves the
+original CompPoly definition and its freshly extracted counterpart, then writes
+the aliases, representation functions and invariants, loop specs, and headline
+theorem against the original definition. It leaves the theorem bodies as
+typechecked `sorry` stubs for `/prove-sorry`; it does not attempt the proofs.
+
+*It asks*: which extracted CompPoly operation needs specs. If the operation
+does not identify the destination Lean module or reference definition, it asks
+one follow-up, then confirms the resolved request before writing stubs.
+
+**`aristotle-prove` / `aristotle-check` — long-running remote proof work.** The
+prove skill starts an asynchronous Aristotle run only for a substantial backlog
+or genuinely hard scope, logs it, and returns immediately. The check skill
+polls only logged sessions; a verified complete or no-progress result is
+integrated, while verified partial progress is resubmitted on its remaining
+holes. Each human-requested API operation asks for a fresh, one-time key and
+never stores it.
+
+**`prove-sorry` — fill in one unproved theorem.** Audits whether the statement
+is even true before trying, decomposes the proof, proves the pieces with
+parallel agents, then adversarially attacks its own result. It asks for a
+specific theorem or whether to list what is open. Same approval gate as above:
+it never weakens a statement without asking.
+
 **`perf-loop` — optimize one operation.** Generates candidate optimizations,
 translates them, and measures each against the current champion inside a single
 benchmark session, accepting only what is measurably faster at every measured
@@ -89,54 +115,26 @@ size. Repeats until a full round of strategies yields nothing.
 - *Proof debt*: every accepted champion is handed to `verify-campaign` before
   the next target is taken up.
 
-**`route-r1` / `route-r2` / `route-r3` — pick the route.** Three ways to reach
-the same goal. Each route runs `perf-loop` as its optimization stage and hands
-the result to `verify-campaign`; `route-r3` is the default.
+**`route-r1` / `route-r2` / `route-r3` — compose an optimization strategy.**
+A route is a named composition through the agent-facing optimization-skill
+pool, not an optimizer in its own right. It decides which stages and
+strategies participate, their order, where candidates originate, and when
+benchmarking and verification occur. The supplied routes below are tested
+compositions; `route-r3` is the default, not the only available strategy.
 
-| Route | How it optimizes | Speed and effort, per its bake-off arm on univariate `mul` |
-|---|---|---|
-| `route-r3` (default) | Optimizes in Lean, benchmarks every candidate, proves each accepted one | −48.7% vs genesis at n=256, verified; 3.14M tokens and 115 minutes of metered proving and auditing |
-| `route-r2` | Optimizes the Rust directly, within what Aeneas can extract | −83.4% vs genesis at n=256, verified; 5.33M tokens and 300 minutes for the whole arm, and it needed no approval gate |
-| `route-r1` | Stacks every Lean optimization first, benchmarks once at the end | No champion: its one benchmark read faster at 256 and 17.5% slower at 64, so a proved lemma chain bought code that will not ship; 1.04M tokens |
+| Route | How it optimizes |
+|---|---|
+| `route-r3` (default) | Lean-side `opt-*` pool, benchmark after every candidate, then verify each accepted champion |
+| `route-r2` | Rust-first `rust-direct` pool within the Aeneas ceiling, bench-steered, then prove the extraction directly |
+| `route-r1` | Lean-side `opt-*` pool to a fixpoint, one translation and benchmark at the end |
 
-Each asks for the operation. Their behaviour is otherwise fixed — the point of
-having three is that they are comparable, so they take no tuning knobs.
-
-**`verify-campaign` — prove an optimization correct.** Takes a champion branch
-and drives it to a module where every equivalence spec is proved and audited,
-so it can merge. It first identifies whether the subject is a champion branch,
-a regenerated `Generated.lean`, or a module from scratch, then asks for that
-subject if needed. It re-extracts, checks the extraction is deterministic,
-repairs the specs, proves them, audits that nothing depends on an unexpected
-axiom, and records what the campaign cost.
-
-> **It may stop and ask for your approval.** Any change to a theorem's
-> statement that makes it assume more or assert less — a new or strengthened
-> hypothesis, a weakened conclusion — waits for you; it is never
-> self-approved, including under `/loop`. Planning a from-scratch or
-> mass-breakage campaign also puts its file and folder structure to you before
-> anything is created.
-
-**`prove-sorry` — fill in one unproved theorem.** Audits whether the statement
-is even true before trying, decomposes the proof, proves the pieces with
-parallel agents, then adversarially attacks its own result. It asks for a
-specific theorem or whether to list what is open. Same approval gate as above:
-it never weakens a statement without asking.
-
-**`aristotle-prove` / `aristotle-check` — long-running remote proof work.** The
-prove skill starts an asynchronous Aristotle run only for a substantial backlog
-or genuinely hard scope, logs it, and returns immediately. The check skill
-polls only logged sessions; a verified complete or no-progress result is
-integrated, while verified partial progress is resubmitted on its remaining
-holes. Each human-requested API operation asks for a fresh, one-time key and
-never stores it.
-
-### Logs
-
-`logs/ledger.jsonl` is the append-only optimization and verification ledger.
-`logs/aristotle-sessions.jsonl` is the append-only record of asynchronous
-Aristotle proof sessions. Both are tracked; bulky Aristotle downloads and
-snapshots remain ignored under `.aristotle-artifacts/`.
+Invoke a supplied route when it already embodies the strategy you want. To
+create another strategy, specify a different subset or ordering of the pool —
+or ask an agent to design one from a performance goal and constraints. The
+result is a distinct `route-<name>` skill, whose composition stays fixed while
+it runs so its outcome is measurable and comparable. Each supplied route asks
+only for the operation; a new route also resolves its intended composition
+before it is created.
 
 **`skill-lab` — run an experiment.** Two kinds: a *bake-off* comparing whole
 routes on one operation, and an *A/B* comparing two versions of a single
@@ -156,6 +154,13 @@ failed proof, on an approval gate, on anything needing a commit you have not
 made, when a benchmark reads unusable twice running or the machine looks
 contended, or when the corpus is exhausted. New operations never enter the
 corpus this way — that stays a deliberate `op-genesis` decision.
+
+### Logs
+
+`logs/ledger.jsonl` is the append-only optimization and verification ledger.
+`logs/aristotle-sessions.jsonl` is the append-only record of asynchronous
+Aristotle proof sessions. Both are tracked; bulky Aristotle downloads and
+snapshots remain ignored under `.aristotle-artifacts/`.
 
 ### Two things every skill here obeys
 
@@ -219,11 +224,11 @@ the human.
 | Skill | Use it when | Agent packet | Produces |
 |---|---|---|---|
 | `op-genesis` | A definition has no Rust counterpart yet | `target` | Naive translation, semantics tests, frozen genesis baseline + `@genesis` stamps, birth bench case, interleaved commit plan. No ledger row — the stamp is the provenance |
+| `aeneas-spec-author` | A new operation was extracted, or a regeneration made its specs stale | `target`, `trigger` (`onboarding` or `regeneration`) | Typechecked `sorry` stubs: aliases, representation functions and invariants, loop specs, headline theorem stated against the original definition, and `Check.lean` audit entries |
 | `perf-loop` | An operation should get faster | `target`, `candidate_stage` (`lean-opt` or `rust-direct`; inherited inside a route) | Candidate ledger row per verdict, accepted champion staged on a `champion/<op>` branch, extraction check recorded |
-| `route-r3` | Default optimization of one target | `target` | Champion + campaign, benchmark deciding each accept |
-| `route-r2` | Rust-first optimization of one target | `target` | Champion via `rust-direct` candidates; specs prove the extraction directly against the definition, with no Lean lemma chain |
-| `route-r1` | Lean-first optimization of one target | `target` | One stacked variant, one benchmark at the end; a rejection ends the route |
-| `verify-campaign` | A champion awaits proof, an extraction regenerated and broke specs, or a module needs verifying end to end | `trigger` (`champion-accept` · `regeneration` · `from-scratch`), `subject` | Proved + audited module, campaign ledger row with its metered effort, ordered merge plan |
+| `route-r3` | Default supplied composition through the Lean-side optimization pool | `target` | Champion + campaign, benchmark deciding each accept |
+| `route-r2` | Supplied Rust-first composition through the direct-Rust optimization pool | `target` | Champion via `rust-direct` candidates; specs prove the extraction directly against the definition, with no Lean lemma chain |
+| `route-r1` | Supplied Lean-first composition through the Lean-side optimization pool | `target` | One stacked variant, one benchmark at the end; a rejection ends the route |
 | `prove-sorry` | A `sorry` needs filling | Exactly one: `target`, or `list_open: true` | Proved theorem, integrated and axiom-audited; folds its own lessons back into itself |
 | `aristotle-prove` | A Lean proof backlog is large or genuinely hard | `targets`, with `complex: true` for <=3 hard holes | Asynchronous Aristotle session ID and a `logs/aristotle-sessions.jsonl` record |
 | `aristotle-check` | A user asks for a recorded Aristotle session's status | Optional `session_ids` | Status records; verified integration or an asynchronous restart after partial progress |
@@ -245,7 +250,7 @@ the human.
 | `lean-to-rust` | A Lean definition must become Rust | The targeted definition | A trivial-grade translation: an idiomatic shell around a body that mirrors the Lean, plus its bench and test obligations |
 | `aeneas-extract` | Rust changed, or extraction must be triaged | The current `cpoly/src` | A regenerated `Generated.lean`, a determinism check, post-extract audits, and a measured row added to the supported-constructs table on every new contact |
 | `rust-bench` | A newly translated operation needs a benchmark | The new operation | Frozen genesis entry, a case that measures that operation and nothing else, proved so by adversarial review before any number is trusted |
-| `aeneas-spec-author` | A new or regenerated operation needs specs | The extracted model + reference definition | Typechecked `sorry` stubs: aliases, representation functions, loop specs, headline theorem stated against the original definition |
+| `verify-campaign` | An accepted champion has proof debt, or regenerated extraction leaves a module's specs stale | `trigger` (`champion-accept` · `regeneration` · `from-scratch`), `subject` | Proved and audited module, campaign ledger row with metered effort, and an ordered merge plan |
 
 ### Reference
 

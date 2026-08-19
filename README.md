@@ -52,6 +52,18 @@ turns up in the axiom dependencies `Check.lean` prints.
 `CHARON=` or `AENEAS=` on the command line points `make extract` at binaries
 kept elsewhere.
 
+### Skill-driven workflow
+
+The workflow is driven by skills. Start a human entry point with its bare slash
+command; the complete catalogue is in [INSTRUCTIONS.md](INSTRUCTIONS.md).
+
+- `/op-genesis` onboards a new operation.
+- `/aeneas-spec-author` writes its unproved Lean specification stubs.
+- `/aristotle-prove` sends substantial Lean proof debt to Aristotle.
+- `/perf-loop` optimizes an existing operation.
+- `/route-r1`, `/route-r2`, and `/route-r3` are supplied optimization routes;
+  ask an agent to create a custom route from the skill pool.
+
 ## Layout
 
 ```

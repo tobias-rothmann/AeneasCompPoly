@@ -14,8 +14,8 @@ opt-contract and the brief's operation counts, never a measurement.
 
 **Human invocation:** start with `/route-r1` alone. Ask: **“Which CompPoly
 operation should route R1 optimize and verify?”** Resolve and confirm that
-single target, then run the fixed route; route choices are deliberately not
-tuning parameters.
+single target, then run this supplied composition; its stage choices are not
+tuning parameters. A different composition is a distinct named route skill.
 
 **Agent invocation:** bypass the dialogue with:
 

@@ -1,6 +1,6 @@
 ---
 name: skill-lab
-description: Running measured experiments over the loop's skills — the route bake-off (route-r1/r2/r3 arms on the same target, metered not capped), skill-version A/Bs (session-scoped variants, exactly one skill bumped per experiment), ownership of logs/ledger.jsonl and its kind-discriminated row schemas, and folding each verdict back into the responsible skill; use when comparing routes or skill versions, when appending bakeoff or ab rows, or when deciding whether ledger variance justifies an A/B
+description: Running measured experiments over the loop's skills — the route bake-off (supplied or custom route-skill arms on the same target, metered not capped), skill-version A/Bs (session-scoped variants, exactly one skill bumped per experiment), ownership of logs/ledger.jsonl and its kind-discriminated row schemas, and folding each verdict back into the responsible skill; use when comparing routes or skill versions, when appending bakeoff or ab rows, or when deciding whether ledger variance justifies an A/B
 ---
 
 # The Skill Lab
@@ -27,7 +27,7 @@ complete experiment before creating a variant or a worktree.
 agent_request:
   kind: bakeoff
   target: CompPoly.<fully-qualified-definition>
-  arms: [route-r1, route-r2, route-r3]
+  arms: [route-r3, route-my-strategy]
 ```
 
 ```yaml
@@ -104,11 +104,12 @@ first:
 
 ## The route bake-off
 
-Arms are the `route-r1` / `route-r2` / `route-r3` skills run on the **same
-target definition**, each from the same genesis baseline, each in its own
-worktree, each blind to the sibling arms' artifacts (an arm that reads
-another arm's candidate notes is contaminated — its row says so or is not
-written). Discipline:
+Arms are named route skills — the supplied `route-r1` / `route-r2` /
+`route-r3` designs or a user-defined route — run on the **same target
+definition**, each from the same genesis baseline, each in its own worktree,
+each blind to the sibling arms' artifacts (an arm that reads another arm's
+candidate notes is contaminated — its row says so or is not written).
+Discipline:
 
 * **Metered, not capped.** Every arm runs to its natural finish — no
   significant win left, proofs done. Effort is measured per the

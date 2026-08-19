@@ -1,6 +1,6 @@
 ---
 name: verify-campaign
-description: "Driving the outer verification pass for a champion or a regenerated extraction — scope the proof debt on the champion branch, champion idiomatic review, re-extraction and determinism check, spec repair/authoring stubs, prove-sorry runs per sorry, Check.lean audit, metered effort into a campaign ledger row, merge plan; use when an accepted optimization awaits its equivalence proofs (K=1: every accepted champion), when Generated.lean regenerated for any reason (Rust edits, aeneas/charon bump) and specs broke, or when asked to verify a module end-to-end"
+description: "Agent-only outer verification stage for a champion or a regenerated extraction — scope the proof debt on the champion branch, champion idiomatic review, re-extraction and determinism check, spec repair/authoring stubs, prove-sorry runs per sorry, Check.lean audit, metered effort into a campaign ledger row, merge plan; use from a parent workflow when an accepted optimization awaits its equivalence proofs (K=1: every accepted champion), when Generated.lean regenerated for any reason (Rust edits, aeneas/charon bump) and specs broke, or when a module needs end-to-end verification"
 ---
 
 # The Outer Verification Pass
@@ -16,16 +16,9 @@ breakage (>~5 files red, from-scratch primitives); this skill is the
 project-local orchestration around it. The inner optimization loop
 (`perf-loop`) never proves; this pass never benches.
 
-## Invocation
+## Agent input
 
-**Human invocation:** start with `/verify-campaign` alone. Ask one question at
-a time: first **“What should I verify: a champion branch, a regenerated
-extraction, or a module from scratch?”** Then ask for the corresponding branch,
-`Generated.lean`/module, or module name if it was not already identified.
-Resolve the trigger (`champion-accept`, `regeneration`, or `from-scratch`) and
-scope before planning work.
-
-**Agent invocation:** bypass the dialogue with:
+Invoke this stage only from another workflow with:
 
 ```yaml
 agent_request:
@@ -34,8 +27,8 @@ agent_request:
 ```
 
 Validate that the subject matches the trigger. Send missing or invalid fields
-back to the invoking agent, not to the human. The separate approval gates for
-theorem weakening and large campaign structure still apply.
+back to the invoking agent. The separate approval gates for theorem weakening
+and large campaign structure still apply.
 
 ## The one rule: main only ever receives a green module
 

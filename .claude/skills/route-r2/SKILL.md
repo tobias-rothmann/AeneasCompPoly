@@ -15,8 +15,9 @@ layer, which is exactly the bake-off's question.
 
 **Human invocation:** start with `/route-r2` alone. Ask: **“Which CompPoly
 operation should route R2 optimize and verify?”** Resolve and confirm that
-single target, then run the fixed route; its Rust-first candidate stage is not
-a separate user parameter.
+single target, then run this supplied composition; its Rust-first candidate
+stage is not a separate user parameter. A different composition is a distinct
+named route skill.
 
 **Agent invocation:** bypass the dialogue with:
 

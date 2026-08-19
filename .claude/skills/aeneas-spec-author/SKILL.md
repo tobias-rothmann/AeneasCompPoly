@@ -17,6 +17,30 @@ should read as if it always lived beside them. When the representation-
 function pattern below stops fitting, read the `aeneas-equivalence-bridges`
 skill before inventing anything.
 
+## Invocation
+
+**Human invocation:** start with the bare command `/aeneas-spec-author`; do
+not put an operation on the command line. Ask first: **“Which extracted
+CompPoly operation should I specify?”** Resolve the named original definition
+and its extracted counterpart, using the current conversation when it already
+identifies them. Ask one follow-up only if the destination Lean module or
+reference definition remains ambiguous, then confirm the resolved request
+before writing stubs. The command authors theorem statements only; it leaves
+their bodies as typechecked `sorry`s for `/prove-sorry`.
+
+**Agent invocation:** accept this complete named request:
+
+```yaml
+agent_request:
+  target: CompPoly.<fully-qualified-definition>
+  trigger: onboarding | regeneration
+```
+
+Validate that `target` resolves and that `Generated.lean` is freshly extracted
+before work starts. If either field is missing or invalid, return the missing
+field to the invoking agent; do not turn an agent-to-agent call into a question
+for the human.
+
 ## The one rule: the headline spec states the original CompPoly definition
 
 Every headline triple has the shape
