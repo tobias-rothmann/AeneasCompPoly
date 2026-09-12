@@ -189,6 +189,7 @@ impl MulAssign for Fp {
 /// doubling.  Mirrors `Hachi.ext4Params.W`.
 pub const W: Fp = Fp(2);
 
+// @genesis 577c0bc 2026-09-12 — field::mul_by_w
 /// Multiply a reduced base-field element by the extension constant `W = 2`.
 ///
 /// This stays private: it expresses the reduction in [`Ext4`]'s arithmetic,
@@ -282,6 +283,7 @@ impl Ext4 {
         self.c0.is_zero() && self.c1.is_zero() && self.c2.is_zero() && self.c3.is_zero()
     }
 
+    // @genesis 577c0bc 2026-09-12 — field::Ext4::square
     /// Square this extension-field element.
     ///
     /// The first translation delegates directly to the general extension
