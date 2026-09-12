@@ -286,6 +286,53 @@ macro_rules! define_cases {
                 )
             }
 
+            /// One symmetric extension product per input.  This compares a
+            /// dedicated square candidate with the semantic reference `a * a`.
+            pub fn ext4_square(m: Mode<'_, '_>, n: usize) -> u64 {
+                let xs = ext4s(0x020C, n);
+                let mut out = vec![cp::Ext4::ZERO; n];
+                support::run_into(
+                    m,
+                    &mut out,
+                    |o| {
+                        let xs = black_box(&xs);
+                        let mut i = 0usize;
+                        while i < o.len() {
+                            o[i] = xs[i].square();
+                            i += 1;
+                        }
+                    },
+                    d_ext4,
+                )
+            }
+
+            /// Sixteen dependent squarings per input.  This is the generic
+            /// square-chain consumer that distinguishes latency from the
+            /// independent-input throughput row above.
+            pub fn ext4_square_chain(m: Mode<'_, '_>, n: usize) -> u64 {
+                let xs = ext4s(0x020D, n);
+                let mut out = vec![cp::Ext4::ZERO; n];
+                support::run_into(
+                    m,
+                    &mut out,
+                    |o| {
+                        let xs = black_box(&xs);
+                        let mut i = 0usize;
+                        while i < o.len() {
+                            let mut z = xs[i];
+                            let mut j = 0usize;
+                            while j < 16 {
+                                z = z.square();
+                                j += 1;
+                            }
+                            o[i] = z;
+                            i += 1;
+                        }
+                    },
+                    d_ext4,
+                )
+            }
+
             /// The heterogeneous `Fp * Ext4` (4 base multiplies).
             ///
             /// **No caller in this crate reaches it.** Every scalar in
@@ -413,6 +460,10 @@ fn field_benches(c: &mut Criterion) {
     bench_case!(c, "field/ext4_neg", ext4_neg, [n]);
     // @covers field::<Ext4 as Mul>::mul
     bench_case!(c, "field/ext4_mul", ext4_mul, [n]);
+    // @covers field::Ext4::square
+    bench_case!(c, "field/ext4_square", ext4_square, [n]);
+    // @covers field::Ext4::square
+    bench_case!(c, "field/ext4_square_chain", ext4_square_chain, [n]);
     // @covers field::<Fp as Mul<Ext4>>::mul
     bench_case!(c, "field/fp_mul_ext4", fp_mul_ext4, [n]);
     // @covers field::Ext4::from_base

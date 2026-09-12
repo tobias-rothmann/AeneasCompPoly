@@ -189,6 +189,15 @@ impl MulAssign for Fp {
 /// doubling.  Mirrors `Hachi.ext4Params.W`.
 pub const W: Fp = Fp(2);
 
+/// Multiply a reduced base-field element by the extension constant `W = 2`.
+///
+/// This stays private: it expresses the reduction in [`Ext4`]'s arithmetic,
+/// rather than an independently useful operation on the base field.  The
+/// first translation keeps the direct field expression as its reference.
+fn mul_by_w(t: Fp) -> Fp {
+    W * t
+}
+
 // @genesis 7ca92f9 2026-07-31 — field::Ext4
 /// An element of `Ext4 = F_P[Y] / (Y^4 - W)`, as its dense little-endian
 /// coefficient vector: `c0 + c1 Y + c2 Y^2 + c3 Y^3`.
@@ -271,6 +280,15 @@ impl Ext4 {
     /// elements (see [`crate::univariate::Poly::trim`]).
     pub fn is_zero(self) -> bool {
         self.c0.is_zero() && self.c1.is_zero() && self.c2.is_zero() && self.c3.is_zero()
+    }
+
+    /// Square this extension-field element.
+    ///
+    /// The first translation delegates directly to the general extension
+    /// product.  It is the semantic reference for a later specialized square.
+    #[must_use]
+    pub fn square(self) -> Ext4 {
+        self * self
     }
 }
 

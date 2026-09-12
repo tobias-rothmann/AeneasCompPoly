@@ -69,6 +69,10 @@ example (a b : cpoly.field.Ext4) (ha : Reduced a) (hb : Reduced b) :
     ∃ c, cpoly.field.Ext4.Insts.CoreOpsArithMulExt4Ext4.mul a b = ok c ∧ Reduced c ∧ toExt c = toExt a * toExt b :=
   spec_imp_exists (ext_mul_spec a b ha hb)
 
+example (a : cpoly.field.Ext4) (ha : Reduced a) :
+    ∃ c, cpoly.field.Ext4.square a = ok c ∧ Reduced c ∧ toExt c = toExt a * toExt a :=
+  spec_imp_exists (ext_square_spec a ha)
+
 example (v w : alloc.vec.Vec cpoly.field.Ext4) (hv : VecReduced v) (hw : VecReduced w)
     (hlen : v.val.length + w.val.length ≤ Std.Usize.max) :
     ∃ z, cpoly.Shared1UnivariatePoly.Insts.CoreOpsArithMulShared0UnivariatePolyUnivariatePoly.mul v w = ok z ∧ VecReduced z ∧
@@ -161,6 +165,7 @@ example (n : ℕ) (r : cpoly.field.Ext4) (v : alloc.vec.Vec cpoly.field.Ext4)
 
 -- 14. Print the headline statements for review.
 #print axioms CPolyEquiv.ext_mul_spec
+#print axioms CPolyEquiv.ext_square_spec
 #print axioms CPolyEquiv.mul_spec
 #print axioms CPolyEquiv.eval_spec
 #print axioms CPolyEquiv.trim_spec

@@ -339,8 +339,13 @@ def field.Fp.Insts.CoreOpsArithMulAssignFp : core.ops.arith.MulAssign field.Fp
     Visibility: public -/
 @[global_simps, irreducible] def field.W : field.Fp := 2#u64
 
+/-- [cpoly::field::mul_by_w]:
+    Source: 'src/field.rs', lines 178:0-180:1 -/
+def field.mul_by_w (t : field.Fp) : Result field.Fp := do
+  field.Fp.Insts.CoreOpsArithMulFpFp.mul field.W t
+
 /-- [cpoly::field::Ext4]
-    Source: 'src/field.rs', lines 185:0-194:1
+    Source: 'src/field.rs', lines 194:0-203:1
     Visibility: public -/
 structure field.Ext4 where
   c0 : field.Fp
@@ -349,35 +354,35 @@ structure field.Ext4 where
   c3 : field.Fp
 
 /-- [cpoly::field::{impl core::clone::Clone for cpoly::field::Ext4}::clone]:
-    Source: 'src/field.rs', lines 184:15-184:20
+    Source: 'src/field.rs', lines 193:15-193:20
     Visibility: public -/
 def field.Ext4.Insts.CoreCloneClone.clone
   (self : field.Ext4) : Result field.Ext4 := do
   ok self
 
 /-- Trait implementation: [cpoly::field::{impl core::clone::Clone for cpoly::field::Ext4}]
-    Source: 'src/field.rs', lines 184:15-184:20 -/
+    Source: 'src/field.rs', lines 193:15-193:20 -/
 @[reducible]
 def field.Ext4.Insts.CoreCloneClone : core.clone.Clone field.Ext4 := {
   clone := field.Ext4.Insts.CoreCloneClone.clone
 }
 
 /-- Trait implementation: [cpoly::field::{impl core::marker::Copy for cpoly::field::Ext4}]
-    Source: 'src/field.rs', lines 184:9-184:13 -/
+    Source: 'src/field.rs', lines 193:9-193:13 -/
 @[reducible]
 def field.Ext4.Insts.CoreMarkerCopy : core.marker.Copy field.Ext4 := {
   cloneInst := field.Ext4.Insts.CoreCloneClone
 }
 
 /-- Trait implementation: [cpoly::field::{impl core::marker::StructuralPartialEq for cpoly::field::Ext4}]
-    Source: 'src/field.rs', lines 184:22-184:31 -/
+    Source: 'src/field.rs', lines 193:22-193:31 -/
 @[reducible]
 def field.Ext4.Insts.CoreMarkerStructuralPartialEq :
   core.marker.StructuralPartialEq field.Ext4 := {
 }
 
 /-- [cpoly::field::{impl core::cmp::PartialEq<cpoly::field::Ext4> for cpoly::field::Ext4}::eq]:
-    Source: 'src/field.rs', lines 184:22-184:31
+    Source: 'src/field.rs', lines 193:22-193:31
     Visibility: public -/
 def field.Ext4.Insts.CoreCmpPartialEqExt4.eq
   (self : field.Ext4) (other : field.Ext4) : Result Bool := do
@@ -395,7 +400,7 @@ def field.Ext4.Insts.CoreCmpPartialEqExt4.eq
   else ok false
 
 /-- Trait implementation: [cpoly::field::{impl core::cmp::PartialEq<cpoly::field::Ext4> for cpoly::field::Ext4}]
-    Source: 'src/field.rs', lines 184:22-184:31 -/
+    Source: 'src/field.rs', lines 193:22-193:31 -/
 @[reducible]
 def field.Ext4.Insts.CoreCmpPartialEqExt4 : core.cmp.PartialEq field.Ext4
   field.Ext4 := {
@@ -403,14 +408,14 @@ def field.Ext4.Insts.CoreCmpPartialEqExt4 : core.cmp.PartialEq field.Ext4
 }
 
 /-- [cpoly::field::{impl core::cmp::Eq for cpoly::field::Ext4}::assert_fields_are_eq]:
-    Source: 'src/field.rs', lines 184:33-184:35
+    Source: 'src/field.rs', lines 193:33-193:35
     Visibility: public -/
 def field.Ext4.Insts.CoreCmpEq.assert_fields_are_eq
   (self : field.Ext4) : Result Unit := do
   ok ()
 
 /-- Trait implementation: [cpoly::field::{impl core::cmp::Eq for cpoly::field::Ext4}]
-    Source: 'src/field.rs', lines 184:33-184:35 -/
+    Source: 'src/field.rs', lines 193:33-193:35 -/
 @[reducible]
 def field.Ext4.Insts.CoreCmpEq : core.cmp.Eq field.Ext4 := {
   partialEqInst := field.Ext4.Insts.CoreCmpPartialEqExt4
@@ -418,21 +423,21 @@ def field.Ext4.Insts.CoreCmpEq : core.cmp.Eq field.Ext4 := {
 }
 
 /-- [cpoly::field::{impl core::default::Default for cpoly::field::Ext4}::default]:
-    Source: 'src/field.rs', lines 184:37-184:44
+    Source: 'src/field.rs', lines 193:37-193:44
     Visibility: public -/
 def field.Ext4.Insts.CoreDefaultDefault.default : Result field.Ext4 := do
   let f ← field.Fp.Insts.CoreDefaultDefault.default
   ok { c0 := f, c1 := f, c2 := f, c3 := f }
 
 /-- Trait implementation: [cpoly::field::{impl core::default::Default for cpoly::field::Ext4}]
-    Source: 'src/field.rs', lines 184:37-184:44 -/
+    Source: 'src/field.rs', lines 193:37-193:44 -/
 @[reducible]
 def field.Ext4.Insts.CoreDefaultDefault : core.default.Default field.Ext4 := {
   default := field.Ext4.Insts.CoreDefaultDefault.default
 }
 
 /-- [cpoly::field::{impl core::fmt::Debug for cpoly::field::Ext4}::fmt]:
-    Source: 'src/field.rs', lines 184:46-184:51
+    Source: 'src/field.rs', lines 193:46-193:51
     Visibility: public -/
 def field.Ext4.Insts.CoreFmtDebug.fmt
   (self : field.Ext4) (f : core.fmt.Formatter) :
@@ -447,14 +452,14 @@ def field.Ext4.Insts.CoreFmtDebug.fmt
     dyn (toStr "c1") dyn1 (toStr "c2") dyn2 (toStr "c3") dyn3
 
 /-- Trait implementation: [cpoly::field::{impl core::fmt::Debug for cpoly::field::Ext4}]
-    Source: 'src/field.rs', lines 184:46-184:51 -/
+    Source: 'src/field.rs', lines 193:46-193:51 -/
 @[reducible]
 def field.Ext4.Insts.CoreFmtDebug : core.fmt.Debug field.Ext4 := {
   fmt := field.Ext4.Insts.CoreFmtDebug.fmt
 }
 
 /-- [cpoly::field::{cpoly::field::Ext4}::ZERO]
-    Source: 'src/field.rs', lines 198:4-203:6
+    Source: 'src/field.rs', lines 207:4-212:6
     Visibility: public -/
 @[global_simps, irreducible]
 def field.Ext4.ZERO : field.Ext4 :=
@@ -466,7 +471,7 @@ def field.Ext4.ZERO : field.Ext4 :=
   }
 
 /-- [cpoly::field::{cpoly::field::Ext4}::ONE]
-    Source: 'src/field.rs', lines 206:4-211:6
+    Source: 'src/field.rs', lines 215:4-220:6
     Visibility: public -/
 @[global_simps, irreducible]
 def field.Ext4.ONE : field.Ext4 :=
@@ -478,7 +483,7 @@ def field.Ext4.ONE : field.Ext4 :=
   }
 
 /-- [cpoly::field::{cpoly::field::Ext4}::GEN]
-    Source: 'src/field.rs', lines 217:4-222:6
+    Source: 'src/field.rs', lines 226:4-231:6
     Visibility: public -/
 @[global_simps, irreducible]
 def field.Ext4.GEN : field.Ext4 :=
@@ -490,7 +495,7 @@ def field.Ext4.GEN : field.Ext4 :=
   }
 
 /-- [cpoly::field::{cpoly::field::Ext4}::new]:
-    Source: 'src/field.rs', lines 225:4-227:5
+    Source: 'src/field.rs', lines 234:4-236:5
     Visibility: public -/
 def field.Ext4.new
   (c0 : field.Fp) (c1 : field.Fp) (c2 : field.Fp) (c3 : field.Fp) :
@@ -499,13 +504,13 @@ def field.Ext4.new
   ok { c0, c1, c2, c3 }
 
 /-- [cpoly::field::{cpoly::field::Ext4}::from_base]:
-    Source: 'src/field.rs', lines 231:4-238:5
+    Source: 'src/field.rs', lines 240:4-247:5
     Visibility: public -/
 def field.Ext4.from_base (a : field.Fp) : Result field.Ext4 := do
   ok { c0 := a, c1 := field.Fp.ZERO, c2 := field.Fp.ZERO, c3 := field.Fp.ZERO }
 
 /-- [cpoly::field::{cpoly::field::Ext4}::is_zero]:
-    Source: 'src/field.rs', lines 246:4-248:5
+    Source: 'src/field.rs', lines 255:4-257:5
     Visibility: public -/
 def field.Ext4.is_zero (self : field.Ext4) : Result Bool := do
   let b ← field.Fp.is_zero self.c0
@@ -521,96 +526,8 @@ def field.Ext4.is_zero (self : field.Ext4) : Result Bool := do
     else ok false
   else ok false
 
-/-- [cpoly::field::{impl core::convert::From<cpoly::field::Fp> for cpoly::field::Ext4}::from]:
-    Source: 'src/field.rs', lines 252:4-254:5
-    Visibility: public -/
-def field.Ext4.Insts.CoreConvertFromFp.from
-  (a : field.Fp) : Result field.Ext4 := do
-  field.Ext4.from_base a
-
-/-- Trait implementation: [cpoly::field::{impl core::convert::From<cpoly::field::Fp> for cpoly::field::Ext4}]
-    Source: 'src/field.rs', lines 251:0-255:1 -/
-@[reducible]
-def field.Ext4.Insts.CoreConvertFromFp : core.convert.From field.Ext4 field.Fp
-  := {
-  «from» := field.Ext4.Insts.CoreConvertFromFp.from
-}
-
-/-- [cpoly::field::{impl core::convert::From<u64> for cpoly::field::Ext4}::from]:
-    Source: 'src/field.rs', lines 259:4-261:5
-    Visibility: public -/
-def field.Ext4.Insts.CoreConvertFromU64.from
-  (a : Std.U64) : Result field.Ext4 := do
-  let f ← field.Fp.new a
-  field.Ext4.from_base f
-
-/-- Trait implementation: [cpoly::field::{impl core::convert::From<u64> for cpoly::field::Ext4}]
-    Source: 'src/field.rs', lines 257:0-262:1 -/
-@[reducible]
-def field.Ext4.Insts.CoreConvertFromU64 : core.convert.From field.Ext4 Std.U64
-  := {
-  «from» := field.Ext4.Insts.CoreConvertFromU64.from
-}
-
-/-- [cpoly::field::{impl core::ops::arith::Add<cpoly::field::Ext4, cpoly::field::Ext4> for cpoly::field::Ext4}::add]:
-    Source: 'src/field.rs', lines 268:4-275:5
-    Visibility: public -/
-def field.Ext4.Insts.CoreOpsArithAddExt4Ext4.add
-  (self : field.Ext4) (rhs : field.Ext4) : Result field.Ext4 := do
-  let f ← field.Fp.Insts.CoreOpsArithAddFpFp.add self.c0 rhs.c0
-  let f1 ← field.Fp.Insts.CoreOpsArithAddFpFp.add self.c1 rhs.c1
-  let f2 ← field.Fp.Insts.CoreOpsArithAddFpFp.add self.c2 rhs.c2
-  let f3 ← field.Fp.Insts.CoreOpsArithAddFpFp.add self.c3 rhs.c3
-  ok { c0 := f, c1 := f1, c2 := f2, c3 := f3 }
-
-/-- Trait implementation: [cpoly::field::{impl core::ops::arith::Add<cpoly::field::Ext4, cpoly::field::Ext4> for cpoly::field::Ext4}]
-    Source: 'src/field.rs', lines 264:0-276:1 -/
-@[reducible]
-def field.Ext4.Insts.CoreOpsArithAddExt4Ext4 : core.ops.arith.Add field.Ext4
-  field.Ext4 field.Ext4 := {
-  add := field.Ext4.Insts.CoreOpsArithAddExt4Ext4.add
-}
-
-/-- [cpoly::field::{impl core::ops::arith::Sub<cpoly::field::Ext4, cpoly::field::Ext4> for cpoly::field::Ext4}::sub]:
-    Source: 'src/field.rs', lines 282:4-289:5
-    Visibility: public -/
-def field.Ext4.Insts.CoreOpsArithSubExt4Ext4.sub
-  (self : field.Ext4) (rhs : field.Ext4) : Result field.Ext4 := do
-  let f ← field.Fp.Insts.CoreOpsArithSubFpFp.sub self.c0 rhs.c0
-  let f1 ← field.Fp.Insts.CoreOpsArithSubFpFp.sub self.c1 rhs.c1
-  let f2 ← field.Fp.Insts.CoreOpsArithSubFpFp.sub self.c2 rhs.c2
-  let f3 ← field.Fp.Insts.CoreOpsArithSubFpFp.sub self.c3 rhs.c3
-  ok { c0 := f, c1 := f1, c2 := f2, c3 := f3 }
-
-/-- Trait implementation: [cpoly::field::{impl core::ops::arith::Sub<cpoly::field::Ext4, cpoly::field::Ext4> for cpoly::field::Ext4}]
-    Source: 'src/field.rs', lines 278:0-290:1 -/
-@[reducible]
-def field.Ext4.Insts.CoreOpsArithSubExt4Ext4 : core.ops.arith.Sub field.Ext4
-  field.Ext4 field.Ext4 := {
-  sub := field.Ext4.Insts.CoreOpsArithSubExt4Ext4.sub
-}
-
-/-- [cpoly::field::{impl core::ops::arith::Neg<cpoly::field::Ext4> for cpoly::field::Ext4}::neg]:
-    Source: 'src/field.rs', lines 296:4-303:5
-    Visibility: public -/
-def field.Ext4.Insts.CoreOpsArithNegExt4.neg
-  (self : field.Ext4) : Result field.Ext4 := do
-  let f ← field.Fp.Insts.CoreOpsArithNegFp.neg self.c0
-  let f1 ← field.Fp.Insts.CoreOpsArithNegFp.neg self.c1
-  let f2 ← field.Fp.Insts.CoreOpsArithNegFp.neg self.c2
-  let f3 ← field.Fp.Insts.CoreOpsArithNegFp.neg self.c3
-  ok { c0 := f, c1 := f1, c2 := f2, c3 := f3 }
-
-/-- Trait implementation: [cpoly::field::{impl core::ops::arith::Neg<cpoly::field::Ext4> for cpoly::field::Ext4}]
-    Source: 'src/field.rs', lines 292:0-304:1 -/
-@[reducible]
-def field.Ext4.Insts.CoreOpsArithNegExt4 : core.ops.arith.Neg field.Ext4
-  field.Ext4 := {
-  neg := field.Ext4.Insts.CoreOpsArithNegExt4.neg
-}
-
 /-- [cpoly::field::{impl core::ops::arith::Mul<cpoly::field::Ext4, cpoly::field::Ext4> for cpoly::field::Ext4}::mul]:
-    Source: 'src/field.rs', lines 315:4-329:5
+    Source: 'src/field.rs', lines 333:4-347:5
     Visibility: public -/
 def field.Ext4.Insts.CoreOpsArithMulExt4Ext4.mul
   (self : field.Ext4) (rhs : field.Ext4) : Result field.Ext4 := do
@@ -639,16 +556,110 @@ def field.Ext4.Insts.CoreOpsArithMulExt4Ext4.mul
   let f17 ← field.Fp.Insts.CoreOpsArithMulFpFp.mul self.c3 rhs.c2
   let t5 ← field.Fp.Insts.CoreOpsArithAddFpFp.add f16 f17
   let t6 ← field.Fp.Insts.CoreOpsArithMulFpFp.mul self.c3 rhs.c3
-  let f18 ← field.Fp.Insts.CoreOpsArithMulFpFp.mul field.W t4
+  let f18 ← field.mul_by_w t4
   let f19 ← field.Fp.Insts.CoreOpsArithAddFpFp.add t0 f18
-  let f20 ← field.Fp.Insts.CoreOpsArithMulFpFp.mul field.W t5
+  let f20 ← field.mul_by_w t5
   let f21 ← field.Fp.Insts.CoreOpsArithAddFpFp.add t1 f20
-  let f22 ← field.Fp.Insts.CoreOpsArithMulFpFp.mul field.W t6
+  let f22 ← field.mul_by_w t6
   let f23 ← field.Fp.Insts.CoreOpsArithAddFpFp.add t2 f22
   ok { c0 := f19, c1 := f21, c2 := f23, c3 := t3 }
 
+/-- [cpoly::field::{cpoly::field::Ext4}::square]:
+    Source: 'src/field.rs', lines 264:4-266:5
+    Visibility: public -/
+def field.Ext4.square (self : field.Ext4) : Result field.Ext4 := do
+  field.Ext4.Insts.CoreOpsArithMulExt4Ext4.mul self self
+
+/-- [cpoly::field::{impl core::convert::From<cpoly::field::Fp> for cpoly::field::Ext4}::from]:
+    Source: 'src/field.rs', lines 270:4-272:5
+    Visibility: public -/
+def field.Ext4.Insts.CoreConvertFromFp.from
+  (a : field.Fp) : Result field.Ext4 := do
+  field.Ext4.from_base a
+
+/-- Trait implementation: [cpoly::field::{impl core::convert::From<cpoly::field::Fp> for cpoly::field::Ext4}]
+    Source: 'src/field.rs', lines 269:0-273:1 -/
+@[reducible]
+def field.Ext4.Insts.CoreConvertFromFp : core.convert.From field.Ext4 field.Fp
+  := {
+  «from» := field.Ext4.Insts.CoreConvertFromFp.from
+}
+
+/-- [cpoly::field::{impl core::convert::From<u64> for cpoly::field::Ext4}::from]:
+    Source: 'src/field.rs', lines 277:4-279:5
+    Visibility: public -/
+def field.Ext4.Insts.CoreConvertFromU64.from
+  (a : Std.U64) : Result field.Ext4 := do
+  let f ← field.Fp.new a
+  field.Ext4.from_base f
+
+/-- Trait implementation: [cpoly::field::{impl core::convert::From<u64> for cpoly::field::Ext4}]
+    Source: 'src/field.rs', lines 275:0-280:1 -/
+@[reducible]
+def field.Ext4.Insts.CoreConvertFromU64 : core.convert.From field.Ext4 Std.U64
+  := {
+  «from» := field.Ext4.Insts.CoreConvertFromU64.from
+}
+
+/-- [cpoly::field::{impl core::ops::arith::Add<cpoly::field::Ext4, cpoly::field::Ext4> for cpoly::field::Ext4}::add]:
+    Source: 'src/field.rs', lines 286:4-293:5
+    Visibility: public -/
+def field.Ext4.Insts.CoreOpsArithAddExt4Ext4.add
+  (self : field.Ext4) (rhs : field.Ext4) : Result field.Ext4 := do
+  let f ← field.Fp.Insts.CoreOpsArithAddFpFp.add self.c0 rhs.c0
+  let f1 ← field.Fp.Insts.CoreOpsArithAddFpFp.add self.c1 rhs.c1
+  let f2 ← field.Fp.Insts.CoreOpsArithAddFpFp.add self.c2 rhs.c2
+  let f3 ← field.Fp.Insts.CoreOpsArithAddFpFp.add self.c3 rhs.c3
+  ok { c0 := f, c1 := f1, c2 := f2, c3 := f3 }
+
+/-- Trait implementation: [cpoly::field::{impl core::ops::arith::Add<cpoly::field::Ext4, cpoly::field::Ext4> for cpoly::field::Ext4}]
+    Source: 'src/field.rs', lines 282:0-294:1 -/
+@[reducible]
+def field.Ext4.Insts.CoreOpsArithAddExt4Ext4 : core.ops.arith.Add field.Ext4
+  field.Ext4 field.Ext4 := {
+  add := field.Ext4.Insts.CoreOpsArithAddExt4Ext4.add
+}
+
+/-- [cpoly::field::{impl core::ops::arith::Sub<cpoly::field::Ext4, cpoly::field::Ext4> for cpoly::field::Ext4}::sub]:
+    Source: 'src/field.rs', lines 300:4-307:5
+    Visibility: public -/
+def field.Ext4.Insts.CoreOpsArithSubExt4Ext4.sub
+  (self : field.Ext4) (rhs : field.Ext4) : Result field.Ext4 := do
+  let f ← field.Fp.Insts.CoreOpsArithSubFpFp.sub self.c0 rhs.c0
+  let f1 ← field.Fp.Insts.CoreOpsArithSubFpFp.sub self.c1 rhs.c1
+  let f2 ← field.Fp.Insts.CoreOpsArithSubFpFp.sub self.c2 rhs.c2
+  let f3 ← field.Fp.Insts.CoreOpsArithSubFpFp.sub self.c3 rhs.c3
+  ok { c0 := f, c1 := f1, c2 := f2, c3 := f3 }
+
+/-- Trait implementation: [cpoly::field::{impl core::ops::arith::Sub<cpoly::field::Ext4, cpoly::field::Ext4> for cpoly::field::Ext4}]
+    Source: 'src/field.rs', lines 296:0-308:1 -/
+@[reducible]
+def field.Ext4.Insts.CoreOpsArithSubExt4Ext4 : core.ops.arith.Sub field.Ext4
+  field.Ext4 field.Ext4 := {
+  sub := field.Ext4.Insts.CoreOpsArithSubExt4Ext4.sub
+}
+
+/-- [cpoly::field::{impl core::ops::arith::Neg<cpoly::field::Ext4> for cpoly::field::Ext4}::neg]:
+    Source: 'src/field.rs', lines 314:4-321:5
+    Visibility: public -/
+def field.Ext4.Insts.CoreOpsArithNegExt4.neg
+  (self : field.Ext4) : Result field.Ext4 := do
+  let f ← field.Fp.Insts.CoreOpsArithNegFp.neg self.c0
+  let f1 ← field.Fp.Insts.CoreOpsArithNegFp.neg self.c1
+  let f2 ← field.Fp.Insts.CoreOpsArithNegFp.neg self.c2
+  let f3 ← field.Fp.Insts.CoreOpsArithNegFp.neg self.c3
+  ok { c0 := f, c1 := f1, c2 := f2, c3 := f3 }
+
+/-- Trait implementation: [cpoly::field::{impl core::ops::arith::Neg<cpoly::field::Ext4> for cpoly::field::Ext4}]
+    Source: 'src/field.rs', lines 310:0-322:1 -/
+@[reducible]
+def field.Ext4.Insts.CoreOpsArithNegExt4 : core.ops.arith.Neg field.Ext4
+  field.Ext4 := {
+  neg := field.Ext4.Insts.CoreOpsArithNegExt4.neg
+}
+
 /-- Trait implementation: [cpoly::field::{impl core::ops::arith::Mul<cpoly::field::Ext4, cpoly::field::Ext4> for cpoly::field::Ext4}]
-    Source: 'src/field.rs', lines 306:0-330:1 -/
+    Source: 'src/field.rs', lines 324:0-348:1 -/
 @[reducible]
 def field.Ext4.Insts.CoreOpsArithMulExt4Ext4 : core.ops.arith.Mul field.Ext4
   field.Ext4 field.Ext4 := {
@@ -656,7 +667,7 @@ def field.Ext4.Insts.CoreOpsArithMulExt4Ext4 : core.ops.arith.Mul field.Ext4
 }
 
 /-- [cpoly::field::{impl core::ops::arith::Mul<cpoly::field::Ext4, cpoly::field::Ext4> for cpoly::field::Fp}::mul]:
-    Source: 'src/field.rs', lines 337:4-344:5
+    Source: 'src/field.rs', lines 355:4-362:5
     Visibility: public -/
 def field.Fp.Insts.CoreOpsArithMulExt4Ext4.mul
   (self : field.Fp) (rhs : field.Ext4) : Result field.Ext4 := do
@@ -667,7 +678,7 @@ def field.Fp.Insts.CoreOpsArithMulExt4Ext4.mul
   ok { c0 := f, c1 := f1, c2 := f2, c3 := f3 }
 
 /-- Trait implementation: [cpoly::field::{impl core::ops::arith::Mul<cpoly::field::Ext4, cpoly::field::Ext4> for cpoly::field::Fp}]
-    Source: 'src/field.rs', lines 332:0-345:1 -/
+    Source: 'src/field.rs', lines 350:0-363:1 -/
 @[reducible]
 def field.Fp.Insts.CoreOpsArithMulExt4Ext4 : core.ops.arith.Mul field.Fp
   field.Ext4 field.Ext4 := {
@@ -675,14 +686,14 @@ def field.Fp.Insts.CoreOpsArithMulExt4Ext4 : core.ops.arith.Mul field.Fp
 }
 
 /-- [cpoly::field::{impl core::ops::arith::AddAssign<cpoly::field::Ext4> for cpoly::field::Ext4}::add_assign]:
-    Source: 'src/field.rs', lines 348:4-350:5
+    Source: 'src/field.rs', lines 366:4-368:5
     Visibility: public -/
 def field.Ext4.Insts.CoreOpsArithAddAssignExt4.add_assign
   (self : field.Ext4) (rhs : field.Ext4) : Result field.Ext4 := do
   field.Ext4.Insts.CoreOpsArithAddExt4Ext4.add self rhs
 
 /-- Trait implementation: [cpoly::field::{impl core::ops::arith::AddAssign<cpoly::field::Ext4> for cpoly::field::Ext4}]
-    Source: 'src/field.rs', lines 347:0-351:1 -/
+    Source: 'src/field.rs', lines 365:0-369:1 -/
 @[reducible]
 def field.Ext4.Insts.CoreOpsArithAddAssignExt4 : core.ops.arith.AddAssign
   field.Ext4 field.Ext4 := {
@@ -690,14 +701,14 @@ def field.Ext4.Insts.CoreOpsArithAddAssignExt4 : core.ops.arith.AddAssign
 }
 
 /-- [cpoly::field::{impl core::ops::arith::SubAssign<cpoly::field::Ext4> for cpoly::field::Ext4}::sub_assign]:
-    Source: 'src/field.rs', lines 354:4-356:5
+    Source: 'src/field.rs', lines 372:4-374:5
     Visibility: public -/
 def field.Ext4.Insts.CoreOpsArithSubAssignExt4.sub_assign
   (self : field.Ext4) (rhs : field.Ext4) : Result field.Ext4 := do
   field.Ext4.Insts.CoreOpsArithSubExt4Ext4.sub self rhs
 
 /-- Trait implementation: [cpoly::field::{impl core::ops::arith::SubAssign<cpoly::field::Ext4> for cpoly::field::Ext4}]
-    Source: 'src/field.rs', lines 353:0-357:1 -/
+    Source: 'src/field.rs', lines 371:0-375:1 -/
 @[reducible]
 def field.Ext4.Insts.CoreOpsArithSubAssignExt4 : core.ops.arith.SubAssign
   field.Ext4 field.Ext4 := {
@@ -705,14 +716,14 @@ def field.Ext4.Insts.CoreOpsArithSubAssignExt4 : core.ops.arith.SubAssign
 }
 
 /-- [cpoly::field::{impl core::ops::arith::MulAssign<cpoly::field::Ext4> for cpoly::field::Ext4}::mul_assign]:
-    Source: 'src/field.rs', lines 360:4-362:5
+    Source: 'src/field.rs', lines 378:4-380:5
     Visibility: public -/
 def field.Ext4.Insts.CoreOpsArithMulAssignExt4.mul_assign
   (self : field.Ext4) (rhs : field.Ext4) : Result field.Ext4 := do
   field.Ext4.Insts.CoreOpsArithMulExt4Ext4.mul self rhs
 
 /-- Trait implementation: [cpoly::field::{impl core::ops::arith::MulAssign<cpoly::field::Ext4> for cpoly::field::Ext4}]
-    Source: 'src/field.rs', lines 359:0-363:1 -/
+    Source: 'src/field.rs', lines 377:0-381:1 -/
 @[reducible]
 def field.Ext4.Insts.CoreOpsArithMulAssignExt4 : core.ops.arith.MulAssign
   field.Ext4 field.Ext4 := {

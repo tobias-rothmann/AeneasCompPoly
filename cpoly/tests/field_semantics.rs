@@ -279,6 +279,33 @@ fn ext_ops_match_reference() {
     }
 }
 
+/// The dedicated square is the symmetric specialization of the independently
+/// computed extension product.  The boundary vectors exercise every doubled
+/// and wrapped coefficient, while the corpus checks the unreduced formula on
+/// arbitrary reduced representatives.
+#[test]
+fn ext_square_matches_product_and_reference() {
+    let mut xs = sample_ext(13, 200);
+    xs.extend_from_slice(&[
+        [0, 0, 0, 0],
+        [1, 0, 0, 0],
+        [0, 1, 0, 0],
+        [0, 0, 1, 0],
+        [0, 0, 0, 1],
+        [P - 1, P - 1, P - 1, P - 1],
+        [P - 1, 0, P - 1, 0],
+        [0, P - 1, 0, P - 1],
+    ]);
+    for &a in &xs {
+        let square = to(a).square();
+        assert_eq!(of(square), ermul(a, a), "reference square {a:?}");
+        assert_eq!(square, to(a) * to(a), "product square {a:?}");
+        for c in of(square) {
+            assert!(c < P, "square output must stay reduced: {a:?}");
+        }
+    }
+}
+
 #[test]
 fn constants_and_zero_test() {
     assert_eq!(of(Ext4::ZERO), [0, 0, 0, 0]);

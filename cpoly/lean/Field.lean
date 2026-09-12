@@ -268,6 +268,14 @@ theorem red_W : Red cpoly.field.W := by unfold Red; rw [cpoly_W_val]; decide
 /-- ... and denotes the `W` of `Hachi.ext4Params`. -/
 @[simp] theorem toK_W : toK cpoly.field.W = 2 := by simp only [toK, cpoly_W_val]; norm_num
 
+/-- The private reduction helper is the direct field multiplication by the
+extension constant. -/
+@[step]
+theorem mul_by_w_spec (t : cpoly.field.Fp) (ht : Red t) :
+    cpoly.field.mul_by_w t ⦃ u => Red u ∧ toK u = toK cpoly.field.W * toK t ⦄ := by
+  rw [cpoly.field.mul_by_w]
+  exact fp_mul_spec cpoly.field.W t red_W ht
+
 /-- `Fp::new` reduces an arbitrary word into the field.  This is the only public
 Rust constructor from a `u64`, and it is what makes `Red` an invariant of the
 type rather than a precondition. -/
@@ -559,6 +567,14 @@ theorem ext_mul_spec (a b : cpoly.field.Ext4) (ha : Reduced a) (hb : Reduced b) 
       em13, em22, em31, em23, em32, toK_W] <;>
     norm_num <;>
     ring
+
+/-- The first `Ext4::square` translation delegates to multiplication. -/
+@[step]
+theorem ext_square_spec (a : cpoly.field.Ext4) (ha : Reduced a) :
+    cpoly.field.Ext4.square a
+      ⦃ c => Reduced c ∧ toExt c = toExt a * toExt a ⦄ := by
+  rw [cpoly.field.Ext4.square]
+  exact ext_mul_spec a a ha ha
 
 /-- `impl Mul<Ext4> for Fp` — scaling an extension element by a base-field one.
 

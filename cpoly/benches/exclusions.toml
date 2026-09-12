@@ -33,6 +33,10 @@
 "field::W" = "a compile-time constant (Fp(2)); there is no code to run"
 "field::Ext4::GEN" = "a compile-time constant; pins the basis convention, never computed"
 
+# `mul_by_w` is an internal reduction step, not an external API. Its cost is
+# included in both the general-product and square cases below.
+"field::mul_by_w" = "private; measured through `Ext4::mul` and `Ext4::square` rows"
+
 # -- O(1) by inspection ------------------------------------------------------
 
 "multilinear::table_len" = """

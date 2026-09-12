@@ -170,6 +170,15 @@ impl MulAssign for Fp {
 /// doubling.  Mirrors `Hachi.ext4Params.W`.
 pub const W: Fp = Fp(2);
 
+/// Multiply a reduced base-field element by the extension constant `W = 2`.
+///
+/// This stays private: it expresses the reduction in [`Ext4`]'s arithmetic,
+/// rather than an independently useful operation on the base field.  The
+/// first translation keeps the direct field expression as its reference.
+fn mul_by_w(t: Fp) -> Fp {
+    W * t
+}
+
 /// An element of `Ext4 = F_P[Y] / (Y^4 - W)`, as its dense little-endian
 /// coefficient vector: `c0 + c1 Y + c2 Y^2 + c3 Y^3`.
 ///
@@ -246,6 +255,15 @@ impl Ext4 {
     pub fn is_zero(self) -> bool {
         self.c0.is_zero() && self.c1.is_zero() && self.c2.is_zero() && self.c3.is_zero()
     }
+
+    /// Square this extension-field element.
+    ///
+    /// The first translation delegates directly to the general extension
+    /// product.  It is the semantic reference for a later specialized square.
+    #[must_use]
+    pub fn square(self) -> Ext4 {
+        self * self
+    }
 }
 
 impl From<Fp> for Ext4 {
@@ -321,9 +339,9 @@ impl Mul for Ext4 {
         let t5: Fp = self.c2 * rhs.c3 + self.c3 * rhs.c2;
         let t6: Fp = self.c3 * rhs.c3;
         Ext4 {
-            c0: t0 + W * t4,
-            c1: t1 + W * t5,
-            c2: t2 + W * t6,
+            c0: t0 + mul_by_w(t4),
+            c1: t1 + mul_by_w(t5),
+            c2: t2 + mul_by_w(t6),
             c3: t3,
         }
     }
