@@ -61,8 +61,10 @@ ANNOT = re.compile(r"^\s*//\s*@genesis\s+(?P<sha>[0-9a-f]{7,40})\s+(?P<date>\d{4
 # The rest of the line, not `\S+`: an item path here is a Rust type expression
 # and half of them contain spaces (`field::<Fp as Add>::add`).
 COVERS = re.compile(r"^\s*//\s*@covers\s+(?P<path>.+?)\s*$")
-# `bench_case!(c, "<group>", <case fn>, [...])` -- the only form the bench files
-# use, and the only thing a `@covers` marker is allowed to sit on.
+# `bench_case!(c, "<group>", <case fn>, [...])` — the only form the bench files
+# use, and the only thing a `@covers` marker is allowed to sit on. The first
+# two arguments can be wrapped by rustfmt, so `covered_paths` matches its small
+# leading window rather than a single physical line.
 BENCH_CASE = re.compile(r"^\s*bench_case!\(\s*c\s*,\s*\"(?P<group>[^\"]+)\"\s*,\s*(?P<fn>\w+)\s*,")
 MIRRORS = re.compile(r"Mirrors\s+`?(?P<name>[A-Za-z0-9_.]+)")
 
@@ -314,11 +316,37 @@ def cmd_check_genesis(args) -> int:
                 continue
             checked += 1
 
-    live = {it.path for m in MODULES for it in R.flatten(R.scan((SRC / f"{m}.rs").read_text(), m))
-            if it.kind in ANNOTATED_KINDS}
+    live_items = {
+        it.path: it
+        for m in MODULES
+        for it in R.flatten(R.scan((SRC / f"{m}.rs").read_text(), m))
+        if it.kind in ANNOTATED_KINDS
+    }
+    live = set(live_items)
     frozen = {it.path for m in MODULES if (GENESIS_SRC / f"{m}.rs").exists()
               for it, _, _, _, _ in _annotated_items(GENESIS_SRC / f"{m}.rs", m)}
-    missing = sorted(live - frozen)
+    genesis_excl = genesis_exclusions()
+    stale_genesis_excl = sorted(path for path in genesis_excl if path not in live)
+    frozen_genesis_excl = sorted(path for path in genesis_excl if path in frozen)
+    non_private_genesis_excl = sorted(
+        path
+        for path in genesis_excl
+        if path in live
+        and not (
+            (live_items[path].kind == "fn" and re.match(r"^fn\b", live_items[path].text))
+            or (live_items[path].kind == "const" and re.match(r"^const\b", live_items[path].text))
+        )
+    )
+    for path in stale_genesis_excl:
+        problems.append(f"genesis exclusion {path} names no item in cpoly/src -- renamed or removed?")
+    for path in frozen_genesis_excl:
+        problems.append(f"genesis exclusion {path} already has a frozen counterpart; drop the exclusion")
+    for path in non_private_genesis_excl:
+        problems.append(
+            f"genesis exclusion {path} is not a private `fn` or compile-time `const`; public or structural items need a frozen baseline"
+        )
+
+    missing = sorted(live - frozen - set(genesis_excl))
     if missing:
         problems.append(
             "these items exist in cpoly/src but have no frozen counterpart, so they have\n"
@@ -487,12 +515,16 @@ def covered_paths() -> tuple[dict[str, list[str]], list[str]]:
 
     for f in sorted(BENCHES.glob("*.rs")):
         pending: list[tuple[int, str]] = []
-        for i, line in enumerate(f.read_text().splitlines()):
+        lines = f.read_text().splitlines()
+        for i, line in enumerate(lines):
             m = COVERS.match(line)
             if m:
                 pending.append((i, m.group("path")))
                 continue
-            b = BENCH_CASE.match(line)
+            # The group is always the second macro argument; three physical
+            # lines are enough for rustfmt's wrapped form, while the fourth
+            # keeps this tolerant of a vertically written opening argument.
+            b = BENCH_CASE.match("\n".join(lines[i : i + 4]))
             if b:
                 group = b.group("group")
                 if group.startswith(CONTROL_PREFIX):
@@ -529,6 +561,20 @@ def exclusions() -> dict[str, str]:
     if not EXCLUSIONS.exists():
         return {}
     return tomllib.loads(EXCLUSIONS.read_text()).get("exclusions", {})
+
+
+def genesis_exclusions() -> dict[str, str]:
+    """Private implementation helpers and constants with no standalone baseline.
+
+    A frozen public operation already contains its first translation's complete
+    call path. A helper introduced only by a later optimization is absent from
+    that path, so freezing it would neither establish nor measure a baseline.
+    Keep the short allowlist in exclusions.toml explicit and reject anything
+    other than a private function or compile-time constant here.
+    """
+    if not EXCLUSIONS.exists():
+        return {}
+    return tomllib.loads(EXCLUSIONS.read_text()).get("genesis_exclusions", {})
 
 
 def all_item_paths() -> set[str]:

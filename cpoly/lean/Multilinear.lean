@@ -57,9 +57,10 @@ fails once the shift amount reaches the word width -- so it fails on exactly the
 inputs for which `2 ^ vars` does not fit in a `usize`.  Specs whose inputs
 already include a vector of length `2 ^ n` get `2 ^ n ≤ Usize.max` for free from
 the `alloc.vec.Vec` invariant (`Vec α = { l : List α // l.length ≤ Usize.max }`);
-the others (`zero_spec`, `zero_evals_spec`, `of_array_spec`, the two bases,
-`eq_tilde_spec`) take it as a hypothesis, which is exactly the weakest condition
-making the triple true.
+the others (`zero_spec`, `zero_evals_spec`, `of_array_spec`, and the two bases)
+take it as a hypothesis, which is exactly the weakest condition making those
+triples true.  The direct `eq_tilde` loop has no table allocation or shift, so
+its specification no longer needs a size side condition.
 -/
 import Field
 import Univariate
@@ -216,6 +217,14 @@ theorem pointFn_of_lt (v : Slice cpoly.field.Ext4) (o : ℕ) {k : ℕ}
 theorem pointFn_succ (v : Slice cpoly.field.Ext4) (o k : ℕ) :
     pointFn v o (k + 1) = pointFn v (o + 1) k := by
   unfold pointFn; rw [show o + (k + 1) = o + 1 + k by omega]
+
+/-- The two ways the iterative basis proof writes a coordinate agree: the
+builder indexes it as `point[j]`, while the mathematical basis uses an offset
+of zero and coordinate `j`. -/
+theorem pointFn_offset_zero (v : Slice cpoly.field.Ext4) (j : ℕ) :
+    pointFn v j 0 = pointFn v 0 j := by
+  unfold pointFn
+  rw [show j + 0 = 0 + j by omega]
 
 /-- `coeffFn` for a table that arrives as a `&[Ext4]` rather than a `&Vec<Ext4>`.
 Since `Vec::deref` is the identity on the underlying list, the two agree on every
@@ -459,6 +468,83 @@ theorem mlValL_eq_eval (n : ℕ) (p : alloc.vec.Vec cpoly.field.Ext4) (w : Slice
   symm
   exact Fin.sum_univ_eq_sum_range
     (fun i => coeffFn p i * lagProd n i (pointFn w o)) (2 ^ n)
+
+/-! ## Direct equality-kernel product -/
+
+/-- One coordinate's contribution to the multilinear equality kernel. -/
+def eqFactor (w x : ℕ → F) (j : ℕ) : F :=
+  (1 - x j) * (1 - w j) + x j * w j
+
+/-- The direct product form of `CMlPolynomialEval.eqTilde`. -/
+def eqProd (n : ℕ) (w x : ℕ → F) : F :=
+  ∏ j ∈ Finset.range n, eqFactor w x j
+
+/-- Split a range product at its least-significant coordinate. -/
+theorem prod_range_succ_head (n : ℕ) (f : ℕ → F) :
+    (∏ j ∈ Finset.range (n + 1), f j) = f 0 * ∏ j ∈ Finset.range n, f (j + 1) := by
+  calc
+    (∏ j ∈ Finset.range (n + 1), f j) = ∏ j : Fin (n + 1), f j.val :=
+      (Fin.prod_univ_eq_prod_range (f := f) (n + 1)).symm
+    _ = f 0 * ∏ j : Fin n, f (j.val + 1) := by
+      rw [Fin.prod_univ_succ]
+      rfl
+    _ = f 0 * ∏ j ∈ Finset.range n, f (j + 1) := by
+      congr 1
+      exact Fin.prod_univ_eq_prod_range (f := fun j => f (j + 1)) n
+
+/-- Summing the two Lagrange weights at every Boolean point factors coordinatewise. -/
+theorem lagProd_pair_sum (n : ℕ) (w x : ℕ → F) :
+    (∑ i ∈ Finset.range (2 ^ n), lagProd n i w * lagProd n i x) = eqProd n w x := by
+  induction n generalizing w x with
+  | zero => simp [lagProd, eqProd, eqFactor]
+  | succ n ih =>
+    rw [show 2 ^ (n + 1) = 2 * 2 ^ n by ring, sum_range_two_mul]
+    calc
+      (∑ j ∈ Finset.range (2 ^ n),
+          (lagProd (n + 1) (2 * j) w * lagProd (n + 1) (2 * j) x +
+            lagProd (n + 1) (2 * j + 1) w * lagProd (n + 1) (2 * j + 1) x)) =
+          ∑ j ∈ Finset.range (2 ^ n), eqFactor w x 0 *
+            (lagProd n j (fun k => w (k + 1)) * lagProd n j (fun k => x (k + 1))) := by
+            apply Finset.sum_congr rfl
+            intro j hj
+            rw [lagProd_succ_even, lagProd_succ_even, lagProd_succ_odd, lagProd_succ_odd]
+            unfold eqFactor
+            ring
+      _ = eqFactor w x 0 *
+            (∑ j ∈ Finset.range (2 ^ n),
+              lagProd n j (fun k => w (k + 1)) * lagProd n j (fun k => x (k + 1))) := by
+            rw [Finset.mul_sum]
+      _ = eqFactor w x 0 * eqProd n (fun k => w (k + 1)) (fun k => x (k + 1)) := by
+            rw [ih]
+      _ = eqProd (n + 1) w x := by
+            unfold eqProd
+            rw [prod_range_succ_head]
+            unfold eqFactor
+            congr 2
+
+/-- CompPoly's equality kernel is the direct coordinatewise product. -/
+theorem eqTilde_eq_eqProd (n : ℕ) (w x : Slice cpoly.field.Ext4) :
+    CMlPolynomialEval.eqTilde (toPoint n w) (toPoint n x) =
+      eqProd n (pointFn w 0) (pointFn x 0) := by
+  rw [CMlPolynomialEval.eqTilde, CMlPolynomialEval.eval, dotProduct_eq_sum_univ]
+  have h : (∑ i : Fin (2 ^ n),
+      (CMlPolynomialEval.lagrangeBasis (toPoint n w)).get i *
+        (CMlPolynomialEval.lagrangeBasis (toPoint n x)).get i) =
+      ∑ i : Fin (2 ^ n),
+        lagProd n i.val (pointFn w 0) * lagProd n i.val (pointFn x 0) := by
+    apply Finset.sum_congr rfl
+    intro i hi
+    rw [Vector.get_eq_getElem, Vector.get_eq_getElem,
+      lagrangeBasis_getElem', lagrangeBasis_getElem']
+  rw [h]
+  calc
+    (∑ i : Fin (2 ^ n),
+        lagProd n i.val (pointFn w 0) * lagProd n i.val (pointFn x 0)) =
+        ∑ i ∈ Finset.range (2 ^ n),
+          lagProd n i (pointFn w 0) * lagProd n i (pointFn x 0) := by
+            exact Fin.sum_univ_eq_sum_range
+              (fun i => lagProd n i (pointFn w 0) * lagProd n i (pointFn x 0)) (2 ^ n)
+    _ = eqProd n (pointFn w 0) (pointFn x 0) := lagProd_pair_sum n _ _
 
 /-! ## `table_len`
 
@@ -1055,130 +1141,241 @@ theorem smul_evals_spec (n : ℕ) (r : cpoly.field.Ext4) (v : alloc.vec.Vec cpol
   intro i hi
   simp [CMlPolynomialEval.smul, toMl]
 
+/-! ## Iterative basis construction -/
+
+/-- Adding the `j`-th binary place leaves every lower bit of an index below
+`2^j` unchanged. -/
+theorem testBit_add_pow_of_lt (j i k : ℕ) (hi : i < 2 ^ j) (hk : k < j) :
+    Nat.testBit (2 ^ j + i) k = Nat.testBit i k := by
+  have h := Nat.testBit_mod_two_pow (2 ^ j + i) j k
+  simp only [hk, decide_true, Bool.true_and] at h
+  rw [Nat.add_mod, Nat.mod_self, zero_add, Nat.mod_eq_of_lt hi] at h
+  rw [Nat.mod_eq_of_lt hi] at h
+  exact h.symm
+
+/-- The newly added place is set. -/
+theorem testBit_add_pow_self (j i : ℕ) (hi : i < 2 ^ j) :
+    Nat.testBit (2 ^ j + i) j = true := by
+  rw [testBit_eq_div_pow_mod, Nat.add_div (Nat.pow_pos (by omega))]
+  rw [Nat.div_self (Nat.pow_pos (by omega)), Nat.div_eq_of_lt hi]
+  simp only [Nat.mod_self, Nat.mod_eq_of_lt hi, zero_add]
+  rw [if_neg (by omega)]
+  rfl
+
+theorem monoProd_extend_low (j i : ℕ) (x : ℕ → F) (hi : i < 2 ^ j) :
+    monoProd (j + 1) i x = monoProd j i x := by
+  unfold monoProd
+  rw [Finset.prod_range_succ, Nat.testBit_eq_false_of_lt hi]
+  simp
+
+theorem monoProd_extend_high (j i : ℕ) (x : ℕ → F) (hi : i < 2 ^ j) :
+    monoProd (j + 1) (2 ^ j + i) x = monoProd j i x * x j := by
+  unfold monoProd
+  rw [Finset.prod_range_succ, testBit_add_pow_self j i hi]
+  simp only [if_true]
+  congr 1
+  apply Finset.prod_congr rfl
+  intro k hk
+  rw [testBit_add_pow_of_lt j i k hi (Finset.mem_range.mp hk)]
+
+theorem lagProd_extend_low (j i : ℕ) (x : ℕ → F) (hi : i < 2 ^ j) :
+    lagProd (j + 1) i x = lagProd j i x * (1 - x j) := by
+  unfold lagProd
+  rw [Finset.prod_range_succ, Nat.testBit_eq_false_of_lt hi]
+  simp
+
+theorem lagProd_extend_high (j i : ℕ) (x : ℕ → F) (hi : i < 2 ^ j) :
+    lagProd (j + 1) (2 ^ j + i) x = lagProd j i x * x j := by
+  unfold lagProd
+  rw [Finset.prod_range_succ, testBit_add_pow_self j i hi]
+  simp only [if_true]
+  congr 1
+  apply Finset.prod_congr rfl
+  intro k hk
+  rw [testBit_add_pow_of_lt j i k hi (Finset.mem_range.mp hk)]
+
+theorem range_pow_succ_append (j : ℕ) :
+    List.range (2 ^ (j + 1)) =
+      List.range (2 ^ j) ++ (List.range (2 ^ j)).map (fun i => 2 ^ j + i) := by
+  apply List.ext_getElem
+  · simp only [List.length_range, List.length_append, List.length_map]
+    rw [pow_succ]
+    omega
+  · intro k hk1 _
+    simp only [List.getElem_range]
+    by_cases hk : k < 2 ^ j
+    · rw [List.getElem_append_left (by simp; exact hk)]
+      simp
+    · have hlow : 2 ^ j ≤ k := by omega
+      have hkfull : k < 2 ^ (j + 1) := by simpa using hk1
+      have hsub : k - 2 ^ j < 2 ^ j := by
+        rw [pow_succ] at hkfull
+        omega
+      rw [List.getElem_append_right (by simp; exact hlow)]
+      simp only [List.getElem_map, List.getElem_range, List.length_range]
+      exact (Nat.add_sub_of_le hlow).symm
+
+theorem mono_extend_map (j : ℕ) (x : ℕ → F) :
+    (List.range (2 ^ j)).map (fun i => monoProd j i x) ++
+      (List.range (2 ^ j)).map (fun i => monoProd j i x * x j) =
+    (List.range (2 ^ (j + 1))).map (fun i => monoProd (j + 1) i x) := by
+  rw [range_pow_succ_append]
+  simp only [List.map_append, List.map_map]
+  congr 1
+  · apply List.map_congr_left
+    intro i hi
+    rw [monoProd_extend_low _ _ _ (List.mem_range.mp hi)]
+  · apply List.map_congr_left
+    intro i hi
+    simp only [Function.comp_apply]
+    rw [monoProd_extend_high _ _ _ (List.mem_range.mp hi)]
+
+theorem lag_extend_map (j : ℕ) (x : ℕ → F) :
+    (List.range (2 ^ j)).map (fun i => lagProd j i x * (1 - x j)) ++
+      (List.range (2 ^ j)).map (fun i => lagProd j i x * x j) =
+    (List.range (2 ^ (j + 1))).map (fun i => lagProd (j + 1) i x) := by
+  rw [range_pow_succ_append]
+  simp only [List.map_append, List.map_map]
+  congr 1
+  · apply List.map_congr_left
+    intro i hi
+    rw [lagProd_extend_low _ _ _ (List.mem_range.mp hi)]
+  · apply List.map_congr_left
+    intro i hi
+    simp only [Function.comp_apply]
+    rw [lagProd_extend_high _ _ _ (List.mem_range.mp hi)]
+
 /-! ## `monomial_basis` -/
 
-theorem monomial_basis_inner_spec (w : Slice cpoly.field.Ext4) (nn : Std.Usize) (idx : ℕ)
-    (hw : VecReduced w) (hnn : nn.val = w.val.length) :
-    ∀ (acc : cpoly.field.Ext4) (m j : Std.Usize),
-      j.val ≤ nn.val → Reduced acc → m.val = idx / 2 ^ j.val →
-      toExt acc = monoProd j.val idx (pointFn w 0) →
-      cpoly.multilinear.monomial_basis_loop0_loop0 w nn acc m j ⦃ z => Reduced z ∧
-        toExt z = monoProd nn.val idx (pointFn w 0) ⦄ := by
-  intro acc m j hj hacc hm hval
+set_option maxHeartbeats 1000000 in
+theorem monomial_basis_inner_spec (w : Slice cpoly.field.Ext4) (basis : alloc.vec.Vec cpoly.field.Ext4)
+    (j half : Std.Usize) (hw : VecReduced w) (hb : VecReduced basis)
+    (hjw : j.val < w.val.length) (hblen : basis.val.length = half.val)
+    (hbound : basis.val.length + half.val ≤ Std.Usize.max) :
+    cpoly.multilinear.monomial_basis_loop0_loop0 w basis j half 0#usize ⦃ z =>
+      VecReduced z ∧ z.val.map toExt = basis.val.map toExt ++
+        (List.range half.val).map (fun k => coeffFn basis k * pointFn w 0 j.val) ⦄ := by
   rw [cpoly.multilinear.monomial_basis_loop0_loop0]
-  apply loop.spec_decr_nat (fun s => nn.val - s.2.2.val)
-    (fun s => s.2.2.val ≤ nn.val ∧ Reduced s.1 ∧ s.2.1.val = idx / 2 ^ s.2.2.val ∧
-      toExt s.1 = monoProd s.2.2.val idx (pointFn w 0))
-  · rintro ⟨a, q, k⟩ ⟨hk, ha, hq, hv⟩
-    simp only [Prod.fst, Prod.snd] at hk ha hq hv
+  apply loop.spec_decr_nat (fun s => half.val - s.2.val)
+    (fun s => s.2.val ≤ half.val ∧ VecReduced s.1 ∧
+      s.1.val.map toExt = basis.val.map toExt ++
+        (List.range s.2.val).map (fun k => coeffFn basis k * pointFn w 0 j.val))
+  · rintro ⟨cur, i⟩ ⟨hi, hcur, hrel⟩
+    simp only [Prod.fst, Prod.snd] at hi hcur hrel
     simp only [cpoly.multilinear.monomial_basis_loop0_loop0.body]
+    by_cases hlt : i < half
+    · rw [if_pos hlt]
+      have hcurlen : cur.val.length = basis.val.length + i.val := by
+        have h := congrArg List.length hrel
+        simpa using h
+      have hib : i.val < basis.val.length := by scalar_tac
+      have hic : i.val < cur.val.length := by scalar_tac
+      step as ⟨old, hold⟩
+      have holdR : Reduced old := hold ▸ hcur _ (List.getElem_mem hic)
+      have holdF : toExt old = coeffFn basis i.val := by
+        have hm := getElem_of_list_eq hrel (i := i.val) (hi := by simpa [hcurlen] using hic)
+        rw [List.getElem_append_left (by simpa using hib)] at hm
+        rw [hold, coeffFn_of_lt basis hib]
+        simpa only [List.getElem_map] using hm
+      step as ⟨x, hx⟩
+      have hxR : Reduced x := hx ▸ hw _ (List.getElem_mem hjw)
+      have hxF0 : toExt x = pointFn w j.val 0 := by
+        calc
+          toExt x = toExt w.val[j.val] := by rw [hx]
+          _ = pointFn w j.val 0 := (pointFn_of_lt w j.val (k := 0) hjw).symm
+      have hxF : toExt x = pointFn w 0 j.val := hxF0.trans (pointFn_offset_zero w j.val)
+      apply spec_bind (ext_mul_spec old x holdR hxR)
+      rintro product ⟨hproductR, hproductF⟩
+      have hpushbound : cur.val.length < Std.Usize.max := by scalar_tac
+      apply spec_bind (alloc.vec.Vec.push_spec cur product hpushbound)
+      rintro cur2 hpush
+      step as ⟨i2, hi2⟩
+      refine ⟨by scalar_tac, ?_, ?_, ?_⟩
+      · intro u hu
+        rw [hpush] at hu
+        rcases List.mem_append.mp hu with hu | hu
+        · exact hcur u hu
+        · rw [List.mem_singleton.mp hu]
+          exact hproductR
+      · rw [hi2, List.range_succ, hpush, List.map_append, hrel, List.map_append]
+        simp only [List.map_cons, List.map_nil]
+        rw [hproductF, holdF, hxF]
+        simp [List.append_assoc]
+      · scalar_tac
+    · rw [if_neg hlt]
+      have heq : i.val = half.val := by scalar_tac
+      exact ⟨hcur, by simpa [heq] using hrel⟩
+  · exact ⟨by simp, hb, by simp⟩
+
+set_option maxHeartbeats 1000000 in
+theorem monomial_basis_loop_spec (w : Slice cpoly.field.Ext4) (nn : Std.Usize)
+    (hw : VecReduced w) (hnn : nn.val = w.val.length) (hmax : 2 ^ nn.val ≤ Std.Usize.max) :
+    ∀ (basis : alloc.vec.Vec cpoly.field.Ext4) (j : Std.Usize),
+      j.val ≤ nn.val → VecReduced basis →
+      basis.val.map toExt
+        = (List.range (2 ^ j.val)).map (fun k => monoProd j.val k (pointFn w 0)) →
+      basis.val.length = 2 ^ j.val →
+      cpoly.multilinear.monomial_basis_loop0 w nn basis j ⦃ z => VecReduced z ∧
+        z.val.map toExt
+          = (List.range (2 ^ nn.val)).map (fun k => monoProd nn.val k (pointFn w 0)) ⦄ := by
+  intro basis j hj hb hrel hblen
+  rw [cpoly.multilinear.monomial_basis_loop0]
+  apply loop.spec_decr_nat (fun s => nn.val - s.2.val)
+    (fun s => s.2.val ≤ nn.val ∧ VecReduced s.1 ∧
+      s.1.val.map toExt = (List.range (2 ^ s.2.val)).map
+        (fun k => monoProd s.2.val k (pointFn w 0)) ∧ s.1.val.length = 2 ^ s.2.val)
+  · rintro ⟨b, k⟩ ⟨hk, hb1, hrel1, hblen1⟩
+    have hrelk : b.val.map toExt = (List.range (2 ^ k.val)).map
+        (fun q => monoProd k.val q (pointFn w 0)) := by
+      simpa only [Prod.fst, Prod.snd] using hrel1
+    have hblenk : b.val.length = 2 ^ k.val := by
+      simpa only [Prod.fst, Prod.snd] using hblen1
+    simp only [cpoly.multilinear.monomial_basis_loop0.body]
     by_cases hlt : k < nn
     · rw [if_pos hlt]
-      step as ⟨bit, hbit⟩
-      have hbitiff : bit = 1#usize ↔ Nat.testBit idx k.val = true := by
-        constructor
-        · intro hb
-          rw [testBit_eq_div_pow_mod, decide_eq_true_eq]
-          scalar_tac
-        · intro ht
-          apply usize_eq_of_val_eq
-          rw [testBit_eq_div_pow_mod, decide_eq_true_eq] at ht
-          scalar_tac
-      by_cases hb : bit = 1#usize
-      · rw [if_pos hb]
-        have hkw : k.val < w.val.length := by scalar_tac
-        step as ⟨x, hxw⟩
-        have hxR : Reduced x := hxw ▸ hw _ (List.getElem_mem hkw)
-        step as ⟨a2, ha2R, ha2F⟩
-        step as ⟨q2, hq2⟩
-        step as ⟨k2, hk2⟩
-        refine ⟨by scalar_tac, ha2R, ?_, ?_, ?_⟩
-        · rw [hq2, hq, Nat.div_div_eq_div_mul]
-          congr 2
-          scalar_tac
-        · apply Eq.trans (b := monoProd (k.val + 1) idx (pointFn w 0))
-          · unfold monoProd at hv ⊢
-            calc
-              toExt a2 = toExt a * toExt x := ha2F
-              _ = (∏ l ∈ Finset.range k.val,
-                    if Nat.testBit idx l then pointFn w 0 l else 1) * toExt x := by rw [hv]
-              _ = ∏ l ∈ Finset.range (k.val + 1),
-                    (if Nat.testBit idx l then pointFn w 0 l else 1) := by
-                    rw [Finset.prod_range_succ]
-                    have ht := hbitiff.mp hb
-                    rw [if_pos ht]
-                    simp [hxw, pointFn_of_lt w 0 (by simpa using hkw)]
-          · congr 2
-            exact hk2.symm
-        · have : k.val < nn.val := by scalar_tac
-          omega
-      · rw [if_neg hb]
-        step as ⟨q2, hq2⟩
-        step as ⟨k2, hk2⟩
-        refine ⟨by scalar_tac, ha, ?_, ?_, ?_⟩
-        · rw [hq2, hq, Nat.div_div_eq_div_mul]
-          congr 2
-          scalar_tac
-        · apply Eq.trans (b := monoProd (k.val + 1) idx (pointFn w 0))
-          · unfold monoProd at hv ⊢
-            calc
-              toExt a = ∏ l ∈ Finset.range k.val,
-                    (if Nat.testBit idx l then pointFn w 0 l else 1) := hv
-              _ = ∏ l ∈ Finset.range (k.val + 1),
-                    (if Nat.testBit idx l then pointFn w 0 l else 1) := by
-                    rw [Finset.prod_range_succ]
-                    have ht : Nat.testBit idx k.val = false := by
-                      apply Bool.eq_false_iff.mpr
-                      intro ht
-                      exact hb (hbitiff.mpr ht)
-                    simp [ht]
-          · congr 2
-            exact hk2.symm
-        · have : k.val < nn.val := by scalar_tac
-          omega
+      have hkw : k.val < w.val.length := by scalar_tac
+      have hbound : b.val.length + b.len.val ≤ Std.Usize.max := by
+        change b.val.length + b.val.length ≤ Std.Usize.max
+        calc
+          b.val.length + b.val.length = 2 ^ (k.val + 1) := by rw [hblenk, pow_succ]; omega
+          _ ≤ 2 ^ nn.val := Nat.pow_le_pow_right (by omega) (by omega)
+          _ ≤ Std.Usize.max := hmax
+      apply spec_bind (monomial_basis_inner_spec w b k b.len hw hb1 hkw (by rfl) hbound)
+      rintro b2 ⟨hb2, hmap2⟩
+      step as ⟨k2, hk2⟩
+      have hcoeff : ∀ q, q < 2 ^ k.val → coeffFn b q = monoProd k.val q (pointFn w 0) := by
+        intro q hq
+        rw [coeffFn_of_lt b (by rw [hblenk]; exact hq)]
+        have hm := getElem_of_list_eq hrelk (i := q) (hi := by simp [hblenk, hq])
+        simpa only [List.getElem_map, List.getElem_range] using hm
+      have hhigh : (List.range b.len.val).map (fun q => coeffFn b q * pointFn w 0 k.val) =
+          (List.range (2 ^ k.val)).map (fun q => monoProd k.val q (pointFn w 0) * pointFn w 0 k.val) := by
+        change (List.range b.val.length).map _ = _
+        rw [hblenk]
+        apply List.map_congr_left
+        intro q hq
+        rw [hcoeff q (List.mem_range.mp hq)]
+      have hmapnext : b2.val.map toExt = (List.range (2 ^ (k.val + 1))).map
+          (fun q => monoProd (k.val + 1) q (pointFn w 0)) := by
+        calc
+          b2.val.map toExt = b.val.map toExt ++
+              (List.range b.len.val).map (fun q => coeffFn b q * pointFn w 0 k.val) := hmap2
+          _ = (List.range (2 ^ k.val)).map (fun q => monoProd k.val q (pointFn w 0)) ++
+              (List.range (2 ^ k.val)).map
+                (fun q => monoProd k.val q (pointFn w 0) * pointFn w 0 k.val) := by
+                rw [hrelk, hhigh]
+          _ = _ := mono_extend_map k.val (pointFn w 0)
+      have hlen2 : b2.val.length = 2 ^ (k.val + 1) := by
+        have h := congrArg List.length hmapnext
+        simpa using h
+      refine ⟨by scalar_tac, hb2, ?_, ?_, ?_⟩
+      · simpa [hk2] using hmapnext
+      · simpa [hk2] using hlen2
+      · scalar_tac
     · rw [if_neg hlt]
       have heq : k.val = nn.val := by scalar_tac
-      exact ⟨ha, by simpa [heq] using hv⟩
-  · exact ⟨hj, hacc, hm, hval⟩
-
-theorem monomial_basis_loop_spec (w : Slice cpoly.field.Ext4) (nn sz : Std.Usize)
-    (hw : VecReduced w) (hnn : nn.val = w.val.length) :
-    ∀ (basis : alloc.vec.Vec cpoly.field.Ext4) (i : Std.Usize),
-      i.val ≤ sz.val → VecReduced basis →
-      basis.val.map toExt
-        = (List.range i.val).map (fun k => monoProd nn.val k (pointFn w 0)) →
-      cpoly.multilinear.monomial_basis_loop0 w nn sz basis i ⦃ z => VecReduced z ∧
-        z.val.map toExt
-          = (List.range sz.val).map (fun k => monoProd nn.val k (pointFn w 0)) ⦄ := by
-  intro basis i hi hb hrel
-  rw [cpoly.multilinear.monomial_basis_loop0]
-  apply loop.spec_decr_nat (fun s => sz.val - s.2.val)
-    (fun s => s.2.val ≤ sz.val ∧ VecReduced s.1 ∧
-      s.1.val.map toExt = (List.range s.2.val).map (fun k => monoProd nn.val k (pointFn w 0)))
-  · rintro ⟨b, k⟩ ⟨hk, hb1, hrel1⟩
-    simp only [cpoly.multilinear.monomial_basis_loop0.body]
-    by_cases hlt : k < sz
-    · rw [if_pos hlt]
-      have hblen : b.val.length = k.val := by
-        have h := congrArg List.length hrel1; simpa using h
-      apply spec_bind (monomial_basis_inner_spec w nn k.val hw hnn cpoly.field.Ext4.ONE k 0#usize
-        (by simp) reduced_ONE (by simp) (by simp))
-      rintro acc ⟨haccR, haccF⟩
-      step as ⟨b2, hb2⟩
-      step as ⟨k2, hk2⟩
-      refine ⟨by scalar_tac, ?_, ?_, ?_⟩
-      · intro u hu; rw [hb2] at hu
-        rcases List.mem_append.mp hu with h | h
-        · exact hb1 u h
-        · rw [List.mem_singleton.mp h]; exact haccR
-      · rw [hb2, hk2, List.range_succ]
-        simp [hrel1, haccF]
-      · have : k.val < sz.val := by scalar_tac
-        omega
-    · rw [if_neg hlt]
-      have heq : k.val = sz.val := by scalar_tac
       exact ⟨hb1, by simpa [heq] using hrel1⟩
-  · exact ⟨hi, hb, hrel⟩
+  · exact ⟨hj, hb, hrel, hblen⟩
 
 /-- `cpoly::multilinear::monomial_basis` ↔ `CMlPolynomial.monomialBasis`. -/
 theorem monomial_basis_spec (n : ℕ) (w : Slice cpoly.field.Ext4)
@@ -1188,13 +1385,18 @@ theorem monomial_basis_spec (n : ℕ) (w : Slice cpoly.field.Ext4)
   rw [cpoly.multilinear.monomial_basis]
   apply spec_bind (pow2_spec (alloc.vec.Vec.len w) (by simpa [hwl] using hsz))
   intro sz hsz'
-  apply spec_mono (monomial_basis_loop_spec w w.len sz hw (by simp)
-    (alloc.vec.Vec.new cpoly.field.Ext4) 0#usize (by simp) (by intro u hu; simp at hu) (by simp))
+  simp only [alloc.vec.Vec.with_capacity]
+  apply spec_bind (alloc.vec.Vec.push_spec (alloc.vec.Vec.new cpoly.field.Ext4)
+    cpoly.field.Ext4.ONE (by scalar_tac))
+  rintro basis hpush
+  apply spec_mono (monomial_basis_loop_spec w w.len hw (by simp) (by simpa [hwl] using hsz)
+    basis 0#usize (by simp)
+    (by intro u hu; rw [hpush] at hu; simp at hu; exact hu ▸ reduced_ONE)
+    (by rw [hpush]; simp [monoProd_zero, toExt_ONE]) (by simp [hpush]))
   rintro z ⟨hz, hmap⟩
-  have hszn : sz.val = 2 ^ n := by simpa [hwl] using hsz'
   have hlen : z.val.length = 2 ^ n := by
     have h := congrArg List.length hmap
-    simpa [hszn] using h
+    simpa [hwl] using h
   refine ⟨hz, hlen, ?_⟩
   apply Vector.ext
   intro i hi
@@ -1208,135 +1410,222 @@ theorem monomial_basis_spec (n : ℕ) (w : Slice cpoly.field.Ext4)
 
 /-! ## `lagrange_basis` -/
 
-theorem lagrange_basis_inner_spec (w : Slice cpoly.field.Ext4) (nn : Std.Usize) (idx : ℕ)
-    (hw : VecReduced w) (hnn : nn.val = w.val.length) :
-    ∀ (acc : cpoly.field.Ext4) (m j : Std.Usize),
-      j.val ≤ nn.val → Reduced acc → m.val = idx / 2 ^ j.val →
-      toExt acc = lagProd j.val idx (pointFn w 0) →
-      cpoly.multilinear.lagrange_basis_loop0_loop0 w nn acc m j ⦃ z => Reduced z ∧
-        toExt z = lagProd nn.val idx (pointFn w 0) ⦄ := by
-  intro acc m j hj hacc hm hval
+set_option maxHeartbeats 1000000 in
+theorem lagrange_basis_low_spec (basis next : alloc.vec.Vec cpoly.field.Ext4)
+    (one_minus : cpoly.field.Ext4) (half : Std.Usize) (hb : VecReduced basis)
+    (hn : VecReduced next) (hblen : basis.val.length = half.val)
+    (hbound : next.val.length + half.val ≤ Std.Usize.max) (hr : Reduced one_minus) :
+    cpoly.multilinear.lagrange_basis_loop0_loop0 basis one_minus half next 0#usize ⦃ z =>
+      VecReduced z ∧ z.val.map toExt = next.val.map toExt ++
+        (List.range half.val).map (fun k => coeffFn basis k * toExt one_minus) ⦄ := by
   rw [cpoly.multilinear.lagrange_basis_loop0_loop0]
-  apply loop.spec_decr_nat (fun s => nn.val - s.2.2.val)
-    (fun s => s.2.2.val ≤ nn.val ∧ Reduced s.1 ∧ s.2.1.val = idx / 2 ^ s.2.2.val ∧
-      toExt s.1 = lagProd s.2.2.val idx (pointFn w 0))
-  · rintro ⟨a, q, k⟩ ⟨hk, ha, hq, hv⟩
-    simp only [Prod.fst, Prod.snd] at hk ha hq hv
+  apply loop.spec_decr_nat (fun s => half.val - s.2.val)
+    (fun s => s.2.val ≤ half.val ∧ VecReduced s.1 ∧
+      s.1.val.map toExt = next.val.map toExt ++
+        (List.range s.2.val).map (fun k => coeffFn basis k * toExt one_minus))
+  · rintro ⟨cur, i⟩ ⟨hi, hcur, hrel⟩
+    simp only [Prod.fst, Prod.snd] at hi hcur hrel
     simp only [cpoly.multilinear.lagrange_basis_loop0_loop0.body]
+    by_cases hlt : i < half
+    · rw [if_pos hlt]
+      have hcurlen : cur.val.length = next.val.length + i.val := by
+        have h := congrArg List.length hrel
+        simpa using h
+      have hib : i.val < basis.val.length := by scalar_tac
+      step as ⟨old, hold⟩
+      have holdR : Reduced old := hold ▸ hb _ (List.getElem_mem hib)
+      have holdF : toExt old = coeffFn basis i.val := by
+        rw [hold, coeffFn_of_lt basis hib]
+      apply spec_bind (ext_mul_spec old one_minus holdR hr)
+      rintro product ⟨hproductR, hproductF⟩
+      have hpushbound : cur.val.length < Std.Usize.max := by scalar_tac
+      apply spec_bind (alloc.vec.Vec.push_spec cur product hpushbound)
+      rintro cur2 hpush
+      step as ⟨i2, hi2⟩
+      refine ⟨by scalar_tac, ?_, ?_, ?_⟩
+      · intro u hu
+        rw [hpush] at hu
+        rcases List.mem_append.mp hu with hu | hu
+        · exact hcur u hu
+        · rw [List.mem_singleton.mp hu]
+          exact hproductR
+      · rw [hi2, List.range_succ, hpush, List.map_append, hrel, List.map_append]
+        simp only [List.map_cons, List.map_nil]
+        rw [hproductF, holdF]
+        simp [List.append_assoc]
+      · scalar_tac
+    · rw [if_neg hlt]
+      have heq : i.val = half.val := by scalar_tac
+      exact ⟨hcur, by simpa [heq] using hrel⟩
+  · exact ⟨by simp, hn, by simp⟩
+
+set_option maxHeartbeats 1000000 in
+theorem lagrange_basis_high_spec (w : Slice cpoly.field.Ext4)
+    (basis next : alloc.vec.Vec cpoly.field.Ext4) (j half : Std.Usize)
+    (hw : VecReduced w) (hb : VecReduced basis) (hn : VecReduced next)
+    (hjw : j.val < w.val.length) (hblen : basis.val.length = half.val)
+    (hbound : next.val.length + half.val ≤ Std.Usize.max) :
+    cpoly.multilinear.lagrange_basis_loop0_loop1 w basis j half next 0#usize ⦃ z =>
+      VecReduced z ∧ z.val.map toExt = next.val.map toExt ++
+        (List.range half.val).map (fun k => coeffFn basis k * pointFn w 0 j.val) ⦄ := by
+  rw [cpoly.multilinear.lagrange_basis_loop0_loop1]
+  apply loop.spec_decr_nat (fun s => half.val - s.2.val)
+    (fun s => s.2.val ≤ half.val ∧ VecReduced s.1 ∧
+      s.1.val.map toExt = next.val.map toExt ++
+        (List.range s.2.val).map (fun k => coeffFn basis k * pointFn w 0 j.val))
+  · rintro ⟨cur, i⟩ ⟨hi, hcur, hrel⟩
+    simp only [Prod.fst, Prod.snd] at hi hcur hrel
+    simp only [cpoly.multilinear.lagrange_basis_loop0_loop1.body]
+    by_cases hlt : i < half
+    · rw [if_pos hlt]
+      have hcurlen : cur.val.length = next.val.length + i.val := by
+        have h := congrArg List.length hrel
+        simpa using h
+      have hib : i.val < basis.val.length := by scalar_tac
+      step as ⟨old, hold⟩
+      have holdR : Reduced old := hold ▸ hb _ (List.getElem_mem hib)
+      have holdF : toExt old = coeffFn basis i.val := by
+        rw [hold, coeffFn_of_lt basis hib]
+      step as ⟨x, hx⟩
+      have hxR : Reduced x := hx ▸ hw _ (List.getElem_mem hjw)
+      have hxF0 : toExt x = pointFn w j.val 0 := by
+        calc
+          toExt x = toExt w.val[j.val] := by rw [hx]
+          _ = pointFn w j.val 0 := (pointFn_of_lt w j.val (k := 0) hjw).symm
+      have hxF : toExt x = pointFn w 0 j.val := hxF0.trans (pointFn_offset_zero w j.val)
+      apply spec_bind (ext_mul_spec old x holdR hxR)
+      rintro product ⟨hproductR, hproductF⟩
+      have hpushbound : cur.val.length < Std.Usize.max := by scalar_tac
+      apply spec_bind (alloc.vec.Vec.push_spec cur product hpushbound)
+      rintro cur2 hpush
+      step as ⟨i2, hi2⟩
+      refine ⟨by scalar_tac, ?_, ?_, ?_⟩
+      · intro u hu
+        rw [hpush] at hu
+        rcases List.mem_append.mp hu with hu | hu
+        · exact hcur u hu
+        · rw [List.mem_singleton.mp hu]
+          exact hproductR
+      · rw [hi2, List.range_succ, hpush, List.map_append, hrel, List.map_append]
+        simp only [List.map_cons, List.map_nil]
+        rw [hproductF, holdF, hxF]
+        simp [List.append_assoc]
+      · scalar_tac
+    · rw [if_neg hlt]
+      have heq : i.val = half.val := by scalar_tac
+      exact ⟨hcur, by simpa [heq] using hrel⟩
+  · exact ⟨by simp, hn, by simp⟩
+
+set_option maxHeartbeats 1000000 in
+theorem lagrange_basis_loop_spec (w : Slice cpoly.field.Ext4) (nn : Std.Usize)
+    (hw : VecReduced w) (hnn : nn.val = w.val.length) (hmax : 2 ^ nn.val ≤ Std.Usize.max) :
+    ∀ (basis : alloc.vec.Vec cpoly.field.Ext4) (j : Std.Usize),
+      j.val ≤ nn.val → VecReduced basis →
+      basis.val.map toExt = (List.range (2 ^ j.val)).map
+        (fun k => lagProd j.val k (pointFn w 0)) →
+      basis.val.length = 2 ^ j.val →
+      cpoly.multilinear.lagrange_basis_loop0 w nn basis j ⦃ z => VecReduced z ∧
+        z.val.map toExt = (List.range (2 ^ nn.val)).map
+          (fun k => lagProd nn.val k (pointFn w 0)) ⦄ := by
+  intro basis j hj hb hrel hblen
+  rw [cpoly.multilinear.lagrange_basis_loop0]
+  apply loop.spec_decr_nat (fun s => nn.val - s.2.val)
+    (fun s => s.2.val ≤ nn.val ∧ VecReduced s.1 ∧
+      s.1.val.map toExt = (List.range (2 ^ s.2.val)).map
+        (fun k => lagProd s.2.val k (pointFn w 0)) ∧ s.1.val.length = 2 ^ s.2.val)
+  · rintro ⟨b, k⟩ ⟨hk, hb1, hrel1, hblen1⟩
+    have hrelk : b.val.map toExt = (List.range (2 ^ k.val)).map
+        (fun q => lagProd k.val q (pointFn w 0)) := by
+      simpa only [Prod.fst, Prod.snd] using hrel1
+    have hblenk : b.val.length = 2 ^ k.val := by
+      simpa only [Prod.fst, Prod.snd] using hblen1
+    simp only [cpoly.multilinear.lagrange_basis_loop0.body]
     by_cases hlt : k < nn
     · rw [if_pos hlt]
-      step as ⟨bit, hbit⟩
-      have hbitiff : bit = 1#usize ↔ Nat.testBit idx k.val = true := by
-        constructor
-        · intro hb
-          rw [testBit_eq_div_pow_mod, decide_eq_true_eq]
-          scalar_tac
-        · intro ht
-          apply usize_eq_of_val_eq
-          rw [testBit_eq_div_pow_mod, decide_eq_true_eq] at ht
-          scalar_tac
       have hkw : k.val < w.val.length := by scalar_tac
-      by_cases hb : bit = 1#usize
-      · rw [if_pos hb]
-        step as ⟨x, hxw⟩
-        have hxR : Reduced x := hxw ▸ hw _ (List.getElem_mem hkw)
-        step as ⟨a2, ha2R, ha2F⟩
-        step as ⟨q2, hq2⟩
-        step as ⟨k2, hk2⟩
-        refine ⟨by scalar_tac, ha2R, ?_, ?_, ?_⟩
-        · rw [hq2, hq, Nat.div_div_eq_div_mul]
-          congr 2
-          scalar_tac
-        · apply Eq.trans (b := lagProd (k.val + 1) idx (pointFn w 0))
-          · unfold lagProd at hv ⊢
-            calc
-              toExt a2 = toExt a * toExt x := ha2F
-              _ = (∏ l ∈ Finset.range k.val,
-                    if Nat.testBit idx l then pointFn w 0 l else 1 - pointFn w 0 l) * toExt x := by rw [hv]
-              _ = ∏ l ∈ Finset.range (k.val + 1),
-                    (if Nat.testBit idx l then pointFn w 0 l else 1 - pointFn w 0 l) := by
-                    rw [Finset.prod_range_succ]
-                    have ht := hbitiff.mp hb
-                    rw [if_pos ht]
-                    simp [hxw, pointFn_of_lt w 0 (by simpa using hkw)]
-          · congr 2
-            exact hk2.symm
-        · have : k.val < nn.val := by scalar_tac
-          omega
-      · rw [if_neg hb]
-        step as ⟨x, hxw⟩
-        have hxR : Reduced x := hxw ▸ hw _ (List.getElem_mem hkw)
-        have hone : Reduced cpoly.field.Ext4.ONE := reduced_ONE
-        step as ⟨oneMinus, homR, homF⟩
-        step as ⟨a2, ha2R, ha2F⟩
-        step as ⟨q2, hq2⟩
-        step as ⟨k2, hk2⟩
-        refine ⟨by scalar_tac, ha2R, ?_, ?_, ?_⟩
-        · rw [hq2, hq, Nat.div_div_eq_div_mul]
-          congr 2
-          scalar_tac
-        · apply Eq.trans (b := lagProd (k.val + 1) idx (pointFn w 0))
-          · unfold lagProd at hv ⊢
-            calc
-              toExt a2 = toExt a * toExt oneMinus := ha2F
-              _ = (∏ l ∈ Finset.range k.val,
-                    if Nat.testBit idx l then pointFn w 0 l else 1 - pointFn w 0 l) *
-                    (1 - toExt x) := by simp [hv, homF]
-              _ = ∏ l ∈ Finset.range (k.val + 1),
-                    (if Nat.testBit idx l then pointFn w 0 l else 1 - pointFn w 0 l) := by
-                    rw [Finset.prod_range_succ]
-                    have ht : Nat.testBit idx k.val = false := by
-                      apply Bool.eq_false_iff.mpr
-                      intro ht
-                      exact hb (hbitiff.mpr ht)
-                    simp [ht, hxw, pointFn_of_lt w 0 (by simpa using hkw)]
-          · congr 2
-            exact hk2.symm
-        · have : k.val < nn.val := by scalar_tac
-          omega
+      step as ⟨x, hx⟩
+      have hxR : Reduced x := hx ▸ hw _ (List.getElem_mem hkw)
+      have hxF0 : toExt x = pointFn w k.val 0 := by
+        calc
+          toExt x = toExt w.val[k.val] := by rw [hx]
+          _ = pointFn w k.val 0 := (pointFn_of_lt w k.val (k := 0) hkw).symm
+      have hxF : toExt x = pointFn w 0 k.val := hxF0.trans (pointFn_offset_zero w k.val)
+      apply spec_bind (ext_sub_spec cpoly.field.Ext4.ONE x reduced_ONE hxR)
+      rintro one_minus ⟨homR, homF⟩
+      have hOneF : toExt one_minus = 1 - pointFn w 0 k.val := by
+        rw [homF, hxF, toExt_ONE]
+      have hcap : 2 * b.len.val ≤ Std.Usize.max := by
+        change 2 * b.val.length ≤ Std.Usize.max
+        calc
+          2 * b.val.length = 2 ^ (k.val + 1) := by rw [hblenk, pow_succ]; omega
+          _ ≤ 2 ^ nn.val := Nat.pow_le_pow_right (by omega) (by omega)
+          _ ≤ Std.Usize.max := hmax
+      step as ⟨capacity, hcapacity⟩
+      simp only [alloc.vec.Vec.with_capacity]
+      apply spec_bind (lagrange_basis_low_spec b (alloc.vec.Vec.new cpoly.field.Ext4) one_minus b.len
+        hb1 (by intro u hu; simp at hu) (by rfl) (by scalar_tac) homR)
+      rintro low ⟨hlow, hlowmap⟩
+      have hlowlen : low.val.length = 2 ^ k.val := by
+        have h := congrArg List.length hlowmap
+        simp only [List.length_map, List.length_append, List.length_range] at h
+        calc
+          low.val.length = [].length + b.len.val := h
+          _ = b.val.length := by simp
+          _ = 2 ^ k.val := hblenk
+      have hhighbound : low.val.length + b.len.val ≤ Std.Usize.max := by
+        change low.val.length + b.val.length ≤ Std.Usize.max
+        calc
+          low.val.length + b.val.length = 2 ^ (k.val + 1) := by rw [hlowlen, hblenk, pow_succ]; omega
+          _ ≤ 2 ^ nn.val := Nat.pow_le_pow_right (by omega) (by omega)
+          _ ≤ Std.Usize.max := hmax
+      apply spec_bind (lagrange_basis_high_spec w b low k b.len hw hb1 hlow hkw (by rfl) hhighbound)
+      rintro b2 ⟨hb2, hmap2⟩
+      step as ⟨k2, hk2⟩
+      have hlowmap' : low.val.map toExt = (List.range (2 ^ k.val)).map
+          (fun q => lagProd k.val q (pointFn w 0) * (1 - pointFn w 0 k.val)) := by
+        rw [hlowmap]
+        change [] ++ (List.range b.val.length).map
+          (fun q => coeffFn b q * toExt one_minus) = _
+        simp only [List.nil_append]
+        rw [hblenk]
+        apply List.map_congr_left
+        intro q hq
+        rw [coeffFn_of_lt b (by rw [hblenk]; exact List.mem_range.mp hq)]
+        have hm := getElem_of_list_eq hrelk (i := q)
+          (hi := by simp [hblenk, List.mem_range.mp hq])
+        simp only [List.getElem_map, List.getElem_range] at hm
+        rw [hm, hOneF]
+      have hhigh : (List.range b.len.val).map (fun q => coeffFn b q * pointFn w 0 k.val) =
+          (List.range (2 ^ k.val)).map (fun q => lagProd k.val q (pointFn w 0) * pointFn w 0 k.val) := by
+        change (List.range b.val.length).map _ = _
+        rw [hblenk]
+        apply List.map_congr_left
+        intro q hq
+        rw [coeffFn_of_lt b (by rw [hblenk]; exact List.mem_range.mp hq)]
+        have hm := getElem_of_list_eq hrelk (i := q) (hi := by simp [hblenk, List.mem_range.mp hq])
+        simp only [List.getElem_map, List.getElem_range] at hm
+        rw [hm]
+      have hmapnext : b2.val.map toExt = (List.range (2 ^ (k.val + 1))).map
+          (fun q => lagProd (k.val + 1) q (pointFn w 0)) := by
+        calc
+          b2.val.map toExt = low.val.map toExt ++
+              (List.range b.len.val).map (fun q => coeffFn b q * pointFn w 0 k.val) := hmap2
+          _ = (List.range (2 ^ k.val)).map
+                (fun q => lagProd k.val q (pointFn w 0) * (1 - pointFn w 0 k.val)) ++
+              (List.range (2 ^ k.val)).map
+                (fun q => lagProd k.val q (pointFn w 0) * pointFn w 0 k.val) := by rw [hlowmap', hhigh]
+          _ = _ := lag_extend_map k.val (pointFn w 0)
+      have hlen2 : b2.val.length = 2 ^ (k.val + 1) := by
+        have h := congrArg List.length hmapnext
+        simpa using h
+      refine ⟨by scalar_tac, hb2, ?_, ?_, ?_⟩
+      · simpa [hk2] using hmapnext
+      · simpa [hk2] using hlen2
+      · scalar_tac
     · rw [if_neg hlt]
       have heq : k.val = nn.val := by scalar_tac
-      exact ⟨ha, by simpa [heq] using hv⟩
-  · exact ⟨hj, hacc, hm, hval⟩
-
-theorem lagrange_basis_loop_spec (w : Slice cpoly.field.Ext4) (nn sz : Std.Usize)
-    (hw : VecReduced w) (hnn : nn.val = w.val.length) :
-    ∀ (basis : alloc.vec.Vec cpoly.field.Ext4) (i : Std.Usize),
-      i.val ≤ sz.val → VecReduced basis →
-      basis.val.map toExt
-        = (List.range i.val).map (fun k => lagProd nn.val k (pointFn w 0)) →
-      cpoly.multilinear.lagrange_basis_loop0 w nn sz basis i ⦃ z => VecReduced z ∧
-        z.val.map toExt
-          = (List.range sz.val).map (fun k => lagProd nn.val k (pointFn w 0)) ⦄ := by
-  intro basis i hi hb hrel
-  rw [cpoly.multilinear.lagrange_basis_loop0]
-  apply loop.spec_decr_nat (fun s => sz.val - s.2.val)
-    (fun s => s.2.val ≤ sz.val ∧ VecReduced s.1 ∧
-      s.1.val.map toExt = (List.range s.2.val).map (fun k => lagProd nn.val k (pointFn w 0)))
-  · rintro ⟨b, k⟩ ⟨hk, hb1, hrel1⟩
-    simp only [cpoly.multilinear.lagrange_basis_loop0.body]
-    by_cases hlt : k < sz
-    · rw [if_pos hlt]
-      have hblen : b.val.length = k.val := by
-        have h := congrArg List.length hrel1; simpa using h
-      apply spec_bind (lagrange_basis_inner_spec w nn k.val hw hnn cpoly.field.Ext4.ONE k 0#usize
-        (by simp) reduced_ONE (by simp) (by simp))
-      rintro acc ⟨haccR, haccF⟩
-      step as ⟨b2, hb2⟩
-      step as ⟨k2, hk2⟩
-      refine ⟨by scalar_tac, ?_, ?_, ?_⟩
-      · intro u hu; rw [hb2] at hu
-        rcases List.mem_append.mp hu with h | h
-        · exact hb1 u h
-        · rw [List.mem_singleton.mp h]; exact haccR
-      · rw [hb2, hk2, List.range_succ]
-        simp [hrel1, haccF]
-      · have : k.val < sz.val := by scalar_tac
-        omega
-    · rw [if_neg hlt]
-      have heq : k.val = sz.val := by scalar_tac
       exact ⟨hb1, by simpa [heq] using hrel1⟩
-  · exact ⟨hi, hb, hrel⟩
+  · exact ⟨hj, hb, hrel, hblen⟩
 
 /-- `cpoly::multilinear::lagrange_basis` ↔ `CMlPolynomialEval.lagrangeBasis`. -/
 theorem lagrange_basis_spec (n : ℕ) (w : Slice cpoly.field.Ext4)
@@ -1347,13 +1636,18 @@ theorem lagrange_basis_spec (n : ℕ) (w : Slice cpoly.field.Ext4)
   simp only [bind_ok_id]
   apply spec_bind (pow2_spec (alloc.vec.Vec.len w) (by simpa [hwl] using hsz))
   intro sz hsz'
-  apply spec_mono (lagrange_basis_loop_spec w w.len sz hw (by simp)
-    (alloc.vec.Vec.new cpoly.field.Ext4) 0#usize (by simp) (by intro u hu; simp at hu) (by simp))
+  simp only [alloc.vec.Vec.with_capacity]
+  apply spec_bind (alloc.vec.Vec.push_spec (alloc.vec.Vec.new cpoly.field.Ext4)
+    cpoly.field.Ext4.ONE (by scalar_tac))
+  rintro basis hpush
+  apply spec_mono (lagrange_basis_loop_spec w w.len hw (by simp) (by simpa [hwl] using hsz)
+    basis 0#usize (by simp)
+    (by intro u hu; rw [hpush] at hu; simp at hu; exact hu ▸ reduced_ONE)
+    (by rw [hpush]; simp [lagProd_zero, toExt_ONE]) (by simp [hpush]))
   rintro z ⟨hz, hmap⟩
-  have hszn : sz.val = 2 ^ n := by simpa [hwl] using hsz'
   have hlen : z.val.length = 2 ^ n := by
     have h := congrArg List.length hmap
-    simpa [hszn] using h
+    simpa [hwl] using h
   refine ⟨hz, hlen, ?_⟩
   apply Vector.ext
   intro i hi
@@ -1470,21 +1764,99 @@ theorem eval_lagrange_spec (n : ℕ) (p : alloc.vec.Vec cpoly.field.Ext4) (w : S
   change (toMlEval n basis)[k] = _
   rw [hb.2.2, lagrangeBasis_getElem']
 
+/-- The first direct-product loop reaches the common arity and accumulates every factor. -/
+theorem eq_tilde_loop0_spec (w x : Slice cpoly.field.Ext4) (n : Std.Usize)
+    (hw : VecReduced w) (hx : VecReduced x)
+    (hn : n.val = w.val.length) (hxl : x.val.length = n.val) :
+    ∀ (acc : cpoly.field.Ext4) (i : Std.Usize), i.val ≤ n.val → Reduced acc →
+      toExt acc = eqProd i.val (pointFn w 0) (pointFn x 0) →
+      cpoly.multilinear.eq_tilde_loop0 w x n acc i ⦃ z =>
+        Reduced z.1 ∧ z.2.val = n.val ∧
+          toExt z.1 = eqProd n.val (pointFn w 0) (pointFn x 0) ⦄ := by
+  intro acc i hi hacc hval
+  rw [cpoly.multilinear.eq_tilde_loop0]
+  apply loop.spec_decr_nat (fun s => n.val - s.2.val)
+    (fun s => s.2.val ≤ n.val ∧ Reduced s.1 ∧
+      toExt s.1 = eqProd s.2.val (pointFn w 0) (pointFn x 0))
+  · rintro ⟨a, k⟩ ⟨hk, ha, hv⟩
+    simp only [Prod.fst, Prod.snd] at hk ha hv
+    simp only [cpoly.multilinear.eq_tilde_loop0.body]
+    by_cases hlt : k < n
+    · rw [if_pos hlt]
+      have hkx : k.val < x.val.length := by scalar_tac
+      have hkw : k.val < w.val.length := by scalar_tac
+      step as ⟨xe, hxe⟩
+      have hxeR : Reduced xe := hxe ▸ hx _ (List.getElem_mem hkx)
+      step as ⟨we, hwe⟩
+      have hweR : Reduced we := hwe ▸ hw _ (List.getElem_mem hkw)
+      apply spec_bind (ext_mul_spec xe we hxeR hweR)
+      rintro product ⟨hproductR, hproductF⟩
+      apply spec_bind (ext_sub_spec cpoly.field.Ext4.ONE xe reduced_ONE hxeR)
+      rintro oneMinusX ⟨honeMinusXR, honeMinusXF⟩
+      apply spec_bind (ext_sub_spec oneMinusX we honeMinusXR hweR)
+      rintro oneMinusXMinusW ⟨honeMinusXMinusWR, honeMinusXMinusWF⟩
+      apply spec_bind (ext_add_spec oneMinusXMinusW product honeMinusXMinusWR hproductR)
+      rintro withProduct ⟨hwithProductR, hwithProductF⟩
+      apply spec_bind (ext_add_spec withProduct product hwithProductR hproductR)
+      rintro factor ⟨hfactorR, hfactorF⟩
+      apply spec_bind (ext_mul_assign_spec a factor ha hfactorR)
+      rintro a2 ⟨ha2R, ha2F⟩
+      step as ⟨k2, hk2⟩
+      refine ⟨by scalar_tac, ha2R, ?_, ?_⟩
+      · calc
+          toExt a2 = toExt a * toExt factor := ha2F
+          _ = eqProd k.val (pointFn w 0) (pointFn x 0) * toExt factor := by rw [hv]
+          _ = eqProd (k.val + 1) (pointFn w 0) (pointFn x 0) := by
+            unfold eqProd
+            rw [Finset.prod_range_succ]
+            unfold eqFactor
+            rw [hfactorF, hwithProductF, honeMinusXMinusWF, honeMinusXF, hproductF]
+            rw [hxe, hwe, pointFn_of_lt x 0 (by simpa using hkx),
+              pointFn_of_lt w 0 (by simpa using hkw), toExt_ONE]
+            ring
+          _ = eqProd k2.val (pointFn w 0) (pointFn x 0) := by
+            congr 2
+            exact hk2.symm
+      · scalar_tac
+    · rw [if_neg hlt]
+      have heq : k.val = n.val := by scalar_tac
+      exact ⟨ha, by simpa [heq], by simpa [heq] using hv⟩
+  · exact ⟨hi, hacc, hval⟩
+
+/-- The compatibility tail is empty when the points have the same arity. -/
+theorem eq_tilde_loop1_done_spec (x : Slice cpoly.field.Ext4)
+    (acc : cpoly.field.Ext4) (i : Std.Usize) (hi : x.val.length ≤ i.val) :
+    cpoly.multilinear.eq_tilde_loop1 x acc i ⦃ z => z = acc ⦄ := by
+  rw [cpoly.multilinear.eq_tilde_loop1]
+  apply loop.spec_decr_nat (fun _ => 0)
+    (fun s => s.1 = acc ∧ x.val.length ≤ s.2.val)
+  · rintro ⟨a, k⟩ ⟨ha, hk⟩
+    simp only [cpoly.multilinear.eq_tilde_loop1.body]
+    have hlt : ¬ k < Slice.len x := by scalar_tac
+    rw [if_neg hlt]
+    simp only [spec_ok]
+    exact ha
+  · exact ⟨rfl, hi⟩
+
 /-- `cpoly::multilinear::eq_tilde` ↔ `CMlPolynomialEval.eqTilde`. -/
 theorem eq_tilde_spec (n : ℕ) (w x : Slice cpoly.field.Ext4)
     (hw : VecReduced w) (hx : VecReduced x)
-    (hwl : w.val.length = n) (hxl : x.val.length = n)
-    (hsz : 2 ^ n ≤ Std.Usize.max) :
+    (hwl : w.val.length = n) (hxl : x.val.length = n) :
     cpoly.multilinear.eq_tilde w x ⦃ z => Reduced z ∧
       toExt z = CMlPolynomialEval.eqTilde (toPoint n w) (toPoint n x) ⦄ := by
   rw [cpoly.multilinear.eq_tilde]
-  apply spec_bind (lagrange_basis_spec n w hw hwl hsz)
-  intro b hb
-  apply spec_mono (eval_lagrange_spec n b x hb.1 hx hb.2.1 hxl)
+  apply spec_bind (eq_tilde_loop0_spec w x (Slice.len w) hw hx (by simp)
+    (by simpa [hwl] using hxl) cpoly.field.Ext4.ONE 0#usize (by simp) reduced_ONE (by simp [eqProd]))
+  rintro ⟨acc, i⟩ ⟨hacc, hi, hval⟩
+  have hilen : i.val = w.val.length := by simpa using hi
+  have hxwlen : x.val.length = w.val.length := hxl.trans hwl.symm
+  apply spec_mono (eq_tilde_loop1_done_spec x acc i
+    (le_of_eq (hxwlen.trans hilen.symm)))
   intro z hz
-  refine ⟨hz.1, ?_⟩
-  rw [hz.2, hb.2.2]
-  rfl
+  rw [hz]
+  refine ⟨hacc, ?_⟩
+  rw [hval, eqTilde_eq_eqProd]
+  simp [hwl]
 
 /-! ## `eval_horner` -/
 
@@ -1665,14 +2037,14 @@ theorem eval_horner_spec (n : ℕ) (p : alloc.vec.Vec cpoly.field.Ext4) (w : Sli
 /-! ## `eval_mle` -/
 
 theorem eval_mle_layer_loop_spec (c : Slice cpoly.field.Ext4)
-    (x0 one_minus : cpoly.field.Ext4)
-    (half : Std.Usize) (hc : VecReduced c) (hx : Reduced x0) (hom : Reduced one_minus)
-    (homF : toExt one_minus = 1 - toExt x0) (hhalf : 2 * half.val ≤ c.val.length) :
+    (x0 : cpoly.field.Ext4)
+    (half : Std.Usize) (hc : VecReduced c) (hx : Reduced x0)
+    (hhalf : 2 * half.val ≤ c.val.length) :
     ∀ (out : alloc.vec.Vec cpoly.field.Ext4) (j : Std.Usize),
       j.val ≤ half.val → VecReduced out →
       out.val.map toExt = (List.range j.val).map
         (fun k => (1 - toExt x0) * coeffFn c (2 * k) + toExt x0 * coeffFn c (2 * k + 1)) →
-      cpoly.multilinear.eval_mle_layer_loop c x0 half one_minus out j ⦃ z => VecReduced z ∧
+      cpoly.multilinear.eval_mle_layer_loop c x0 half out j ⦃ z => VecReduced z ∧
         z.val.map toExt = (List.range half.val).map
           (fun k => (1 - toExt x0) * coeffFn c (2 * k) + toExt x0 * coeffFn c (2 * k + 1)) ⦄ := by
   intro out j hj hout hrel
@@ -1697,8 +2069,8 @@ theorem eval_mle_layer_loop_spec (c : Slice cpoly.field.Ext4)
       have hhi' : i1.val < c.val.length := by scalar_tac
       have hloR : Reduced lo := hloeq ▸ hc _ (List.getElem_mem hlo')
       have hhiR : Reduced hiw := hhiweq ▸ hc _ (List.getElem_mem hhi')
-      step as ⟨a, haR, haF⟩
-      step as ⟨b, hbR, hbF⟩
+      step as ⟨d, hdR, hdF⟩
+      step as ⟨m, hmR, hmF⟩
       step as ⟨v, hvR, hvF⟩
       step as ⟨out2, hout2⟩
       step as ⟨j2, hj2⟩
@@ -1708,8 +2080,9 @@ theorem eval_mle_layer_loop_spec (c : Slice cpoly.field.Ext4)
         · exact hout1 u h
         · rw [List.mem_singleton.mp h]; exact hvR
       · rw [hout2, hj2, List.range_succ]
-        simp only [List.map_append, List.map_cons, List.map_nil, hrel1, hvF, haF, hbF, homF]
+        simp only [List.map_append, List.map_cons, List.map_nil, hrel1, hvF, hmF, hdF]
         simp [coeffFn, hlo, hhi, hi, hi1, hloeq, hhiweq]
+        ring
       · have : j1.val < half.val := by scalar_tac
         omega
     · rw [if_neg hlt]
@@ -1727,16 +2100,14 @@ theorem eval_mle_layer_spec (n : ℕ) (c : Slice cpoly.field.Ext4) (x0 : cpoly.f
             else 0 ⦄ := by
   rw [cpoly.multilinear.eval_mle_layer]
   step as ⟨half, hhalf⟩
-  have hone : Reduced cpoly.field.Ext4.ONE := reduced_ONE
-  step as ⟨one_minus, hom, homF⟩
   have hclen : c.len.val = 2 ^ (n + 1) := by simpa using hcl
   have hhalfval : half.val = 2 ^ n := by
     calc
       half.val = c.len.val / 2 := hhalf
       _ = 2 ^ (n + 1) / 2 := by rw [hclen]
       _ = 2 ^ n := by rw [pow_succ]; omega
-  apply spec_mono (eval_mle_layer_loop_spec c x0 one_minus half hc hx hom
-    (by simpa using homF) (by rw [hhalfval, hcl, pow_succ]; omega)
+  apply spec_mono (eval_mle_layer_loop_spec c x0 half hc hx
+    (by rw [hhalfval, hcl, pow_succ]; omega)
     (alloc.vec.Vec.new cpoly.field.Ext4) 0#usize (by simp) (by intro u hu; simp at hu) (by simp))
   rintro z ⟨hz, hmap⟩
   have hlen : z.val.length = 2 ^ n := by
@@ -1751,37 +2122,168 @@ theorem eval_mle_layer_spec (n : ℕ) (c : Slice cpoly.field.Ext4) (x0 : cpoly.f
     exact hm
   · rw [if_neg hk, coeffFn_of_ge z (by omega)]
 
-theorem eval_mle_loop1_spec (n : ℕ) (w : Slice cpoly.field.Ext4) (nn : Std.Usize)
+/- The storage-aware MLE path overwrites the low half of its owned table before
+   shrinking it.  The inner invariant records both the completed prefix and the
+   still-live source suffix, so reading `2*i` and `2*i+1` can never observe an
+   earlier write. -/
+theorem eval_mle_in_place_loop_spec (w : Slice cpoly.field.Ext4) (j half : Std.Usize)
+    (c : alloc.vec.Vec cpoly.field.Ext4) (hw : VecReduced w) (hc : VecReduced c)
+    (hjw : j.val < w.val.length) (hhalf : 2 * half.val ≤ c.val.length) :
+    cpoly.multilinear.MultilinearEvals.eval_mle_loop0_loop0 w c j half 0#usize
+      ⦃ z => VecReduced z ∧ z.val.length = c.val.length ∧ ∀ k, coeffFn z k =
+        if k < half.val then
+          coeffFn c (2 * k) + pointFn w j.val 0 *
+            (coeffFn c (2 * k + 1) - coeffFn c (2 * k))
+        else coeffFn c k ⦄ := by
+  rw [cpoly.multilinear.MultilinearEvals.eval_mle_loop0_loop0]
+  apply loop.spec_decr_nat (fun s => half.val - s.2.val)
+    (fun s => VecReduced s.1 ∧ s.1.val.length = c.val.length ∧ s.2.val ≤ half.val ∧
+      ∀ k, coeffFn s.1 k = if k < s.2.val then
+        coeffFn c (2 * k) + pointFn w j.val 0 *
+          (coeffFn c (2 * k + 1) - coeffFn c (2 * k))
+        else coeffFn c k)
+  · rintro ⟨cur, i⟩ ⟨hcur, hlen, hi, hfn⟩
+    simp only [Prod.fst, Prod.snd] at hcur hlen hi hfn
+    simp only [cpoly.multilinear.MultilinearEvals.eval_mle_loop0_loop0.body]
+    by_cases hlt : i < half
+    · rw [if_pos hlt]
+      step as ⟨i1, hi1⟩
+      have hi1val : i1.val = 2 * i.val := by scalar_tac
+      have hlow : i1.val < cur.val.length := by scalar_tac
+      step as ⟨lo, hlo⟩
+      step as ⟨i2, hi2⟩
+      have hi2val : i2.val = 2 * i.val + 1 := by scalar_tac
+      have hhigh : i2.val < cur.val.length := by scalar_tac
+      step as ⟨hiw, hhiw⟩
+      step as ⟨x, hx⟩
+      have hxR : Reduced x := hx ▸ hw _ (List.getElem_mem hjw)
+      have hloR : Reduced lo := hlo ▸ hcur _ (List.getElem_mem hlow)
+      have hhiR : Reduced hiw := hhiw ▸ hcur _ (List.getElem_mem hhigh)
+      have hloF : toExt lo = coeffFn c (2 * i.val) := by
+        calc
+          toExt lo = coeffFn cur i1.val := by rw [coeffFn_of_lt cur hlow, hlo]
+          _ = coeffFn c (2 * i.val) := by rw [hfn, if_neg (by omega), hi1val]
+      have hhiF : toExt hiw = coeffFn c (2 * i.val + 1) := by
+        calc
+          toExt hiw = coeffFn cur i2.val := by rw [coeffFn_of_lt cur hhigh, hhiw]
+          _ = coeffFn c (2 * i.val + 1) := by rw [hfn, if_neg (by omega), hi2val]
+      have hxF : toExt x = pointFn w j.val 0 := by
+        calc
+          toExt x = toExt w.val[j.val] := by rw [hx]
+          _ = pointFn w j.val 0 := (pointFn_of_lt w j.val (k := 0) (by omega)).symm
+      step as ⟨d, hdR, hdF⟩
+      step as ⟨m, hmR, hmF⟩
+      step as ⟨v, hvR, hvF⟩
+      step as ⟨_x, back, _hx, hback⟩
+      step as ⟨i3, hi3⟩
+      subst hback
+      have hset : (cur.set i v).val = cur.val.set i.val v := by simp
+      have hsetlen : (cur.set i v).val.length = c.val.length := by
+        rw [hset, List.length_set, hlen]
+      have hcoeff : ∀ k, coeffFn (cur.set i v) k =
+          if i.val = k then toExt v else coeffFn cur k := by
+        intro k
+        by_cases hk : k < cur.val.length
+        · rw [coeffFn_of_lt _ (by rw [hsetlen]; omega), coeffFn_of_lt cur hk,
+            getElem_of_list_eq hset, List.getElem_set]
+          split <;> rfl
+        · rw [coeffFn_of_ge _ (by omega), coeffFn_of_ge cur (by omega),
+            if_neg (by omega)]
+      refine ⟨?_, hsetlen, by scalar_tac, ?_⟩
+      · intro u hu
+        rw [hset] at hu
+        rcases List.mem_or_eq_of_mem_set hu with h | h
+        · exact hcur u h
+        · exact h ▸ hvR
+      · refine ⟨?_, by scalar_tac⟩
+        intro k
+        rw [hcoeff k]
+        by_cases hki : i.val = k
+        · subst k
+          rw [if_pos rfl, if_pos (by scalar_tac), hvF, hmF, hdF, hxF, hloF, hhiF]
+        · rw [if_neg hki, hfn k]
+          by_cases hki' : k < i.val
+          · rw [if_pos hki', if_pos (by scalar_tac)]
+          · rw [if_neg hki', if_neg (by omega)]
+    · rw [if_neg hlt]
+      have heq : i.val = half.val := by scalar_tac
+      refine ⟨hcur, hlen, ?_⟩
+      intro k
+      simpa [heq] using hfn k
+  · exact ⟨hc, rfl, by simp, fun k => by simp⟩
+
+theorem eval_mle_loop0_spec (n : ℕ) (w : Slice cpoly.field.Ext4) (nn : Std.Usize)
     (t : F) (hw : VecReduced w) (hwl : w.val.length = n) (hnn : nn.val = n) :
     ∀ (cur : alloc.vec.Vec cpoly.field.Ext4) (j : Std.Usize),
       j.val ≤ n → VecReduced cur → cur.val.length = 2 ^ (n - j.val) →
       mlValL (n - j.val) (coeffFn cur) (pointFn w j.val) = t →
-      cpoly.multilinear.MultilinearEvals.eval_mle_loop w nn cur j ⦃ z => VecReduced z ∧
+      cpoly.multilinear.MultilinearEvals.eval_mle_loop0 w nn cur j ⦃ z => VecReduced z ∧
         z.val.length = 1 ∧ coeffFn z 0 = t ⦄ := by
   intro cur j hj hcur hcurlen hval
-  rw [cpoly.multilinear.MultilinearEvals.eval_mle_loop]
+  rw [cpoly.multilinear.MultilinearEvals.eval_mle_loop0]
   apply loop.spec_decr_nat (fun s => n - s.2.val)
     (fun s => s.2.val ≤ n ∧ VecReduced s.1 ∧
       s.1.val.length = 2 ^ (n - s.2.val) ∧
       mlValL (n - s.2.val) (coeffFn s.1) (pointFn w s.2.val) = t)
   · rintro ⟨cur1, j1⟩ ⟨hj1, hcur1, hlen1, hval1⟩
-    simp only [Prod.fst, Prod.snd] at hj1 hcur1 hlen1 hval1
-    simp only [cpoly.multilinear.MultilinearEvals.eval_mle_loop.body]
+    simp only [cpoly.multilinear.MultilinearEvals.eval_mle_loop0.body]
     by_cases hlt : j1 < nn
     · rw [if_pos hlt]
       have hjn : j1.val < n := by scalar_tac
       have hjw : j1.val < w.val.length := by omega
-      step as ⟨x, hx⟩
-      have hxR : Reduced x := hx ▸ hw _ (List.getElem_mem hjw)
-      have hpow : cur1.val.length = 2 ^ ((n - (j1.val + 1)) + 1) := by
-        rw [hlen1]
-        congr 2
-        omega
-      apply spec_bind (eval_mle_layer_spec (n - (j1.val + 1)) cur1 x hcur1 hxR hpow)
+      step as ⟨half, hhalf⟩
+      have hhalfval : half.val = 2 ^ (n - (j1.val + 1)) := by
+        calc
+          half.val = cur1.val.length / 2 := hhalf
+          _ = 2 ^ (n - j1.val) / 2 := by rw [hlen1]
+          _ = 2 ^ (n - (j1.val + 1)) := by
+            rw [show n - j1.val = (n - (j1.val + 1)) + 1 by omega, pow_succ]
+            omega
+      have hhalf_eq : 2 * half.val = cur1.val.length := by
+        calc
+          2 * half.val = 2 * 2 ^ (n - (j1.val + 1)) := by rw [hhalfval]
+          _ = 2 ^ (n - (j1.val + 1)) * 2 := by ring
+          _ = cur1.val.length := by
+            rw [hlen1, show n - j1.val = (n - (j1.val + 1)) + 1 by omega, pow_succ]
+      have hhalfbound : 2 * half.val ≤ cur1.val.length := le_of_eq hhalf_eq
+      apply spec_bind (eval_mle_in_place_loop_spec w j1 half cur1 hw hcur1 hjw hhalfbound)
       rintro cur2 ⟨hcur2, hlen2, hfn2⟩
+      have hhalf_le : half.val ≤ cur2.val.length := by
+        calc
+          half.val = 2 ^ (n - (j1.val + 1)) := hhalfval
+          _ ≤ 2 ^ (n - (j1.val + 1)) * 2 := by omega
+          _ = cur2.val.length := by
+            rw [hlen2, hlen1, show n - j1.val = (n - (j1.val + 1)) + 1 by omega,
+              pow_succ]
+      apply spec_bind (alloc.vec.Vec.resize_spec cpoly.field.Ext4.Insts.CoreCloneClone cur2 half
+        cpoly.field.Ext4.ZERO (ext_clone_eq _))
+      intro cur3 hresize
+      have htake : cur3.val = cur2.val.take half.val := by
+        rw [hresize, List.resize, if_pos (Nat.zero_le _),
+          Nat.sub_eq_zero_of_le hhalf_le, List.replicate_zero,
+          List.append_nil]
+      have hcur3 : VecReduced cur3 := by
+        intro u hu
+        rw [htake] at hu
+        exact hcur2 u (List.mem_of_mem_take hu)
+      have hlen3 : cur3.val.length = half.val := by
+        rw [htake, List.length_take, Nat.min_eq_left hhalf_le]
+      have hmap3 : cur3.val.map toExt = (List.range half.val).map (coeffFn cur2) := by
+        rw [hresize, map_resize_eq_range_map]
+        rfl
+      have hfn3 : ∀ k, k < half.val → coeffFn cur3 k =
+          coeffFn cur1 (2 * k) + pointFn w j1.val 0 *
+            (coeffFn cur1 (2 * k + 1) - coeffFn cur1 (2 * k)) := by
+        intro k hk
+        have hk3 : k < cur3.val.length := by rw [hlen3]; exact hk
+        have hkmap3 : k < (cur3.val.map toExt).length := by simp [hk3]
+        rw [coeffFn_of_lt cur3 hk3]
+        have hm := getElem_of_list_eq hmap3 (i := k) (hi := hkmap3)
+        simp only [List.getElem_map, List.getElem_range] at hm
+        rw [hm, hfn2, if_pos hk]
       step as ⟨j2, hj2⟩
-      refine ⟨by scalar_tac, hcur2, ?_, ?_, ?_⟩
-      · simpa [hj2] using hlen2
+      refine ⟨by scalar_tac, hcur3, ?_, ?_, ?_⟩
+      · rw [hlen3, hhalfval, hj2]
       · rw [show n - j2.val = n - (j1.val + 1) by omega]
         have hpoint : pointFn w j2.val = fun k => pointFn w j1.val (k + 1) := by
           funext k
@@ -1791,17 +2293,23 @@ theorem eval_mle_loop1_spec (n : ℕ) (w : Slice cpoly.field.Ext4) (nn : Std.Usi
           rw [harith]
         rw [hpoint]
         calc
-          mlValL (n - (j1.val + 1)) (coeffFn cur2) (fun k => pointFn w j1.val (k + 1)) =
+          mlValL (n - (j1.val + 1)) (coeffFn cur3) (fun k => pointFn w j1.val (k + 1)) =
               mlValL (n - (j1.val + 1))
-                (fun k => (1 - pointFn w j1.val 0) * coeffFn cur1 (2 * k) + pointFn w j1.val 0 * coeffFn cur1 (2 * k + 1))
+                (fun k => coeffFn cur1 (2 * k) + pointFn w j1.val 0 *
+                  (coeffFn cur1 (2 * k + 1) - coeffFn cur1 (2 * k)))
                 (fun k => pointFn w j1.val (k + 1)) := by
                   unfold mlValL
                   apply Finset.sum_congr rfl
                   intro k hk
-                  rw [hfn2, if_pos (Finset.mem_range.mp hk)]
-                  have hxpoint : toExt x = pointFn w j1.val 0 := by
-                    simp [pointFn, hx, hjw]
-                  rw [hxpoint]
+                  rw [hfn3 k (by simpa [hhalfval] using Finset.mem_range.mp hk)]
+          _ = mlValL (n - (j1.val + 1))
+                (fun k => (1 - pointFn w j1.val 0) * coeffFn cur1 (2 * k) +
+                  pointFn w j1.val 0 * coeffFn cur1 (2 * k + 1))
+                (fun k => pointFn w j1.val (k + 1)) := by
+                  unfold mlValL
+                  apply Finset.sum_congr rfl
+                  intro k _
+                  ring
           _ = mlValL ((n - (j1.val + 1)) + 1) (coeffFn cur1) (pointFn w j1.val) :=
                 mlValL_layer _ _ _
           _ = t := by
@@ -1827,7 +2335,7 @@ theorem eval_mle_spec (n : ℕ) (p : alloc.vec.Vec cpoly.field.Ext4) (w : Slice 
   apply spec_bind (vec_clone_spec p)
   intro cur hcur
   rw [hcur]
-  apply spec_bind (eval_mle_loop1_spec n w w.len
+  apply spec_bind (eval_mle_loop0_spec n w w.len
     (mlValL n (coeffFn p) (pointFn w 0)) hw hwl hlen p 0#usize
     (by simp) hp (by simpa using hpl) (by simp))
   intro z hz

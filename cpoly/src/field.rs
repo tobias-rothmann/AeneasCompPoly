@@ -42,9 +42,17 @@
 //!   (`P < 2^32`, so `(P-1)^2 < 2^64`; the slack is about `200 * 2^32`);
 //! * `W * t = 2t <= 2(P-1) < 2^33`.
 //!
-//! So every intermediate fits in `u64` with NO overflow, which keeps Aeneas's
-//! checked-arithmetic `Result` trivially `ok`.  Note this is *not* true of the
-//! obvious next step: a 64-bit modulus would need `u128` intermediates.
+//! So every base-field intermediate fits in `u64` with NO overflow, which keeps
+//! Aeneas's checked-arithmetic `Result` trivially `ok`.  Note this is *not*
+//! true of the obvious next step: a 64-bit modulus would need `u128`
+//! intermediates.
+//!
+//! The general extension product deliberately accumulates its unreduced output
+//! coefficients in a `(low, high)` pair representing `low + high * 2^64`.
+//! The largest one is `7(P - 1)^2 < 7 * 2^64`, so its high word is at most six.
+//! This makes it possible to postpone each output's reduction until all of its
+//! terms have been folded by `Y^4 = 2`, without either losing a carry or using
+//! a wider Rust integer.
 //!
 //! The extension arithmetic is fully unrolled, so no operation on [`Ext4`] needs
 //! a loop of its own and the extracted model of this module is entirely
@@ -109,7 +117,8 @@ impl Add for Fp {
 
     /// `a + b <= 2(P-1) < 2^64`, so the `u64` sum cannot overflow.
     fn add(self, rhs: Fp) -> Fp {
-        Fp((self.0 + rhs.0) % P)
+        let sum = self.0 + rhs.0;
+        Fp(if sum >= P { sum - P } else { sum })
     }
 }
 
@@ -119,7 +128,11 @@ impl Sub for Fp {
     /// Adding `P` first keeps the subtraction on `u64` from going negative;
     /// `a + P - b <= (P-1) + P < 2^64`.
     fn sub(self, rhs: Fp) -> Fp {
-        Fp((self.0 + P - rhs.0) % P)
+        Fp(if self.0 >= rhs.0 {
+            self.0 - rhs.0
+        } else {
+            self.0 + P - rhs.0
+        })
     }
 }
 
@@ -136,9 +149,10 @@ impl Mul for Fp {
 impl Neg for Fp {
     type Output = Fp;
 
-    /// The outer `% P` is what sends `0` to `0` rather than to `P`.
+    /// Zero is its own additive inverse; every other canonical representative
+    /// has inverse `P - a`, already in `[0, P)`.
     fn neg(self) -> Fp {
-        Fp((P - self.0) % P)
+        Fp(if self.0 == 0 { 0 } else { P - self.0 })
     }
 }
 
@@ -174,9 +188,65 @@ pub const W: Fp = Fp(2);
 ///
 /// This stays private: it expresses the reduction in [`Ext4`]'s arithmetic,
 /// rather than an independently useful operation on the base field.  The
-/// first translation keeps the direct field expression as its reference.
+/// first translation keeps the direct field expression as its reference.  The
+/// general formula below folds unreduced products directly, while this helper
+/// remains the specified `W` multiplication used by the field proof.
+#[allow(dead_code)]
 fn mul_by_w(t: Fp) -> Fp {
-    W * t
+    t + t
+}
+
+/// Reduce `low + high * 2^64` modulo `P`, for `high <= 6`.
+///
+/// `2^32 = 99 (mod P)` and `2^64 = 9_801 (mod P)`.  Splitting the low word at
+/// 32 bits twice leaves a value below `P + 10_000`, so one subtraction produces
+/// the canonical representative.  Division and remainder by this power of two
+/// lower to the same shifts and mask as the equivalent spelling.
+#[inline(always)]
+fn reduce_wide(low: u64, high: u64) -> Fp {
+    const LIMB: u64 = 1u64 << 32;
+    let folded_once = (low % LIMB) + 99 * (low / LIMB) + 9_801 * high;
+    let folded_twice = (folded_once % LIMB) + 99 * (folded_once / LIMB);
+    Fp(if folded_twice >= P {
+        folded_twice - P
+    } else {
+        folded_twice
+    })
+}
+
+/// Add one raw base-field product to a two-word extension accumulator.
+#[inline(always)]
+fn add_product(acc: (u64, u64), a: Fp, b: Fp) -> (u64, u64) {
+    let (low, carry) = acc.0.overflowing_add(a.0 * b.0);
+    (low, acc.1 + u64::from(carry))
+}
+
+/// Add twice one raw base-field product to a two-word extension accumulator.
+#[inline(always)]
+fn add_double_product(acc: (u64, u64), a: Fp, b: Fp) -> (u64, u64) {
+    let product = a.0 * b.0;
+    let (low, carry0) = acc.0.overflowing_add(product);
+    let (low, carry1) = low.overflowing_add(product);
+    (low, acc.1 + u64::from(carry0) + u64::from(carry1))
+}
+
+/// Add four times one raw base-field product to a two-word extension
+/// accumulator.
+#[inline(always)]
+fn add_quadruple_product(acc: (u64, u64), a: Fp, b: Fp) -> (u64, u64) {
+    let product = a.0 * b.0;
+    let (low, carry0) = acc.0.overflowing_add(product);
+    let (low, carry1) = low.overflowing_add(product);
+    let (low, carry2) = low.overflowing_add(product);
+    let (low, carry3) = low.overflowing_add(product);
+    (
+        low,
+        acc.1
+            + u64::from(carry0)
+            + u64::from(carry1)
+            + u64::from(carry2)
+            + u64::from(carry3),
+    )
 }
 
 /// An element of `Ext4 = F_P[Y] / (Y^4 - W)`, as its dense little-endian
@@ -258,11 +328,33 @@ impl Ext4 {
 
     /// Square this extension-field element.
     ///
-    /// The first translation delegates directly to the general extension
-    /// product.  It is the semantic reference for a later specialized square.
+    /// This exploits symmetry in the degree-six product, using ten base-field
+    /// products rather than the general multiplier's sixteen.  The unreduced
+    /// output bounds are `7`, `6`, `5`, and `4` products respectively, so the
+    /// carry words remain within [`reduce_wide`]'s contract.
     #[must_use]
+    #[inline(always)]
     pub fn square(self) -> Ext4 {
-        self * self
+        let c0 = add_product((0, 0), self.c0, self.c0);
+        let c0 = add_quadruple_product(c0, self.c1, self.c3);
+        let c0 = add_double_product(c0, self.c2, self.c2);
+
+        let c1 = add_double_product((0, 0), self.c0, self.c1);
+        let c1 = add_quadruple_product(c1, self.c2, self.c3);
+
+        let c2 = add_double_product((0, 0), self.c0, self.c2);
+        let c2 = add_product(c2, self.c1, self.c1);
+        let c2 = add_double_product(c2, self.c3, self.c3);
+
+        let c3 = add_double_product((0, 0), self.c0, self.c3);
+        let c3 = add_double_product(c3, self.c1, self.c2);
+
+        Ext4 {
+            c0: reduce_wide(c0.0, c0.1),
+            c1: reduce_wide(c1.0, c1.1),
+            c2: reduce_wide(c2.0, c2.1),
+            c3: reduce_wide(c3.0, c3.1),
+        }
     }
 }
 
@@ -324,25 +416,40 @@ impl Neg for Ext4 {
 impl Mul for Ext4 {
     type Output = Ext4;
 
-    /// Mirrors `Ext.mul` at `d = 4`.
+    /// Schoolbook multiplication with one carry-aware reduction per output.
     ///
-    /// `t0 .. t6` are the schoolbook product's coefficients before reduction,
-    /// then `Y^4 = W` folds the high half back with a factor of [`W`]:
-    /// `out[k] = t[k] + W * t[k + 4]` for `k < 3`, and `out[3] = t[3]`
-    /// (there is no `t7`, since `i + j <= 6` for `i, j < 4`).
+    /// `Y^4 = 2` lets degrees four through six fold directly into the four
+    /// output accumulators.  Their unreduced bounds, in units of
+    /// `(P - 1)^2`, are respectively `7`, `6`, `5`, and `4`; consequently the
+    /// carry words passed to [`reduce_wide`] are at most `6`, `5`, `4`, and
+    /// `3`.  This retains the ordinary degree-six product formula while
+    /// avoiding all of its intermediate base-field reductions.
     fn mul(self, rhs: Ext4) -> Ext4 {
-        let t0: Fp = self.c0 * rhs.c0;
-        let t1: Fp = self.c0 * rhs.c1 + self.c1 * rhs.c0;
-        let t2: Fp = self.c0 * rhs.c2 + self.c1 * rhs.c1 + self.c2 * rhs.c0;
-        let t3: Fp = self.c0 * rhs.c3 + self.c1 * rhs.c2 + self.c2 * rhs.c1 + self.c3 * rhs.c0;
-        let t4: Fp = self.c1 * rhs.c3 + self.c2 * rhs.c2 + self.c3 * rhs.c1;
-        let t5: Fp = self.c2 * rhs.c3 + self.c3 * rhs.c2;
-        let t6: Fp = self.c3 * rhs.c3;
+        let c0 = add_product((0, 0), self.c0, rhs.c0);
+        let c1 = add_product((0, 0), self.c0, rhs.c1);
+        let c2 = add_product((0, 0), self.c0, rhs.c2);
+        let c3 = add_product((0, 0), self.c0, rhs.c3);
+
+        let c0 = add_double_product(c0, self.c1, rhs.c3);
+        let c1 = add_product(c1, self.c1, rhs.c0);
+        let c2 = add_product(c2, self.c1, rhs.c1);
+        let c3 = add_product(c3, self.c1, rhs.c2);
+
+        let c0 = add_double_product(c0, self.c2, rhs.c2);
+        let c1 = add_double_product(c1, self.c2, rhs.c3);
+        let c2 = add_product(c2, self.c2, rhs.c0);
+        let c3 = add_product(c3, self.c2, rhs.c1);
+
+        let c0 = add_double_product(c0, self.c3, rhs.c1);
+        let c1 = add_double_product(c1, self.c3, rhs.c2);
+        let c2 = add_double_product(c2, self.c3, rhs.c3);
+        let c3 = add_product(c3, self.c3, rhs.c0);
+
         Ext4 {
-            c0: t0 + mul_by_w(t4),
-            c1: t1 + mul_by_w(t5),
-            c2: t2 + mul_by_w(t6),
-            c3: t3,
+            c0: reduce_wide(c0.0, c0.1),
+            c1: reduce_wide(c1.0, c1.1),
+            c2: reduce_wide(c2.0, c2.1),
+            c3: reduce_wide(c3.0, c3.1),
         }
     }
 }

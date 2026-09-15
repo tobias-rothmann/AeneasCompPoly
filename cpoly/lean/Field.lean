@@ -154,11 +154,34 @@ theorem fp_add_spec (a b : cpoly.field.Fp) (ha : Red a) (hb : Red b) :
       ⦃ c => Red c ∧ toK c = toK a + toK b ⦄ := by
   unfold Red at ha hb
   rw [cpoly.field.Fp.Insts.CoreOpsArithAddFpFp.add]
-  step as ⟨i, hi⟩
-  step as ⟨c, hc⟩
-  refine ⟨?_, ?_⟩
-  · unfold Red; rw [hc, cpoly_P_val]; exact Nat.mod_lt _ (by decide)
-  · simp only [toK, hc, cpoly_P_val, ZMod.natCast_mod, hi, Nat.cast_add]
+  step as ⟨sum, hsum⟩
+  have hsum_lt : sum.val < 2 * P := by
+    rw [hsum]
+    omega
+  by_cases hP_le : P ≤ sum.val
+  · have hif : sum ≥ cpoly.field.P := by
+      simpa [cpoly_P_val] using hP_le
+    rw [if_pos hif]
+    step as ⟨out, hout⟩
+    refine ⟨?_, ?_⟩
+    · unfold Red
+      rw [hout, cpoly_P_val]
+      omega
+    · have hp_le : cpoly.field.P.val ≤ sum.val := by
+        simpa [cpoly_P_val] using hP_le
+      unfold toK
+      rw [hout, Nat.cast_sub hp_le, cpoly_P_val, ZMod.natCast_self, hsum, Nat.cast_add]
+      simp
+  · have hif : ¬ sum ≥ cpoly.field.P := by
+      intro h
+      apply hP_le
+      simpa [cpoly_P_val] using h
+    rw [if_neg hif]
+    refine ⟨?_, ?_⟩
+    · unfold Red
+      simpa [cpoly_P_val] using Nat.lt_of_not_ge hP_le
+    · unfold toK
+      rw [hsum, Nat.cast_add]
 
 /-- `impl Mul for Fp`.  The `a * b` in the generated code is a *checked* `U64`
 product; it succeeds because `P < 2^32` forces `a * b ≤ (P-1)^2 < 2^64`. -/
@@ -181,16 +204,35 @@ theorem fp_sub_spec (a b : cpoly.field.Fp) (ha : Red a) (hb : Red b) :
       ⦃ c => Red c ∧ toK c = toK a - toK b ⦄ := by
   unfold Red at ha hb
   rw [cpoly.field.Fp.Insts.CoreOpsArithSubFpFp.sub]
-  step as ⟨i, hi⟩          -- i = a + P
-  step as ⟨j, hj⟩          -- j = i - b   (b.val ≤ i.val auto-discharged)
-  step as ⟨c, hc⟩          -- c = j % P
-  refine ⟨?_, ?_⟩
-  · unfold Red; rw [hc, cpoly_P_val]; exact Nat.mod_lt _ (by decide)
-  · -- toK c = ↑(j % P) = ↑j = ↑(a + P - b) = ↑a + ↑P - ↑b = ↑a - ↑b   (↑P = 0)
-    have hbi : b.val ≤ a.val + P := by scalar_tac
-    simp only [toK, hc, cpoly_P_val, ZMod.natCast_mod, hj, hi]
-    rw [Nat.cast_sub hbi, Nat.cast_add, ZMod.natCast_self]
-    ring
+  by_cases hba : b.val ≤ a.val
+  · have hif : a ≥ b := by simpa using hba
+    rw [if_pos hif]
+    step as ⟨out, hout⟩
+    refine ⟨?_, ?_⟩
+    · unfold Red
+      rw [hout]
+      omega
+    · unfold toK
+      rw [hout, Nat.cast_sub hba]
+  · have hif : ¬ a ≥ b := by
+      intro h
+      apply hba
+      simpa using h
+    rw [if_neg hif]
+    step as ⟨sum, hsum⟩
+    step as ⟨out, hout⟩
+    refine ⟨?_, ?_⟩
+    · unfold Red
+      rw [hout, hsum, cpoly_P_val]
+      omega
+    · have hbi : b.val ≤ a.val + P := by omega
+      have hbs : b.val ≤ sum.val := by
+        rw [hsum, cpoly_P_val]
+        exact hbi
+      unfold toK
+      rw [hout, Nat.cast_sub hbs, hsum, Nat.cast_add,
+        cpoly_P_val, ZMod.natCast_self]
+      ring
 
 /-- `impl Neg for Fp`. -/
 @[step]
@@ -198,14 +240,29 @@ theorem fp_neg_spec (a : cpoly.field.Fp) (ha : Red a) :
     cpoly.field.Fp.Insts.CoreOpsArithNegFp.neg a ⦃ c => Red c ∧ toK c = - toK a ⦄ := by
   unfold Red at ha
   rw [cpoly.field.Fp.Insts.CoreOpsArithNegFp.neg]
-  step as ⟨i, hi⟩          -- i = P - a   (a.val ≤ P.val auto-discharged)
-  step as ⟨c, hc⟩          -- c = i % P
-  refine ⟨?_, ?_⟩
-  · unfold Red; rw [hc, cpoly_P_val]; exact Nat.mod_lt _ (by decide)
-  · have hai : a.val ≤ P := by scalar_tac
-    simp only [toK, hc, cpoly_P_val, ZMod.natCast_mod, hi]
-    rw [Nat.cast_sub hai, ZMod.natCast_self]
-    ring
+  by_cases hzero : a = 0#u64
+  · rw [if_pos hzero, hzero]
+    refine ⟨?_, ?_⟩
+    · unfold Red; decide
+    · unfold toK; simp
+  · rw [if_neg hzero]
+    step as ⟨out, hout⟩
+    refine ⟨?_, ?_⟩
+    · unfold Red
+      rw [hout, cpoly_P_val]
+      have ha_pos : 0 < a.val := by
+        apply Nat.pos_of_ne_zero
+        intro ha0
+        apply hzero
+        apply U64.bv_eq_imp_eq
+        apply BitVec.eq_of_toNat_eq
+        simpa using ha0
+      omega
+    · have hai : a.val ≤ cpoly.field.P.val := by
+        simpa [cpoly_P_val] using Nat.le_of_lt ha
+      unfold toK
+      rw [hout, Nat.cast_sub hai, cpoly_P_val, ZMod.natCast_self]
+      ring
 
 /-! ### The compound-assignment impls
 
@@ -268,13 +325,444 @@ theorem red_W : Red cpoly.field.W := by unfold Red; rw [cpoly_W_val]; decide
 /-- ... and denotes the `W` of `Hachi.ext4Params`. -/
 @[simp] theorem toK_W : toK cpoly.field.W = 2 := by simp only [toK, cpoly_W_val]; norm_num
 
+/-- A product of two reduced Hachi representatives is a checked `u64` product.
+The F2 accumulator deliberately uses this fact before preserving carries
+separately. -/
+theorem red_mul_fits_u64 (x y : cpoly.field.Fp) (hx : Red x) (hy : Red y) :
+    x.val * y.val ≤ U64.max := by
+  unfold Red at hx hy
+  have hx' : x.val ≤ P - 1 := by omega
+  have hy' : y.val ≤ P - 1 := by omega
+  calc
+    x.val * y.val ≤ (P - 1) * (P - 1) := Nat.mul_le_mul hx' hy'
+    _ ≤ U64.max := by norm_num [U64.max_eq]
+
+/-- The field image of one machine-word carry. -/
+def carryK (b : Bool) : K := if b then 1 else 0
+
+/-- The field image of the two-word integer represented by an F2 accumulator. -/
+def wideK (acc : Std.U64 × Std.U64) : K :=
+  (((acc.2 : Std.U64).val) : K) * 9801 + (((acc.1 : Std.U64).val) : K)
+
+@[simp] theorem u64_size_toK : (U64.size : K) = 9801 := by
+  rw [U64.size, U64.numBits]
+  have hP : P = 4294967197 := by norm_num [P, Hachi.fieldSize]
+  apply (ZMod.natCast_eq_natCast_iff' 18446744073709551616 9801 P).2
+  rw [hP]
+
+/-- `overflowing_add` preserves the represented integer, with its boolean
+carry read as either zero or one. -/
+theorem overflowing_add_toK (x y : Std.U64) :
+    (((core.num.U64.overflowing_add x y).1).val : K) +
+        carryK ((core.num.U64.overflowing_add x y).2) * 9801 =
+      (x.val : K) + (y.val : K) := by
+  have h := core.num.U64.overflowing_add_eq x y
+  dsimp only at h
+  by_cases overflow : x.val + y.val > U64.max
+  · rw [if_pos (by simpa using overflow)] at h
+    obtain ⟨hval, hcarry⟩ := h
+    rw [hcarry]
+    have hvalK := congrArg (fun n : Nat => (n : K)) hval
+    simpa [carryK, u64_size_toK] using hvalK
+  · rw [if_neg (by simpa using overflow)] at h
+    obtain ⟨hval, hcarry⟩ := h
+    rw [hcarry]
+    have hvalK := congrArg (fun n : Nat => (n : K)) hval
+    simpa [carryK] using hvalK
+
+/-- Adding one raw reduced-coefficient product preserves the field image of
+the two-word accumulator.  The `u64` low word is allowed to wrap; its carry is
+recorded in the high word. -/
+@[step]
+theorem add_product_spec (acc : Std.U64 × Std.U64) (a b : cpoly.field.Fp)
+    (ha : Red a) (hb : Red b) (hacc : acc.2.val ≤ 5) :
+    cpoly.field.add_product acc a b ⦃ out =>
+      out.2.val ≤ acc.2.val + 1 ∧ wideK out = wideK acc + toK a * toK b ⦄ := by
+  rw [cpoly.field.add_product]
+  apply spec_bind (U64.mul_spec (red_mul_fits_u64 a b ha hb))
+  intro product hproduct
+  simp only [lift]
+  simp
+  apply spec_bind (U64.add_spec (by
+    change acc.2.val + (core.convert.num.FromU64Bool.from
+      (core.num.U64.overflowing_add acc.1 product).2).val ≤ U64.max
+    simp only [core.convert.num.FromU64Bool.from]
+    split <;> norm_num [U64.max_eq] at hacc ⊢ <;> omega))
+  intro high hhigh
+  simp only [spec_ok]
+  simp only [wideK]
+  change high.val = acc.2.val +
+      (core.convert.num.FromU64Bool.from
+        (core.num.U64.overflowing_add acc.1 product).2).val at hhigh
+  have hcarry :
+      (core.convert.num.FromU64Bool.from
+        (core.num.U64.overflowing_add acc.1 product).2).val =
+        if (core.num.U64.overflowing_add acc.1 product).2 then 1 else 0 := by
+    cases (core.num.U64.overflowing_add acc.1 product).2 <;>
+      simp [core.convert.num.FromU64Bool.from, UScalar.val]
+  constructor
+  · rw [hhigh, hcarry]
+    split <;> omega
+  ·
+    change ((high.val : K) * 9801 +
+      ((core.num.U64.overflowing_add acc.1 product).1.val : K)) = _
+    rw [hhigh]
+    rw [hcarry]
+    have hcarryK :
+        ((if (core.num.U64.overflowing_add acc.1 product).2 then 1 else 0 : Nat) : K) =
+          carryK (core.num.U64.overflowing_add acc.1 product).2 := by
+      simp [carryK]
+    have hproductK : (product.val : K) = toK a * toK b := by
+      rw [hproduct]
+      unfold toK
+      norm_cast
+    rw [Nat.cast_add, hcarryK, ← hproductK]
+    have hoverflow := overflowing_add_toK acc.1 product
+    linear_combination hoverflow
+
+/-- Adding twice one raw reduced-coefficient product preserves the field image
+of the accumulator.  This is the `2 * aᵢbⱼ` wrap contribution in `Ext4::mul`. -/
+@[step]
+theorem add_double_product_spec (acc : Std.U64 × Std.U64) (a b : cpoly.field.Fp)
+    (ha : Red a) (hb : Red b) (hacc : acc.2.val ≤ 5) :
+    cpoly.field.add_double_product acc a b ⦃ out =>
+      out.2.val ≤ acc.2.val + 2 ∧ wideK out = wideK acc + 2 * toK a * toK b ⦄ := by
+  rw [cpoly.field.add_double_product]
+  apply spec_bind (U64.mul_spec (red_mul_fits_u64 a b ha hb))
+  intro product hproduct
+  simp only [lift]
+  simp
+  change (do
+    let high0 ← acc.2 + core.convert.num.FromU64Bool.from
+      (core.num.U64.overflowing_add acc.1 product).2
+    let high1 ← high0 + core.convert.num.FromU64Bool.from
+      (core.num.U64.overflowing_add (core.num.U64.overflowing_add acc.1 product).1 product).2
+    ok ((core.num.U64.overflowing_add (core.num.U64.overflowing_add acc.1 product).1 product).1,
+      high1)) ⦃ out => out.2.val ≤ acc.2.val + 2 ∧
+        wideK out = wideK acc + 2 * toK a * toK b ⦄
+  apply spec_bind (U64.add_spec (by
+    simp only [core.convert.num.FromU64Bool.from]
+    split <;> norm_num [U64.max_eq] at hacc ⊢ <;> omega))
+  intro high0 hhigh0
+  apply spec_bind (U64.add_spec (by
+    have hcarry0 : (core.convert.num.FromU64Bool.from
+      (core.num.U64.overflowing_add acc.1 product).2).val ≤ 1 := by
+      cases (core.num.U64.overflowing_add acc.1 product).2 <;>
+        simp [core.convert.num.FromU64Bool.from, UScalar.val]
+    have : high0.val ≤ acc.2.val + 1 := by
+      rw [hhigh0]
+      omega
+    simp only [core.convert.num.FromU64Bool.from]
+    split <;> norm_num [U64.max_eq] at hacc ⊢ <;> omega))
+  intro high1 hhigh1
+  simp only [spec_ok]
+  have hcarry0 : (core.convert.num.FromU64Bool.from
+      (core.num.U64.overflowing_add acc.1 product).2).val =
+      if (core.num.U64.overflowing_add acc.1 product).2 then 1 else 0 := by
+    cases (core.num.U64.overflowing_add acc.1 product).2 <;>
+      simp [core.convert.num.FromU64Bool.from, UScalar.val]
+  have hcarry1 : (core.convert.num.FromU64Bool.from
+      (core.num.U64.overflowing_add
+        (core.num.U64.overflowing_add acc.1 product).1 product).2).val =
+      if (core.num.U64.overflowing_add
+        (core.num.U64.overflowing_add acc.1 product).1 product).2 then 1 else 0 := by
+    cases (core.num.U64.overflowing_add
+      (core.num.U64.overflowing_add acc.1 product).1 product).2 <;>
+      simp [core.convert.num.FromU64Bool.from, UScalar.val]
+  constructor
+  · rw [hhigh1, hhigh0, hcarry0, hcarry1]
+    split <;> split <;> omega
+  · simp only [wideK]
+    change ((high1.val : K) * 9801 +
+      ((core.num.U64.overflowing_add
+        (core.num.U64.overflowing_add acc.1 product).1 product).1.val : K)) = _
+    change high0.val = acc.2.val +
+      (core.convert.num.FromU64Bool.from
+        (core.num.U64.overflowing_add acc.1 product).2).val at hhigh0
+    change high1.val = high0.val +
+      (core.convert.num.FromU64Bool.from
+        (core.num.U64.overflowing_add
+          (core.num.U64.overflowing_add acc.1 product).1 product).2).val at hhigh1
+    rw [hhigh1, hhigh0, hcarry0, hcarry1]
+    have hcarry0K :
+        ((if (core.num.U64.overflowing_add acc.1 product).2 then 1 else 0 : Nat) : K) =
+          carryK (core.num.U64.overflowing_add acc.1 product).2 := by
+      simp [carryK]
+    have hcarry1K :
+        ((if (core.num.U64.overflowing_add
+          (core.num.U64.overflowing_add acc.1 product).1 product).2 then 1 else 0 : Nat) : K) =
+          carryK (core.num.U64.overflowing_add
+            (core.num.U64.overflowing_add acc.1 product).1 product).2 := by
+      simp [carryK]
+    have hproductK : (product.val : K) = toK a * toK b := by
+      rw [hproduct]
+      unfold toK
+      norm_cast
+    simp only [Nat.cast_add]
+    rw [hcarry0K, hcarry1K]
+    have hoverflow0 := overflowing_add_toK acc.1 product
+    have hoverflow1 := overflowing_add_toK
+      (core.num.U64.overflowing_add acc.1 product).1 product
+    linear_combination hoverflow0 + hoverflow1 + 2 * hproductK
+
+/-- Adding four copies of one raw reduced-coefficient product preserves the
+field image of the accumulator.  Squaring uses this for its two `4 * aᵢaⱼ`
+cross terms, while keeping the product unreduced. -/
+@[step]
+theorem add_quadruple_product_spec (acc : Std.U64 × Std.U64) (a b : cpoly.field.Fp)
+    (ha : Red a) (hb : Red b) (hacc : acc.2.val ≤ 3) :
+    cpoly.field.add_quadruple_product acc a b ⦃ out =>
+      out.2.val ≤ acc.2.val + 4 ∧ wideK out = wideK acc + 4 * toK a * toK b ⦄ := by
+  rw [cpoly.field.add_quadruple_product]
+  apply spec_bind (U64.mul_spec (red_mul_fits_u64 a b ha hb))
+  intro product hproduct
+  simp only [lift]
+  simp
+  have carry_val (carry : Bool) :
+      (core.convert.num.FromU64Bool.from carry).val = if carry then 1 else 0 := by
+    cases carry <;> simp [core.convert.num.FromU64Bool.from, UScalar.val]
+  have carry_le (carry : Bool) :
+      (core.convert.num.FromU64Bool.from carry).val ≤ 1 := by
+    rw [carry_val]
+    split <;> omega
+  let low0 := (core.num.U64.overflowing_add acc.1 product).1
+  let carry0 := (core.num.U64.overflowing_add acc.1 product).2
+  let low1 := (core.num.U64.overflowing_add low0 product).1
+  let carry1 := (core.num.U64.overflowing_add low0 product).2
+  let low2 := (core.num.U64.overflowing_add low1 product).1
+  let carry2 := (core.num.U64.overflowing_add low1 product).2
+  let low3 := (core.num.U64.overflowing_add low2 product).1
+  let carry3 := (core.num.U64.overflowing_add low2 product).2
+  change (do
+    let high0 ← acc.2 + core.convert.num.FromU64Bool.from carry0
+    let high1 ← high0 + core.convert.num.FromU64Bool.from carry1
+    let high2 ← high1 + core.convert.num.FromU64Bool.from carry2
+    let high3 ← high2 + core.convert.num.FromU64Bool.from carry3
+    ok (low3, high3)) ⦃ out => out.2.val ≤ acc.2.val + 4 ∧
+        wideK out = wideK acc + 4 * toK a * toK b ⦄
+  apply spec_bind (U64.add_spec (by
+    have hcarry := carry_le carry0
+    norm_num [U64.max_eq] at hacc ⊢
+    omega))
+  intro high0 hhigh0
+  apply spec_bind (U64.add_spec (by
+    have hcarry := carry_le carry1
+    have hcarry0 := carry_le carry0
+    change high0.val = acc.2.val + (core.convert.num.FromU64Bool.from carry0).val at hhigh0
+    have hhigh0' : high0.val ≤ acc.2.val + 1 := by omega
+    norm_num [U64.max_eq] at hacc ⊢
+    omega))
+  intro high1 hhigh1
+  apply spec_bind (U64.add_spec (by
+    have hcarry := carry_le carry2
+    have hcarry0 := carry_le carry0
+    have hcarry1 := carry_le carry1
+    change high0.val = acc.2.val + (core.convert.num.FromU64Bool.from carry0).val at hhigh0
+    change high1.val = high0.val + (core.convert.num.FromU64Bool.from carry1).val at hhigh1
+    have hhigh0' : high0.val ≤ acc.2.val + 1 := by
+      have hcarry0 := carry_le carry0
+      omega
+    have hhigh1' : high1.val ≤ acc.2.val + 2 := by omega
+    norm_num [U64.max_eq] at hacc ⊢
+    omega))
+  intro high2 hhigh2
+  apply spec_bind (U64.add_spec (by
+    have hcarry := carry_le carry3
+    have hcarry0 := carry_le carry0
+    have hcarry1 := carry_le carry1
+    have hcarry2 := carry_le carry2
+    change high0.val = acc.2.val + (core.convert.num.FromU64Bool.from carry0).val at hhigh0
+    change high1.val = high0.val + (core.convert.num.FromU64Bool.from carry1).val at hhigh1
+    change high2.val = high1.val + (core.convert.num.FromU64Bool.from carry2).val at hhigh2
+    have hhigh0' : high0.val ≤ acc.2.val + 1 := by
+      have hcarry0 := carry_le carry0
+      omega
+    have hhigh1' : high1.val ≤ acc.2.val + 2 := by
+      have hcarry1 := carry_le carry1
+      omega
+    have hhigh2' : high2.val ≤ acc.2.val + 3 := by omega
+    norm_num [U64.max_eq] at hacc ⊢
+    omega))
+  intro high3 hhigh3
+  simp only [spec_ok]
+  change high0.val = acc.2.val + (core.convert.num.FromU64Bool.from carry0).val at hhigh0
+  change high1.val = high0.val + (core.convert.num.FromU64Bool.from carry1).val at hhigh1
+  change high2.val = high1.val + (core.convert.num.FromU64Bool.from carry2).val at hhigh2
+  change high3.val = high2.val + (core.convert.num.FromU64Bool.from carry3).val at hhigh3
+  constructor
+  · rw [hhigh3, hhigh2, hhigh1, hhigh0]
+    rw [carry_val carry0, carry_val carry1, carry_val carry2, carry_val carry3]
+    split <;> split <;> split <;> split <;> omega
+  · simp only [wideK]
+    change ((high3.val : K) * 9801 + (low3.val : K)) = _
+    rw [hhigh3, hhigh2, hhigh1, hhigh0]
+    have hcarry0K :
+        ((if carry0 then 1 else 0 : Nat) : K) = carryK carry0 := by simp [carryK]
+    have hcarry1K :
+        ((if carry1 then 1 else 0 : Nat) : K) = carryK carry1 := by simp [carryK]
+    have hcarry2K :
+        ((if carry2 then 1 else 0 : Nat) : K) = carryK carry2 := by simp [carryK]
+    have hcarry3K :
+        ((if carry3 then 1 else 0 : Nat) : K) = carryK carry3 := by simp [carryK]
+    have hproductK : (product.val : K) = toK a * toK b := by
+      rw [hproduct]
+      unfold toK
+      norm_cast
+    simp only [Nat.cast_add]
+    rw [carry_val carry0, carry_val carry1, carry_val carry2, carry_val carry3,
+      hcarry0K, hcarry1K, hcarry2K, hcarry3K]
+    have hoverflow0 := overflowing_add_toK acc.1 product
+    have hoverflow1 := overflowing_add_toK low0 product
+    have hoverflow2 := overflowing_add_toK low1 product
+    have hoverflow3 := overflowing_add_toK low2 product
+    linear_combination hoverflow0 + hoverflow1 + hoverflow2 + hoverflow3 + 4 * hproductK
+
+/-- F2's two-word reduction is a canonical base-field representative.  The
+accumulator high word is at most seven in the only call sites below. -/
+@[step]
+theorem reduce_wide_spec (low high : Std.U64) (hhigh : high.val ≤ 7) :
+    cpoly.field.reduce_wide low high ⦃ out =>
+      Red out ∧ toK out = wideK (low, high) ⦄ := by
+  rw [cpoly.field.reduce_wide]
+  rw [cpoly.field.reduce_wide.LIMB]
+  step as ⟨limb, hlimb⟩
+  norm_num [U64.size, U64.numBits] at hlimb
+  have hshift : ((1 <<< 32 : Nat) % 18446744073709551616) = 4294967296 := by
+    decide
+  rw [hshift] at hlimb
+  step as ⟨r0, hr0⟩
+  step as ⟨q0, hq0⟩
+  step as ⟨x0, hx0⟩
+  step as ⟨s0, hs0⟩
+  step as ⟨x1, hx1⟩
+  step as ⟨folded_once, hfolded_once⟩
+  step as ⟨r1, hr1⟩
+  step as ⟨q1, hq1⟩
+  step as ⟨x2, hx2⟩
+  step as ⟨folded_twice, hfolded_twice⟩
+  have hdecomp0 : r0.val + 4294967296 * q0.val = low.val := by
+    rw [hr0, hq0, hlimb]
+    exact Nat.mod_add_div low.val 4294967296
+  have hdecomp1 : r1.val + 4294967296 * q1.val = folded_once.val := by
+    rw [hr1, hq1, hlimb]
+    exact Nat.mod_add_div folded_once.val 4294967296
+  have hL : ((4294967296 : Nat) : K) = (99 : K) := by
+    have hP : P = 4294967197 := by norm_num [P, Hachi.fieldSize]
+    apply (ZMod.natCast_eq_natCast_iff' 4294967296 99 P).2
+    rw [hP]
+  have hdecomp0K' := congrArg (fun n : Nat => (n : K)) hdecomp0
+  have hdecomp0K : (r0.val : K) + ((4294967296 : Nat) : K) * (q0.val : K) = (low.val : K) := by
+    simpa only [Nat.cast_add, Nat.cast_mul] using hdecomp0K'
+  have hdecomp1K' := congrArg (fun n : Nat => (n : K)) hdecomp1
+  have hdecomp1K : (r1.val : K) + ((4294967296 : Nat) : K) * (q1.val : K) = (folded_once.val : K) := by
+    simpa only [Nat.cast_add, Nat.cast_mul] using hdecomp1K'
+  have htwiceK' := congrArg (fun n : Nat => (n : K)) hfolded_twice
+  have htwiceK : (folded_twice.val : K) = (r1.val : K) + (x2.val : K) := by
+    simpa only [Nat.cast_add] using htwiceK'
+  have honceK' := congrArg (fun n : Nat => (n : K)) hfolded_once
+  have honceK : (folded_once.val : K) = (s0.val : K) + (x1.val : K) := by
+    simpa only [Nat.cast_add] using honceK'
+  have hs0K' := congrArg (fun n : Nat => (n : K)) hs0
+  have hs0K : (s0.val : K) = (r0.val : K) + (x0.val : K) := by
+    simpa only [Nat.cast_add] using hs0K'
+  have hx0K' := congrArg (fun n : Nat => (n : K)) hx0
+  have hx0K : (x0.val : K) = ((99 : Nat) : K) * (q0.val : K) := by
+    simpa only [Nat.cast_mul] using hx0K'
+  have hx1K' := congrArg (fun n : Nat => (n : K)) hx1
+  have hx1K : (x1.val : K) = ((9801 : Nat) : K) * (high.val : K) := by
+    simpa only [Nat.cast_mul] using hx1K'
+  have hx2K' := congrArg (fun n : Nat => (n : K)) hx2
+  have hx2K : (x2.val : K) = ((99 : Nat) : K) * (q1.val : K) := by
+    simpa only [Nat.cast_mul] using hx2K'
+  have hfoldedK : (folded_twice.val : K) = wideK (low, high) := by
+    calc
+      (folded_twice.val : K) = (r1.val : K) + ((99 : Nat) : K) * (q1.val : K) := by
+        rw [htwiceK, hx2K]
+      _ = (r1.val : K) + ((4294967296 : Nat) : K) * (q1.val : K) := by
+        rw [hL]
+        norm_num
+      _ = (folded_once.val : K) := hdecomp1K
+      _ = (r0.val : K) + ((99 : Nat) : K) * (q0.val : K) +
+        ((9801 : Nat) : K) * (high.val : K) := by
+        rw [honceK, hs0K, hx0K, hx1K]
+      _ = (low.val : K) + ((9801 : Nat) : K) * (high.val : K) := by
+        rw [hL] at hdecomp0K
+        linear_combination hdecomp0K
+      _ = wideK (low, high) := by
+        simp only [wideK]
+        ring
+  have hlow : low.val < 18446744073709551616 := by
+    have hlow' := low.hBounds
+    norm_num [UScalarTy.U64_numBits_eq] at hlow'
+    exact hlow'
+  have hq0 : q0.val < 4294967296 := by
+    rw [hq0, hlimb]
+    apply (Nat.div_lt_iff_lt_mul (by norm_num)).2
+    norm_num
+    exact hlow
+  have hr0 : r0.val < 4294967296 := by
+    rw [hr0, hlimb]
+    exact Nat.mod_lt _ (by norm_num)
+  have hs0 : s0.val < 429496729600 := by
+    rw [hs0, hx0]
+    omega
+  have hx1 : x1.val ≤ 68607 := by
+    rw [hx1]
+    omega
+  have hfolded_once : folded_once.val < 433791696896 := by
+    rw [hfolded_once]
+    omega
+  have hq1 : q1.val < 101 := by
+    rw [hq1, hlimb]
+    apply (Nat.div_lt_iff_lt_mul (by norm_num)).2
+    norm_num
+    exact hfolded_once
+  have hr1 : r1.val < 4294967296 := by
+    rw [hr1, hlimb]
+    exact Nat.mod_lt _ (by norm_num)
+  have hfolded_twice : folded_twice.val < 4294977196 := by
+    rw [hfolded_twice, hx2]
+    omega
+  have hP : P = 4294967197 := by norm_num [P, Hachi.fieldSize]
+  have htwice_twoP : folded_twice.val < 2 * P := by
+    rw [hP]
+    omega
+  by_cases hP_le : P ≤ folded_twice.val
+  · have hif : folded_twice ≥ cpoly.field.P := by
+      simpa [cpoly_P_val] using hP_le
+    rw [if_pos hif]
+    step as ⟨out, hout⟩
+    · simpa [cpoly_P_val] using hP_le
+    refine ⟨?_, ?_⟩
+    · unfold Red
+      rw [hout, cpoly_P_val, hP] at *
+      omega
+    · have hp_le : cpoly.field.P.val ≤ folded_twice.val := by
+        simpa [cpoly_P_val] using hP_le
+      unfold toK
+      rw [hout, Nat.cast_sub hp_le, cpoly_P_val, ZMod.natCast_self]
+      simpa using hfoldedK
+  · have hif : ¬ folded_twice ≥ cpoly.field.P := by
+      intro h
+      apply hP_le
+      simpa [cpoly_P_val] using h
+    rw [if_neg hif]
+    refine ⟨?_, hfoldedK⟩
+    unfold Red
+    simpa [cpoly_P_val] using Nat.lt_of_not_ge hP_le
+
 /-- The private reduction helper is the direct field multiplication by the
 extension constant. -/
 @[step]
 theorem mul_by_w_spec (t : cpoly.field.Fp) (ht : Red t) :
     cpoly.field.mul_by_w t ⦃ u => Red u ∧ toK u = toK cpoly.field.W * toK t ⦄ := by
   rw [cpoly.field.mul_by_w]
-  exact fp_mul_spec cpoly.field.W t red_W ht
+  step as ⟨u, ru, eu⟩
+  refine ⟨ru, ?_⟩
+  rw [eu]
+  unfold toK
+  rw [cpoly_W_val]
+  ring
 
 /-- `Fp::new` reduces an arbitrary word into the field.  This is the only public
 Rust constructor from a `u64`, and it is what makes `Red` an invariant of the
@@ -510,6 +998,7 @@ theorem ext_neg_spec (a : cpoly.field.Ext4) (ha : Reduced a) :
   rcases fin_four_cases i with h | h | h | h <;> rw [h] <;>
     simp only [extCoeff, e0, e1, e2, e3]
 
+set_option maxRecDepth 16384 in
 /-- `impl Mul for Ext4`.
 
 The Rust code forms the seven schoolbook coefficients `t0 .. t6` and folds the
@@ -517,64 +1006,131 @@ high half back with a factor of `W = 2` (`Y^4 = 2`); the reference `Ext.mul`
 sums the two-branch kernel over all `(i, j) : Fin 4 × Fin 4`.  Expanding both
 double sums with `sum_univ_four'` turns the identity into commutative-ring
 algebra in the eight coefficients, which `ring` closes. -/
-@[step]
 theorem ext_mul_spec (a b : cpoly.field.Ext4) (ha : Reduced a) (hb : Reduced b) :
     cpoly.field.Ext4.Insts.CoreOpsArithMulExt4Ext4.mul a b
       ⦃ c => Reduced c ∧ toExt c = toExt a * toExt b ⦄ := by
   obtain ⟨a0, a1, a2, a3⟩ := ha
   obtain ⟨b0, b1, b2, b3⟩ := hb
-  have hW : Red cpoly.field.W := red_W
   rw [cpoly.field.Ext4.Insts.CoreOpsArithMulExt4Ext4.mul]
-  step as ⟨t0, rt0, et0⟩
-  step as ⟨m01, rm01, em01⟩
-  step as ⟨m10, rm10, em10⟩
-  step as ⟨t1, rt1, et1⟩
-  step as ⟨m02, rm02, em02⟩
-  step as ⟨m11, rm11, em11⟩
-  step as ⟨s2, rs2, es2⟩
-  step as ⟨m20, rm20, em20⟩
-  step as ⟨t2, rt2, et2⟩
-  step as ⟨m03, rm03, em03⟩
-  step as ⟨m12, rm12, em12⟩
-  step as ⟨s3a, rs3a, es3a⟩
-  step as ⟨m21, rm21, em21⟩
-  step as ⟨s3b, rs3b, es3b⟩
-  step as ⟨m30, rm30, em30⟩
-  step as ⟨t3, rt3, et3⟩
-  step as ⟨m13, rm13, em13⟩
-  step as ⟨m22, rm22, em22⟩
-  step as ⟨s4, rs4, es4⟩
-  step as ⟨m31, rm31, em31⟩
-  step as ⟨t4, rt4, et4⟩
-  step as ⟨m23, rm23, em23⟩
-  step as ⟨m32, rm32, em32⟩
-  step as ⟨t5, rt5, et5⟩
-  step as ⟨t6, rt6, et6⟩
-  step as ⟨w4, rw4, ew4⟩
-  step as ⟨c0, rc0, ec0⟩
-  step as ⟨w5, rw5, ew5⟩
-  step as ⟨c1, rc1, ec1⟩
-  step as ⟨w6, rw6, ew6⟩
-  step as ⟨c2, rc2, ec2⟩
-  refine ⟨⟨rc0, rc1, rc2, rt3⟩, ?_⟩
+  step as ⟨c0, hc0bound, hc0⟩
+  step as ⟨c1, hc1bound, hc1⟩
+  step as ⟨c2, hc2bound, hc2⟩
+  step as ⟨c3, hc3bound, hc3⟩
+  step as ⟨c01, hc01bound, hc01⟩
+  step as ⟨c11, hc11bound, hc11⟩
+  step as ⟨c21, hc21bound, hc21⟩
+  step as ⟨c31, hc31bound, hc31⟩
+  step as ⟨c02, hc02bound, hc02⟩
+  step as ⟨c12, hc12bound, hc12⟩
+  step as ⟨c22, hc22bound, hc22⟩
+  step as ⟨c32, hc32bound, hc32⟩
+  step as ⟨c03, hc03bound, hc03⟩
+  step as ⟨c13, hc13bound, hc13⟩
+  step as ⟨c23, hc23bound, hc23⟩
+  step as ⟨c33, hc33bound, hc33⟩
+  change (do
+    let f ← cpoly.field.reduce_wide c03.1 c03.2
+    let f1 ← cpoly.field.reduce_wide c13.1 c13.2
+    let f2 ← cpoly.field.reduce_wide c23.1 c23.2
+    let f3 ← cpoly.field.reduce_wide c33.1 c33.2
+    ok ({ c0 := f, c1 := f1, c2 := f2, c3 := f3 } : cpoly.field.Ext4)) ⦃ c =>
+      Reduced c ∧ toExt c = toExt a * toExt b ⦄
+  step as ⟨f0, rf0, ef0⟩
+  step as ⟨f1, rf1, ef1⟩
+  step as ⟨f2, rf2, ef2⟩
+  step as ⟨f3, rf3, ef3⟩
+  have ec0 : wideK c03 = toK a.c0 * toK b.c0 +
+      2 * toK a.c1 * toK b.c3 + 2 * toK a.c2 * toK b.c2 + 2 * toK a.c3 * toK b.c1 := by
+    rw [hc03, hc02, hc01, hc0]
+    simp only [wideK]
+    norm_num
+  have ec1 : wideK c13 = toK a.c0 * toK b.c1 + toK a.c1 * toK b.c0 +
+      2 * toK a.c2 * toK b.c3 + 2 * toK a.c3 * toK b.c2 := by
+    rw [hc13, hc12, hc11, hc1]
+    simp only [wideK]
+    norm_num
+  have ec2 : wideK c23 = toK a.c0 * toK b.c2 + toK a.c1 * toK b.c1 +
+      toK a.c2 * toK b.c0 + 2 * toK a.c3 * toK b.c3 := by
+    rw [hc23, hc22, hc21, hc2]
+    simp only [wideK]
+    norm_num
+  have ec3 : wideK c33 = toK a.c0 * toK b.c3 + toK a.c1 * toK b.c2 +
+      toK a.c2 * toK b.c1 + toK a.c3 * toK b.c0 := by
+    rw [hc33, hc32, hc31, hc3]
+    simp only [wideK]
+    norm_num
+  refine ⟨⟨rf0, rf1, rf2, rf3⟩, ?_⟩
   apply Ext.ext; intro i
   have h4 : Hachi.ext4Params.d = 4 := Hachi.ext4Params_d
   rw [Ext.coeff_mul, sum_univ_four' Hachi.ext4Params_d]
   simp only [sum_univ_four' Hachi.ext4Params_d, coeff_toExt, Hachi.ext4Params_W, h4]
   rcases fin_four_cases i with h | h | h | h <;> rw [h] <;>
-    simp only [extCoeff, ec0, ec1, ec2, et3, ew4, ew5, ew6, et0, et1, et2, et4, et5, et6,
-      es2, es3a, es3b, es4, em01, em10, em02, em11, em20, em03, em12, em21, em30,
-      em13, em22, em31, em23, em32, toK_W] <;>
+    simp only [extCoeff, ef0, ef1, ef2, ef3, ec0, ec1, ec2, ec3] <;>
     norm_num <;>
     ring
 
-/-- The first `Ext4::square` translation delegates to multiplication. -/
+attribute [step] ext_mul_spec
+
+/- The specialized `Ext4::square` uses the product symmetry: four diagonal
+products and six off-diagonal products, rather than the general multiplier's
+sixteen.  Its raw accumulators are discharged with the same two-word reduction
+contract as `ext_mul_spec`. -/
 @[step]
 theorem ext_square_spec (a : cpoly.field.Ext4) (ha : Reduced a) :
     cpoly.field.Ext4.square a
       ⦃ c => Reduced c ∧ toExt c = toExt a * toExt a ⦄ := by
+  obtain ⟨a0, a1, a2, a3⟩ := ha
   rw [cpoly.field.Ext4.square]
-  exact ext_mul_spec a a ha ha
+  step as ⟨c0, hc0bound, hc0⟩
+  step as ⟨c01, hc01bound, hc01⟩
+  step as ⟨c02, hc02bound, hc02⟩
+  step as ⟨c1, hc1bound, hc1⟩
+  step as ⟨c11, hc11bound, hc11⟩
+  step as ⟨c2, hc2bound, hc2⟩
+  step as ⟨c21, hc21bound, hc21⟩
+  step as ⟨c22, hc22bound, hc22⟩
+  step as ⟨c3, hc3bound, hc3⟩
+  step as ⟨c31, hc31bound, hc31⟩
+  change (do
+    let f ← cpoly.field.reduce_wide c02.1 c02.2
+    let f1 ← cpoly.field.reduce_wide c11.1 c11.2
+    let f2 ← cpoly.field.reduce_wide c22.1 c22.2
+    let f3 ← cpoly.field.reduce_wide c31.1 c31.2
+    ok ({ c0 := f, c1 := f1, c2 := f2, c3 := f3 } : cpoly.field.Ext4)) ⦃ c =>
+      Reduced c ∧ toExt c = toExt a * toExt a ⦄
+  step as ⟨f0, rf0, ef0⟩
+  step as ⟨f1, rf1, ef1⟩
+  step as ⟨f2, rf2, ef2⟩
+  step as ⟨f3, rf3, ef3⟩
+  have ec0 : wideK c02 = toK a.c0 * toK a.c0 +
+      4 * toK a.c1 * toK a.c3 + 2 * toK a.c2 * toK a.c2 := by
+    rw [hc02, hc01, hc0]
+    simp only [wideK]
+    norm_num
+  have ec1 : wideK c11 = 2 * toK a.c0 * toK a.c1 +
+      4 * toK a.c2 * toK a.c3 := by
+    rw [hc11, hc1]
+    simp only [wideK]
+    norm_num
+  have ec2 : wideK c22 = 2 * toK a.c0 * toK a.c2 + toK a.c1 * toK a.c1 +
+      2 * toK a.c3 * toK a.c3 := by
+    rw [hc22, hc21, hc2]
+    simp only [wideK]
+    norm_num
+  have ec3 : wideK c31 = 2 * toK a.c0 * toK a.c3 +
+      2 * toK a.c1 * toK a.c2 := by
+    rw [hc31, hc3]
+    simp only [wideK]
+    norm_num
+  refine ⟨⟨rf0, rf1, rf2, rf3⟩, ?_⟩
+  apply Ext.ext; intro i
+  have h4 : Hachi.ext4Params.d = 4 := Hachi.ext4Params_d
+  rw [Ext.coeff_mul, sum_univ_four' Hachi.ext4Params_d]
+  simp only [sum_univ_four' Hachi.ext4Params_d, coeff_toExt, Hachi.ext4Params_W, h4]
+  rcases fin_four_cases i with h | h | h | h <;> rw [h] <;>
+    simp only [extCoeff, ef0, ef1, ef2, ef3, ec0, ec1, ec2, ec3] <;>
+    norm_num <;>
+    ring
 
 /-- `impl Mul<Ext4> for Fp` — scaling an extension element by a base-field one.
 

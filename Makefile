@@ -38,6 +38,14 @@ PKG       := $(CURDIR)/cpoly
 TOOLCHAIN := $(CURDIR)/toolchain
 STAMPS    := $(CURDIR)/.make
 
+# The assembly experiment is isolated from the production Aeneas package: its
+# Rust leaf, its Sail proof, and their incompatible Lean toolchains each keep a
+# separate build root.
+RISCV_RUST_PKG := $(CURDIR)/experiments/riscv-fp-mul
+RISCV_PROOF    := $(CURDIR)/experiments/riscv-fp-mul-proof
+RISCV_TARGET   := riscv64gc-unknown-none-elf
+ANNEAL_VERSION := 0.1.0-alpha.24
+
 # Overridable, for binaries kept somewhere else: `make extract CHARON=/path/to/charon`.
 CHARON := $(TOOLCHAIN)/charon
 AENEAS := $(TOOLCHAIN)/aeneas
@@ -70,7 +78,8 @@ TC_STAMP   := $(STAMPS)/toolchain-$(AENEAS_TAG)
 BUILD_LOG  := $(STAMPS)/build.log
 
 .DEFAULT_GOAL := help
-.PHONY: help setup build test extract check-toolchain clean
+.PHONY: help setup build test extract check-toolchain clean \
+	setup-riscv-prototype riscv-prototype riscv-rust riscv-proof riscv-anneal
 
 # One synopsis, then targets, then variables -- the usual shape for a command's
 # --help. No per-target variable subsections: a variable on the command line
@@ -100,11 +109,14 @@ help:
 	@echo '    test           run the Rust-side semantics tests'
 	@echo '    clean          drop build output, keeping fetched dependencies'
 	@echo '    run-bench      time every operation against its frozen first translation'
+	@echo '    riscv-prototype check the experimental RV64 leaf and its Sail proof'
 	@echo ''
 	@echo '  Advanced targets (driven by the optimization loop, rarely by hand):'
 	@echo '    bench-check    check the frozen baseline against git, and bench coverage'
 	@echo '    bench-stamp    re-derive the @genesis stamps after adding a function'
 	@echo '    ledger-check   validate logs/ledger.jsonl rows and append-only history'
+	@echo '    riscv-anneal   generate/check the experimental unsafe-leaf axiom'
+	@echo '    setup-riscv-prototype install the optional RV64 and Anneal toolchains'
 	@echo ''
 	@echo '  Variables:'
 	@echo '    AENEAS=<path>  aeneas binary for `extract` (default ./toolchain/aeneas)'
@@ -240,6 +252,92 @@ test:
 	  echo 'error: cargo not found. Run `make setup`.' >&2; exit 1; \
 	fi; \
 	cd $(PKG) && cargo test
+
+# --- experimental RV64 field multiplication ---------------------------------
+
+# Optional by design. Anneal is pre-alpha and installs its own pinned
+# Charon/Aeneas/Lean stack; making it part of `setup` would impose that moving
+# dependency on users of the stable, zero-axiom proof pipeline.
+setup-riscv-prototype: bench-toolchain
+	@set -euo pipefail; \
+	echo '==> RV64 Rust target ($(BENCH_TOOLCHAIN))'; \
+	rustup target add --toolchain '$(BENCH_TOOLCHAIN)' '$(RISCV_TARGET)'; \
+	if ! cargo anneal --version 2>/dev/null | grep -q '$(ANNEAL_VERSION)'; then \
+	  echo '==> installing cargo-anneal $(ANNEAL_VERSION)'; \
+	  rustup run '$(BENCH_TOOLCHAIN)' cargo install --locked \
+	    'cargo-anneal@$(ANNEAL_VERSION)'; \
+	fi; \
+	if [ '$(OS)' = macos ]; then \
+	  if ! command -v brew >/dev/null 2>&1; then \
+	    echo 'error: Anneal aarch64-macos needs GMP; Homebrew was not found.' >&2; \
+	    echo '       Install Homebrew and GMP, then retry.' >&2; exit 1; \
+	  elif ! brew --prefix gmp >/dev/null 2>&1; then \
+	    echo '==> installing GMP (Anneal macOS runtime dependency)'; \
+	    brew install gmp; \
+	  fi; \
+	fi; \
+	echo '==> Anneal-managed Charon/Aeneas/Lean toolchain'; \
+	cargo anneal setup
+
+riscv-prototype: riscv-rust riscv-proof
+	@echo '==> RV64 prototype checks out; performance still requires target hardware'
+
+# The source tests execute the portable branch on the host. The cross-build is
+# the complementary check: keep the actual RV64 body compiling and fail if LLVM
+# no longer emits the two adjacent instructions proved in Lean.
+riscv-rust: bench-toolchain
+	@echo '==> RV64 field-multiplication Rust experiment'
+	@set -euo pipefail; \
+	if ! rustup target list --installed --toolchain '$(BENCH_TOOLCHAIN)' | \
+	    grep -qx '$(RISCV_TARGET)'; then \
+	  echo 'error: target $(RISCV_TARGET) is missing for $(BENCH_TOOLCHAIN).' >&2; \
+	  echo '       Run `make setup-riscv-prototype`.' >&2; exit 1; \
+	fi; \
+	rustup run '$(BENCH_TOOLCHAIN)' cargo test \
+	  --manifest-path '$(RISCV_RUST_PKG)/Cargo.toml'; \
+	rustup run '$(BENCH_TOOLCHAIN)' cargo rustc \
+	  --manifest-path '$(RISCV_RUST_PKG)/Cargo.toml' --release \
+	  --target '$(RISCV_TARGET)' --lib -- -C link-dead-code --emit=asm; \
+	asm_dir='$(RISCV_RUST_PKG)/target/$(RISCV_TARGET)/release/deps'; \
+	awk 'prev ~ /^[[:space:]]*mul[[:space:]]/ && \
+	     $$0 ~ /^[[:space:]]*remu[[:space:]]/ { found = 1 } \
+	     { prev = $$0 } END { exit !found }' "$$asm_dir"/*.s || { \
+	  echo 'error: no adjacent `mul`/`remu` pair in emitted RV64 assembly.' >&2; \
+	  exit 1; \
+	}
+
+# `#print axioms` in CPolyRiscvFpMul.lean exposes the exact proof boundary in
+# every cold build. The scan makes a newly introduced `sorry` fatal even when
+# Lake reuses a cached olean and therefore prints no warning.
+riscv-proof: | $(STAMPS)
+	@echo '==> RV64 field-multiplication Sail proof'
+	@set -euo pipefail; \
+	if grep -nE '(^|[^A-Za-z])sorry([^A-Za-z]|$$)' \
+	    '$(RISCV_PROOF)/CPolyRiscvFpMul.lean'; then \
+	  echo 'error: the RV64 proof contains `sorry`.' >&2; exit 1; \
+	fi; \
+	cd '$(RISCV_PROOF)' && lake build CPolyRiscvFpMul \
+	  2>&1 | tee '$(STAMPS)/riscv-proof.log'; \
+	if grep -q 'sorryAx' '$(STAMPS)/riscv-proof.log'; then \
+	  echo 'error: the RV64 proof depends on `sorryAx`.' >&2; exit 1; \
+	fi
+
+# Anneal intentionally imports the inline-assembly contract as an axiom. This
+# checks generation/composition only; CPolyRiscvFpMul.lean is what justifies the
+# axiom's mathematical statement.
+riscv-anneal:
+	@set -euo pipefail; \
+	if ! cargo anneal --version >/dev/null 2>&1; then \
+	  echo 'error: cargo-anneal is missing. Run `make setup-riscv-prototype`.' >&2; \
+	  exit 1; \
+	fi; \
+	if [ '$(OS)' = macos ] && command -v brew >/dev/null 2>&1; then \
+	  gmp_lib="$$(brew --prefix gmp 2>/dev/null)/lib"; \
+	  if [ -f "$$gmp_lib/libgmp.10.dylib" ]; then \
+	    export DYLD_LIBRARY_PATH="$$gmp_lib:$${DYLD_LIBRARY_PATH:-}"; \
+	  fi; \
+	fi; \
+	cd '$(RISCV_RUST_PKG)' && cargo anneal verify --lib
 
 # `--preset=aeneas` is mandatory: aeneas rejects an llbc emitted without it.
 # `-- --lib` keeps cargo off the test targets, which are not part of the model.
@@ -391,4 +489,7 @@ clean:
 	@echo '==> clean'
 	@-cd $(PKG) && lake clean
 	@-cd $(PKG) && cargo clean
+	@-cd $(RISCV_RUST_PKG) && cargo clean
+	@-cd $(RISCV_PROOF) && lake clean
 	@rm -f '$(BUILD_LOG)' '$(PKG)/$(LLBC)'
+	@rm -f '$(STAMPS)/riscv-proof.log'

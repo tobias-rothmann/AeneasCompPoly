@@ -23,9 +23,9 @@
 
 use cpoly::field::{Ext4, Fp, P, W};
 use cpoly::multilinear::{
-    add_pointwise, eq_tilde, lagrange_basis, lagrange_to_mono_level, monomial_basis,
-    mono_to_lagrange_level, neg_pointwise, scale_pointwise, table_len, MultilinearEvals,
-    MultilinearPoly,
+    add_pointwise, eq_tilde, eval_mle_layer, lagrange_basis, lagrange_to_mono_level,
+    mono_to_lagrange_level, monomial_basis, neg_pointwise, scale_pointwise, table_len,
+    MultilinearEvals, MultilinearPoly,
 };
 
 /// The independent representation of an extension element: little-endian
@@ -33,12 +33,7 @@ use cpoly::multilinear::{
 type E = [u64; 4];
 
 fn of(a: Ext4) -> E {
-    [
-        a.c0.to_u64(),
-        a.c1.to_u64(),
-        a.c2.to_u64(),
-        a.c3.to_u64(),
-    ]
+    [a.c0.to_u64(), a.c1.to_u64(), a.c2.to_u64(), a.c3.to_u64()]
 }
 
 fn to(a: E) -> Ext4 {
@@ -145,7 +140,14 @@ fn sample(seed: u64, count: usize) -> Vec<E> {
         flat.push(z % P);
     }
     (0..count)
-        .map(|i| [flat[4 * i], flat[4 * i + 1], flat[4 * i + 2], flat[4 * i + 3]])
+        .map(|i| {
+            [
+                flat[4 * i],
+                flat[4 * i + 1],
+                flat[4 * i + 2],
+                flat[4 * i + 3],
+            ]
+        })
         .collect()
 }
 
@@ -220,7 +222,11 @@ fn ref_mobius_spec(p: &[E], n: usize) -> Vec<E> {
             for j in 0..(1usize << n) {
                 if i & j == j {
                     let d = (i.count_ones() - j.count_ones()) % 2;
-                    acc = if d == 0 { radd(acc, p[j]) } else { rsub(acc, p[j]) };
+                    acc = if d == 0 {
+                        radd(acc, p[j])
+                    } else {
+                        rsub(acc, p[j])
+                    };
                 }
             }
             acc
@@ -232,6 +238,30 @@ fn ref_mobius_spec(p: &[E], n: usize) -> Vec<E> {
 /// `Σ_i p[i] · ∏_{bit j of i set} x[j]`.
 fn ref_eval_coeffs(p: &[E], x: &[E]) -> E {
     ref_dot(p, &ref_monomial_basis(x))
+}
+
+/// One MLE layer, written in the original two-product affine form so the test
+/// remains an oracle for the optimized implementation.
+fn ref_eval_mle_layer(values: &[E], x0: E) -> Vec<E> {
+    let half = values.len() / 2;
+    (0..half)
+        .map(|j| {
+            radd(
+                rmul(rsub(rone(), x0), values[2 * j]),
+                rmul(x0, values[2 * j + 1]),
+            )
+        })
+        .collect()
+}
+
+fn fresh_eval_mle_reference(values: &[Ext4], point: &[Ext4]) -> Ext4 {
+    let mut cur = values.to_vec();
+    let mut j = 0;
+    while j < point.len() {
+        cur = eval_mle_layer(&cur, point[j]);
+        j += 1;
+    }
+    cur[0]
 }
 
 // ---------------------------------------------------------------
@@ -256,7 +286,11 @@ fn zero_is_all_zeros() {
         let ze = MultilinearEvals::zeros(n);
         assert_eq!(ze.len(), 1usize << n);
         assert_eq!(ofe(&ze), ofc(&z));
-        assert_eq!(ofe(&z.clone().to_evals(n)), ofe(&ze), "zeta of zero is zero");
+        assert_eq!(
+            ofe(&z.clone().to_evals(n)),
+            ofe(&ze),
+            "zeta of zero is zero"
+        );
     }
 }
 
@@ -302,6 +336,30 @@ fn bases_match_reference() {
             ref_lagrange_basis(&w),
             "lagrange n={n}"
         );
+    }
+}
+
+/// Each doubling step appends the entries with its new little-endian bit set.
+/// Check that exact order for every Boolean point through four variables, in
+/// addition to the arbitrary extension-field corpus above.
+#[test]
+fn iterative_bases_preserve_little_endian_order() {
+    for n in 0..=4 {
+        for k in 0..(1usize << n) {
+            let w: Vec<E> = (0..n)
+                .map(|j| if bit(k, j) { rone() } else { RZERO })
+                .collect();
+            assert_eq!(
+                ofv(&monomial_basis(&tov(&w))),
+                ref_monomial_basis(&w),
+                "monomial n={n} point={k}"
+            );
+            assert_eq!(
+                ofe(&lagrange_basis(&tov(&w))),
+                ref_lagrange_basis(&w),
+                "lagrange n={n} point={k}"
+            );
+        }
     }
 }
 
@@ -366,6 +424,78 @@ fn eval_mle_matches_eval_lagrange() {
         let v = evals(&sample(n as u64 + 71, sz));
         let w = tov(&sample(n as u64 + 81, n));
         assert_eq!(of(v.eval_mle(&w)), of(v.eval(&w)), "mle n={n}");
+    }
+}
+
+#[test]
+fn affine_mle_layers_and_in_place_fold_match_the_reference() {
+    for n in 0..9 {
+        let len = 1usize << n;
+        let values = sample(0x401 + n as u64, len);
+        let point = sample(0x801 + n as u64, n);
+        let mut cur = values.clone();
+        for &x in &point {
+            assert_eq!(
+                ofv(&eval_mle_layer(&tov(&cur), to(x))),
+                ref_eval_mle_layer(&cur, x),
+                "extension layer n={n}"
+            );
+            cur = ref_eval_mle_layer(&cur, x);
+        }
+        let values_ext = tov(&values);
+        let point_ext = tov(&point);
+        assert_eq!(
+            evals(&values).eval_mle(&point_ext),
+            fresh_eval_mle_reference(&values_ext, &point_ext),
+            "extension full n={n}"
+        );
+    }
+
+    for n in 0..=4 {
+        let len = 1usize << n;
+        for point_bits in 0..(1usize << n) {
+            let point: Vec<E> = (0..n)
+                .map(|j| if bit(point_bits, j) { rone() } else { RZERO })
+                .collect();
+            for table_kind in 0..3 {
+                let values: Vec<E> = (0..len)
+                    .map(|i| {
+                        if (i + table_kind) % 2 == 0 {
+                            RZERO
+                        } else {
+                            rone()
+                        }
+                    })
+                    .collect();
+                assert_eq!(
+                    evals(&values).eval_mle(&tov(&point)),
+                    fresh_eval_mle_reference(&tov(&values), &tov(&point)),
+                    "boolean n={n}, point={point_bits}, table={table_kind}"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn in_place_mle_preserves_the_fresh_fold_panic_behavior() {
+    for table_len in 0..=8 {
+        let values = tov(&sample(0xA01 + table_len as u64, table_len));
+        for point_len in 0..=6 {
+            let point = tov(&sample(0xB01 + point_len as u64, point_len));
+            let fresh = std::panic::catch_unwind(|| fresh_eval_mle_reference(&values, &point));
+            let in_place = std::panic::catch_unwind(|| {
+                MultilinearEvals::from_values(values.clone()).eval_mle(&point)
+            });
+            assert_eq!(
+                fresh.is_ok(),
+                in_place.is_ok(),
+                "table={table_len}, point={point_len}"
+            );
+            if let (Ok(fresh), Ok(in_place)) = (fresh, in_place) {
+                assert_eq!(fresh, in_place, "table={table_len}, point={point_len}");
+            }
+        }
     }
 }
 
@@ -468,6 +598,72 @@ fn eq_tilde_matches_product_form() {
     }
 }
 
+/// The direct implementation agrees with the former basis-and-evaluation route
+/// on its full valid domain, including exhaustive Boolean points and a
+/// deterministic arbitrary-point corpus.  It also preserves the old behavior
+/// on unequal input lengths: extra `x` coordinates contribute `(1 - x[i])`,
+/// while a shorter `x` panics.
+#[test]
+fn eq_tilde_matches_lagrange_oracle_and_legacy_arities() {
+    assert_eq!(eq_tilde(&[], &[]), Ext4::ONE, "zero-dimensional kernel");
+
+    for n in 0..5 {
+        let points = 1usize << n;
+        for wi in 0..points {
+            let w: Vec<Ext4> = (0..n)
+                .map(|j| if bit(wi, j) { Ext4::ONE } else { Ext4::ZERO })
+                .collect();
+            for xi in 0..points {
+                let x: Vec<Ext4> = (0..n)
+                    .map(|j| if bit(xi, j) { Ext4::ONE } else { Ext4::ZERO })
+                    .collect();
+                assert_eq!(
+                    eq_tilde(&w, &x),
+                    lagrange_basis(&w).eval(&x),
+                    "Boolean oracle n={n} w={wi} x={xi}"
+                );
+            }
+        }
+    }
+
+    for n in 0..13 {
+        let w = tov(&sample(n as u64 + 171, n));
+        let x = tov(&sample(n as u64 + 181, n));
+        assert_eq!(
+            eq_tilde(&w, &x),
+            lagrange_basis(&w).eval(&x),
+            "arbitrary oracle n={n}"
+        );
+    }
+
+    for wlen in 0..5 {
+        for extra in 1..4 {
+            let w = tov(&sample(wlen as u64 + 191, wlen));
+            let x = tov(&sample(wlen as u64 + extra as u64 + 201, wlen + extra));
+            assert_eq!(
+                eq_tilde(&w, &x),
+                lagrange_basis(&w).eval(&x),
+                "longer x wlen={wlen} extra={extra}"
+            );
+        }
+    }
+
+    for wlen in 1..5 {
+        for xlen in 0..wlen {
+            let w = tov(&sample(wlen as u64 + 211, wlen));
+            let x = tov(&sample(xlen as u64 + 221, xlen));
+            assert!(
+                std::panic::catch_unwind(|| eq_tilde(&w, &x)).is_err(),
+                "direct path should panic for wlen={wlen} xlen={xlen}"
+            );
+            assert!(
+                std::panic::catch_unwind(|| lagrange_basis(&w).eval(&x)).is_err(),
+                "legacy path should panic for wlen={wlen} xlen={xlen}"
+            );
+        }
+    }
+}
+
 /// Negation and scalar multiplication, in both readings.  Each reading has its
 /// own `Neg` and `Mul<Ext4>`, sharing one loop underneath.
 #[test]
@@ -481,8 +677,16 @@ fn neg_and_smul_are_coefficientwise() {
 
         assert_eq!(ofc(&-&coeffs(&p, n)), want_neg, "MultilinearPoly neg n={n}");
         assert_eq!(ofe(&-&evals(&p)), want_neg, "MultilinearEvals neg n={n}");
-        assert_eq!(ofc(&(&coeffs(&p, n) * to(s))), want_smul, "MultilinearPoly smul n={n}");
-        assert_eq!(ofe(&(&evals(&p) * to(s))), want_smul, "MultilinearEvals smul n={n}");
+        assert_eq!(
+            ofc(&(&coeffs(&p, n) * to(s))),
+            want_smul,
+            "MultilinearPoly smul n={n}"
+        );
+        assert_eq!(
+            ofe(&(&evals(&p) * to(s))),
+            want_smul,
+            "MultilinearEvals smul n={n}"
+        );
 
         // the shared helpers agree with the impls that call them
         assert_eq!(ofv(&neg_pointwise(&tov(&p))), want_neg);

@@ -73,7 +73,10 @@ macro_rules! define_cases {
             // -- corpus -----------------------------------------------------
 
             fn fps(tag: u64, n: usize) -> Vec<cp::Fp> {
-                support::words(tag, n).into_iter().map(cp::Fp::new).collect()
+                support::words(tag, n)
+                    .into_iter()
+                    .map(cp::Fp::new)
+                    .collect()
             }
 
             fn ext4s(tag: u64, n: usize) -> Vec<cp::Ext4> {
@@ -420,10 +423,12 @@ macro_rules! define_cases {
             /// `support::control_workload`.
             pub fn control(m: Mode<'_, '_>, n: usize) -> u64 {
                 let xs = support::words(0x0000, n);
-                support::run(m, || support::control_workload(black_box(&xs)),
-                    |v: &Vec<u64>| v.iter().fold(0u64, |a, x| support::mix(a, *x)))
+                support::run(
+                    m,
+                    || support::control_workload(black_box(&xs)),
+                    |v: &Vec<u64>| v.iter().fold(0u64, |a, x| support::mix(a, *x)),
+                )
             }
-
         }
     };
 }

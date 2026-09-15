@@ -102,8 +102,9 @@ macro_rules! define_cases {
             }
 
             fn d_slice(v: &[cp::Ext4]) -> u64 {
-                v.iter()
-                    .fold(support::mix(0, v.len() as u64), |a, x| support::mix(a, d_ext4(x)))
+                v.iter().fold(support::mix(0, v.len() as u64), |a, x| {
+                    support::mix(a, d_ext4(x))
+                })
             }
 
             // `&Vec` rather than `&[_]` because these are used as the `digest`
@@ -230,11 +231,7 @@ macro_rules! define_cases {
 
             pub fn monomial_basis(m: Mode<'_, '_>, vars: usize) -> u64 {
                 let pt = point(0x040F, vars);
-                support::run(
-                    m,
-                    || cp::multilinear::monomial_basis(black_box(&pt)),
-                    d_vec,
-                )
+                support::run(m, || cp::multilinear::monomial_basis(black_box(&pt)), d_vec)
             }
 
             pub fn lagrange_basis(m: Mode<'_, '_>, vars: usize) -> u64 {
@@ -276,7 +273,14 @@ macro_rules! define_cases {
 
             pub fn poly_neg(m: Mode<'_, '_>, vars: usize) -> u64 {
                 let p = cp::MultilinearPoly::from_coeffs(table(0x0418, vars), vars);
-                support::run(m, || { let p = black_box(&p); -p }, d_poly)
+                support::run(
+                    m,
+                    || {
+                        let p = black_box(&p);
+                        -p
+                    },
+                    d_poly,
+                )
             }
 
             pub fn poly_smul(m: Mode<'_, '_>, vars: usize) -> u64 {
@@ -312,7 +316,14 @@ macro_rules! define_cases {
 
             pub fn evals_neg(m: Mode<'_, '_>, vars: usize) -> u64 {
                 let e = cp::MultilinearEvals::from_values(table(0x0422, vars));
-                support::run(m, || { let e = black_box(&e); -e }, d_evals)
+                support::run(
+                    m,
+                    || {
+                        let e = black_box(&e);
+                        -e
+                    },
+                    d_evals,
+                )
             }
 
             pub fn evals_smul(m: Mode<'_, '_>, vars: usize) -> u64 {
@@ -332,10 +343,12 @@ macro_rules! define_cases {
             /// `support::control_workload`.
             pub fn control(m: Mode<'_, '_>, n: usize) -> u64 {
                 let xs = support::words(0x0000, n);
-                support::run(m, || support::control_workload(black_box(&xs)),
-                    |v: &Vec<u64>| v.iter().fold(0u64, |a, x| support::mix(a, *x)))
+                support::run(
+                    m,
+                    || support::control_workload(black_box(&xs)),
+                    |v: &Vec<u64>| v.iter().fold(0u64, |a, x| support::mix(a, *x)),
+                )
             }
-
         }
     };
 }
@@ -377,9 +390,19 @@ fn multilinear_benches(c: &mut Criterion) {
     // @covers multilinear::eval_mle_layer
     bench_case!(c, "multilinear/eval_mle_layer", eval_mle_layer, [v]);
     // @covers multilinear::mono_to_lagrange_level
-    bench_case!(c, "multilinear/mono_to_lagrange_level", mono_to_lagrange_level, [v]);
+    bench_case!(
+        c,
+        "multilinear/mono_to_lagrange_level",
+        mono_to_lagrange_level,
+        [v]
+    );
     // @covers multilinear::lagrange_to_mono_level
-    bench_case!(c, "multilinear/lagrange_to_mono_level", lagrange_to_mono_level, [v]);
+    bench_case!(
+        c,
+        "multilinear/lagrange_to_mono_level",
+        lagrange_to_mono_level,
+        [v]
+    );
 
     // @covers multilinear::<&MultilinearPoly as Neg>::neg
     bench_case!(c, "multilinear/poly_neg", poly_neg, [v]);
@@ -406,7 +429,12 @@ fn multilinear_benches(c: &mut Criterion) {
     // @covers multilinear::MultilinearPoly::eval
     bench_case!(c, "multilinear/poly_eval", poly_eval, [v0, v1]);
     // @covers multilinear::MultilinearPoly::eval_horner
-    bench_case!(c, "multilinear/poly_eval_horner", poly_eval_horner, [v0, v1]);
+    bench_case!(
+        c,
+        "multilinear/poly_eval_horner",
+        poly_eval_horner,
+        [v0, v1]
+    );
     // @covers multilinear::MultilinearPoly::to_evals
     bench_case!(c, "multilinear/poly_to_evals", poly_to_evals, [v0, v1]);
 

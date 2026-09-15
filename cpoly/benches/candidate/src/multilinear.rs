@@ -135,26 +135,23 @@ pub fn dot(a: &[Ext4], b: &[Ext4]) -> Ext4 {
 /// point[j]`.  Mirrors `CMlPolynomial.monomialBasis`.
 ///
 /// This is the vector [`MultilinearPoly::eval`] dots a coefficient table
-/// against.  The inner loop walks the bits of `i` from least to most
-/// significant, keeping `m = i / 2^j` so that `m % 2` is bit `j`.
+/// against.  It grows the little-endian table one coordinate at a time: the
+/// existing half has the new bit clear, and its copy multiplied by `point[j]`
+/// has that bit set.
 pub fn monomial_basis(point: &[Ext4]) -> Vec<Ext4> {
     let vars: usize = point.len();
     let sz: usize = table_len(vars);
-    let mut basis: Vec<Ext4> = Vec::new();
-    let mut i: usize = 0;
-    while i < sz {
-        let mut acc: Ext4 = Ext4::ONE;
-        let mut m: usize = i;
-        let mut j: usize = 0;
-        while j < vars {
-            if m % 2 == 1 {
-                acc *= point[j];
-            }
-            m /= 2;
-            j += 1;
+    let mut basis: Vec<Ext4> = Vec::with_capacity(sz);
+    basis.push(Ext4::ONE);
+    let mut j: usize = 0;
+    while j < vars {
+        let half: usize = basis.len();
+        let mut i: usize = 0;
+        while i < half {
+            basis.push(basis[i] * point[j]);
+            i += 1;
         }
-        basis.push(acc);
-        i += 1;
+        j += 1;
     }
     basis
 }
@@ -165,27 +162,32 @@ pub fn monomial_basis(point: &[Ext4]) -> Vec<Ext4> {
 ///
 /// The result is returned as [`MultilinearEvals`] because that is what it is:
 /// the hypercube table of the equality kernel `eq~(point, ·)`, which is why
-/// [`eq_tilde`] is just this followed by [`MultilinearEvals::eval`].
+/// [`eq_tilde`] is just this followed by [`MultilinearEvals::eval`].  Each
+/// level writes the bit-clear half and then the bit-set half into a fresh,
+/// exactly-sized vector, preserving little-endian order without rescanning
+/// previous coordinates.
 pub fn lagrange_basis(point: &[Ext4]) -> MultilinearEvals {
     let vars: usize = point.len();
-    let sz: usize = table_len(vars);
-    let mut basis: Vec<Ext4> = Vec::new();
-    let mut i: usize = 0;
-    while i < sz {
-        let mut acc: Ext4 = Ext4::ONE;
-        let mut m: usize = i;
-        let mut j: usize = 0;
-        while j < vars {
-            if m % 2 == 1 {
-                acc *= point[j];
-            } else {
-                acc *= Ext4::ONE - point[j];
-            }
-            m /= 2;
-            j += 1;
+    let _sz: usize = table_len(vars);
+    let mut basis: Vec<Ext4> = Vec::with_capacity(1);
+    basis.push(Ext4::ONE);
+    let mut j: usize = 0;
+    while j < vars {
+        let one_minus: Ext4 = Ext4::ONE - point[j];
+        let half: usize = basis.len();
+        let mut next: Vec<Ext4> = Vec::with_capacity(2 * half);
+        let mut i: usize = 0;
+        while i < half {
+            next.push(basis[i] * one_minus);
+            i += 1;
         }
-        basis.push(acc);
-        i += 1;
+        i = 0;
+        while i < half {
+            next.push(basis[i] * point[j]);
+            i += 1;
+        }
+        basis = next;
+        j += 1;
     }
     MultilinearEvals(basis)
 }
@@ -202,7 +204,7 @@ pub fn lagrange_basis(point: &[Ext4]) -> MultilinearEvals {
 /// If `b` is shorter than `a`: the loop runs over `a.len()`.
 pub fn add_pointwise(a: &[Ext4], b: &[Ext4]) -> Vec<Ext4> {
     let n: usize = a.len();
-    let mut out: Vec<Ext4> = Vec::new();
+    let mut out: Vec<Ext4> = Vec::with_capacity(n);
     let mut i: usize = 0;
     while i < n {
         out.push(a[i] + b[i]);
@@ -219,7 +221,7 @@ pub fn add_pointwise(a: &[Ext4], b: &[Ext4]) -> Vec<Ext4> {
 /// `CMlPolynomialEval.neg`.
 pub fn neg_pointwise(v: &[Ext4]) -> Vec<Ext4> {
     let n: usize = v.len();
-    let mut out: Vec<Ext4> = Vec::new();
+    let mut out: Vec<Ext4> = Vec::with_capacity(n);
     let mut i: usize = 0;
     while i < n {
         out.push(-v[i]);
@@ -245,8 +247,30 @@ pub fn scale_pointwise(v: &[Ext4], scalar: Ext4) -> Vec<Ext4> {
 
 /// The multilinear equality kernel `eq~(w, x)`.  Mirrors
 /// `CMlPolynomialEval.eqTilde`.
+///
+/// For equal-length inputs of arity `n`, this takes `O(n)` field operations and
+/// `O(1)` auxiliary storage.
+///
+/// # Panics
+///
+/// If `x` is shorter than `w`.  This is the behavior of the former
+/// `lagrange_basis(w).eval(x)` implementation.  If `x` is longer, its extra
+/// coordinates retain that implementation's `(1 - x[i])` factors.
 pub fn eq_tilde(w: &[Ext4], x: &[Ext4]) -> Ext4 {
-    lagrange_basis(w).eval(x)
+    let n: usize = w.len();
+    let mut acc: Ext4 = Ext4::ONE;
+    let mut i: usize = 0;
+    while i < n {
+        let product: Ext4 = x[i] * w[i];
+        let factor: Ext4 = Ext4::ONE - x[i] - w[i] + product + product;
+        acc *= factor;
+        i += 1;
+    }
+    while i < x.len() {
+        acc *= Ext4::ONE - x[i];
+        i += 1;
+    }
+    acc
 }
 
 // ------------------------------------------------------------------
@@ -275,17 +299,20 @@ pub fn eval_horner_layer(coeffs: &[Ext4], x0: Ext4) -> Vec<Ext4> {
 /// One multilinear-extension layer on an *evaluation* table: fold the
 /// least-significant variable at `x0`, halving the length.
 ///
-/// `out[j] = (1 - x0) * values[2j] + x0 * values[2j+1]`.
+/// `out[j] = values[2j] + x0 * (values[2j+1] - values[2j])`.
+///
+/// This affine form is algebraically equivalent to
+/// `(1 - x0) * low + x0 * high`, but uses one extension multiplication per
+/// output rather than two.
 /// Mirrors `CMlPolynomialEval.evalMleLayer`.
 pub fn eval_mle_layer(values: &[Ext4], x0: Ext4) -> Vec<Ext4> {
     let half: usize = values.len() / 2;
-    let one_minus: Ext4 = Ext4::ONE - x0;
     let mut out: Vec<Ext4> = Vec::new();
     let mut j: usize = 0;
     while j < half {
         let lo: Ext4 = values[2 * j];
         let hi: Ext4 = values[2 * j + 1];
-        out.push(one_minus * lo + x0 * hi);
+        out.push(lo + x0 * (hi - lo));
         j += 1;
     }
     out
@@ -535,12 +562,24 @@ impl MultilinearEvals {
 
     /// Evaluate the multilinear extension at `point` by repeated folding layers:
     /// `O(2^vars)` field operations.  Mirrors `CMlPolynomialEval.evalMle`.
+    ///
+    /// The cloned table is folded in its live prefix, then shortened after each
+    /// layer.  This uses one table-sized allocation rather than allocating a
+    /// new vector at every layer; `self` is never mutated.
     pub fn eval_mle(&self, point: &[Ext4]) -> Ext4 {
         let vars: usize = point.len();
         let mut cur: Vec<Ext4> = self.0.clone();
         let mut j: usize = 0;
         while j < vars {
-            cur = eval_mle_layer(&cur, point[j]);
+            let half: usize = cur.len() / 2;
+            let mut i: usize = 0;
+            while i < half {
+                let lo: Ext4 = cur[2 * i];
+                let hi: Ext4 = cur[2 * i + 1];
+                cur[i] = lo + point[j] * (hi - lo);
+                i += 1;
+            }
+            cur.resize(half, Ext4::ZERO);
             j += 1;
         }
         cur[0]

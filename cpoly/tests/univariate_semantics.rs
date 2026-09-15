@@ -35,12 +35,7 @@ use cpoly::univariate::UnivariatePoly;
 type E = [u64; 4];
 
 fn of(a: Ext4) -> E {
-    [
-        a.c0.to_u64(),
-        a.c1.to_u64(),
-        a.c2.to_u64(),
-        a.c3.to_u64(),
-    ]
+    [a.c0.to_u64(), a.c1.to_u64(), a.c2.to_u64(), a.c3.to_u64()]
 }
 
 fn to(a: E) -> Ext4 {
@@ -140,7 +135,14 @@ fn sample_base(seed: u64, count: usize) -> Vec<u64> {
 fn sample_ext(seed: u64, count: usize) -> Vec<E> {
     let flat = sample_base(seed, 4 * count);
     (0..count)
-        .map(|i| [flat[4 * i], flat[4 * i + 1], flat[4 * i + 2], flat[4 * i + 3]])
+        .map(|i| {
+            [
+                flat[4 * i],
+                flat[4 * i + 1],
+                flat[4 * i + 2],
+                flat[4 * i + 3],
+            ]
+        })
         .collect()
 }
 
@@ -188,7 +190,10 @@ fn ref_eval(p: &[E], xv: E) -> E {
 fn univariate_constructors() {
     let r = sample_ext(41, 1)[0];
     assert_eq!(ofv(&UnivariatePoly::constant(to(r))), vec![r]);
-    assert_eq!(ofv(&UnivariatePoly::x()), vec![[0, 0, 0, 0], [1 % P, 0, 0, 0]]);
+    assert_eq!(
+        ofv(&UnivariatePoly::x()),
+        vec![[0, 0, 0, 0], [1 % P, 0, 0, 0]]
+    );
 }
 
 #[test]
@@ -197,7 +202,10 @@ fn trim_drops_exactly_the_trailing_zeros() {
     let z: E = [0, 0, 0, 0];
     assert_eq!(ofv(&tov(&[]).trim()), Vec::<E>::new());
     assert_eq!(ofv(&tov(&[z, z, z]).trim()), Vec::<E>::new());
-    assert_eq!(ofv(&tov(&[a[0], z, a[1], z, z]).trim()), vec![a[0], z, a[1]]);
+    assert_eq!(
+        ofv(&tov(&[a[0], z, a[1], z, z]).trim()),
+        vec![a[0], z, a[1]]
+    );
     assert_eq!(ofv(&tov(&a).trim()), a.clone());
     // A coefficient that is zero in only three of four coordinates must survive.
     for k in 0..4 {
@@ -218,14 +226,13 @@ fn univariate_ops_match_reference() {
 
             // add_raw is zero-padded and untrimmed.
             let want_raw: Vec<E> = (0..n.max(m))
-                .map(|i| {
-                    eradd(
-                        *p.get(i).unwrap_or(&[0; 4]),
-                        *q.get(i).unwrap_or(&[0; 4]),
-                    )
-                })
+                .map(|i| eradd(*p.get(i).unwrap_or(&[0; 4]), *q.get(i).unwrap_or(&[0; 4])))
                 .collect();
-            assert_eq!(ofv(&pr.add_untrimmed(&qr)), want_raw, "add_untrimmed {n}x{m}");
+            assert_eq!(
+                ofv(&pr.add_untrimmed(&qr)),
+                want_raw,
+                "add_untrimmed {n}x{m}"
+            );
 
             let mut want = want_raw.clone();
             while let Some(last) = want.last() {
@@ -242,12 +249,7 @@ fn univariate_ops_match_reference() {
 
             let want_sub = {
                 let mut v: Vec<E> = (0..n.max(m))
-                    .map(|i| {
-                        ersub(
-                            *p.get(i).unwrap_or(&[0; 4]),
-                            *q.get(i).unwrap_or(&[0; 4]),
-                        )
-                    })
+                    .map(|i| ersub(*p.get(i).unwrap_or(&[0; 4]), *q.get(i).unwrap_or(&[0; 4])))
                     .collect();
                 while let Some(last) = v.last() {
                     if *last == [0, 0, 0, 0] {
@@ -268,6 +270,68 @@ fn univariate_ops_match_reference() {
 
             let pt = sample_ext(110 + n as u64, 1)[0];
             assert_eq!(of(pr.eval(to(pt))), ref_eval(&p, pt), "eval {n}");
+        }
+    }
+}
+
+/// The multiplication backend changes at a private measured cutoff, and its
+/// recursive path has different split shapes from the tiny exhaustive corpus
+/// above.  Exercise both sides of that cutoff, odd lengths, large imbalance,
+/// and zero-heavy representations against the independent convolution.
+#[test]
+fn multiplication_large_and_unbalanced_shapes_match_reference() {
+    let shapes: &[(usize, usize)] = &[
+        (0, 0),
+        (0, 1),
+        (1, 0),
+        (1, 1),
+        (2, 5),
+        (5, 2),
+        (4, 4),
+        (5, 5),
+        (8, 9),
+        (16, 16),
+        (17, 31),
+        (31, 17),
+        (32, 32),
+        (33, 33),
+        (64, 64),
+        (65, 64),
+        (127, 128),
+        (128, 127),
+        (255, 256),
+        (256, 255),
+        (256, 256),
+        (17, 257),
+        (257, 17),
+    ];
+
+    for (case, &(n, m)) in shapes.iter().enumerate() {
+        let dense_p = sample_ext(0xB100 + case as u64, n);
+        let dense_q = sample_ext(0xB200 + case as u64, m);
+        for sparse in [false, true] {
+            let mut p = dense_p.clone();
+            let mut q = dense_q.clone();
+            if sparse {
+                for (i, coefficient) in p.iter_mut().enumerate() {
+                    if i % 5 != 0 {
+                        *coefficient = [0; 4];
+                    }
+                }
+                for (i, coefficient) in q.iter_mut().enumerate() {
+                    if i % 7 != 0 {
+                        *coefficient = [0; 4];
+                    }
+                }
+            }
+            let product = &tov(&p) * &tov(&q);
+            assert_eq!(
+                ofv(&product),
+                ref_mul(&p, &q),
+                "{}x{}, sparse={sparse}",
+                n,
+                m
+            );
         }
     }
 }
@@ -307,7 +371,13 @@ fn conventions_pinned() {
     // Evaluating 1 + 2X at Y gives 1 + 2Y.
     assert_eq!(of(p.eval(Ext4::GEN)), [1, 2, 0, 0]);
     // X^4 evaluated at Y is Y^4 = W, so the two directions do interact.
-    let x4 = tov(&[[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [1, 0, 0, 0]]);
+    let x4 = tov(&[
+        [0, 0, 0, 0],
+        [0, 0, 0, 0],
+        [0, 0, 0, 0],
+        [0, 0, 0, 0],
+        [1, 0, 0, 0],
+    ]);
     assert_eq!(of(x4.eval(Ext4::GEN)), [WV, 0, 0, 0]);
     // And `Ext4`'s `Mul` is the operation `eval` uses for that.
     assert_eq!(of(Ext4::GEN * Ext4::GEN), [0, 0, 1, 0]);
@@ -330,7 +400,11 @@ fn coefficients_round_trip() {
         assert_eq!(ofv(&p), e);
         let back: Vec<E> = p.clone().into_coeffs().iter().map(|&a| of(a)).collect();
         assert_eq!(back, e);
-        assert_eq!(UnivariatePoly::from(p.clone().into_coeffs()), p, "From<Vec<Ext4>>");
+        assert_eq!(
+            UnivariatePoly::from(p.clone().into_coeffs()),
+            p,
+            "From<Vec<Ext4>>"
+        );
     }
     // trailing zeros are representable, and survive `from_coeffs`
     let z: E = [0, 0, 0, 0];
@@ -342,7 +416,11 @@ fn len_is_empty_and_degree() {
     assert!(UnivariatePoly::zero().is_empty());
     assert_eq!(UnivariatePoly::zero().len(), 0);
     assert_eq!(UnivariatePoly::zero().degree(), None);
-    assert_eq!(UnivariatePoly::default(), UnivariatePoly::zero(), "Default is the zero polynomial");
+    assert_eq!(
+        UnivariatePoly::default(),
+        UnivariatePoly::zero(),
+        "Default is the zero polynomial"
+    );
 
     // `UnivariatePoly::constant` is untrimmed, so even a zero constant has one coefficient
     assert!(!UnivariatePoly::constant(Ext4::ZERO).is_empty());

@@ -196,7 +196,9 @@ pub fn control_workload(xs: &[u64]) -> Vec<u64> {
     let mut acc = 0u64;
     let mut i = 0usize;
     while i < xs.len() {
-        acc = acc.wrapping_mul(6_364_136_223_846_793_005).wrapping_add(xs[i]);
+        acc = acc
+            .wrapping_mul(6_364_136_223_846_793_005)
+            .wrapping_add(xs[i]);
         acc ^= acc >> 29;
         out.push(acc);
         i += 1;
@@ -341,7 +343,8 @@ macro_rules! case {
         let d_now = now::$f($crate::support::Mode::Digest, p);
         let d_gen = genesis::$f($crate::support::Mode::Digest, p);
         assert_eq!(
-            d_now, d_gen,
+            d_now,
+            d_gen,
             "bench `{}` at {}: cpoly and the frozen genesis snapshot compute \
              DIFFERENT results. Either the current code is wrong, or it changed \
              semantics; either way the timings below would compare two different \
@@ -353,7 +356,8 @@ macro_rules! case {
         {
             let d_cand = candidate::$f($crate::support::Mode::Digest, p);
             assert_eq!(
-                d_cand, d_now,
+                d_cand,
+                d_now,
                 "bench `{}` at {}: the candidate slot and cpoly compute DIFFERENT \
                  results, so this is not an optimization, it is a semantics \
                  change. The loop must reject the candidate; do not silence this.",
@@ -365,9 +369,13 @@ macro_rules! case {
             now::$f($crate::support::Mode::Bench(b), p);
         });
         #[cfg(feature = "candidate")]
-        $g.bench_with_input(::criterion::BenchmarkId::new("candidate", p), &p, |b, &p| {
-            candidate::$f($crate::support::Mode::Bench(b), p);
-        });
+        $g.bench_with_input(
+            ::criterion::BenchmarkId::new("candidate", p),
+            &p,
+            |b, &p| {
+                candidate::$f($crate::support::Mode::Bench(b), p);
+            },
+        );
         $g.bench_with_input(::criterion::BenchmarkId::new("genesis", p), &p, |b, &p| {
             genesis::$f($crate::support::Mode::Bench(b), p);
         });

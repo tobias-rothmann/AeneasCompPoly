@@ -43,3 +43,27 @@
 a single `1usize << vars`. One shift instruction, and every caller of it is
 already benched at the size it produces, so a regression here is unmissable
 there. Benching it would measure the black_box around it."""
+
+# -- genesis-only exclusions -------------------------------------------------
+#
+# A later optimization can introduce a private helper that did not exist in
+# the frozen implementation of its public caller. The caller's frozen body is
+# already the complete baseline, so copying the new helper into genesis would
+# create an artificial item with no baseline to measure. `check-genesis`
+# accepts only private functions and compile-time constants in this table,
+# rejects stale entries, and rejects an exclusion once a frozen counterpart
+# exists. A new private constant is no more a standalone workload than a new
+# helper function: its value is already reflected in the public operation that
+# uses it.
+
+[genesis_exclusions]
+"field::reduce_wide" = "private reduction used only by the optimized `Ext4::mul`; the frozen product has no such helper"
+"field::add_product" = "private accumulator step used only by the optimized `Ext4::mul`; measured through that public row"
+"field::add_double_product" = "private doubled accumulator step used only by the optimized `Ext4::mul`; measured through that public row"
+"field::add_quadruple_product" = "private fourfold accumulator step introduced for optimized `Ext4::square`; measured through that public row"
+"univariate::R64" = "private compile-time reduction constant used only by optimized univariate multiplication; no standalone runtime workload"
+"univariate::KARATSUBA_CUTOFF" = "private compile-time tuning constant used only by optimized univariate multiplication; no standalone runtime workload"
+"univariate::reduce_u128" = "private delayed-reduction helper introduced by optimized univariate multiplication; measured through the public multiplication row"
+"univariate::conv_delayed" = "private schoolbook leaf introduced by optimized univariate multiplication; measured through the public multiplication row"
+"univariate::add_slices" = "private Karatsuba sum helper introduced by optimized univariate multiplication; measured through the public multiplication row"
+"univariate::mul_karatsuba" = "private recursive multiplication helper introduced by optimized univariate multiplication; measured through the public multiplication row"

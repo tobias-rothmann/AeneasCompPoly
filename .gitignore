@@ -1,8 +1,8 @@
-# This repository holds exactly two things: the `cpoly` Rust crate and the Lean
-# proofs about its Aeneas-extracted model. Everything else in this directory --
-# the Aeneas checkouts, the CompPoly clone, the extraction binaries, and every
-# build tree -- is either third-party, machine-local, or derived, and is listed
-# below. `make setup` obtains the parts that are not in git.
+# The production core is the `cpoly` Rust crate and the Lean proofs about its
+# Aeneas-extracted model. Tracked documentation and isolated experiments may sit
+# beside it. The Aeneas checkouts, CompPoly clone, extraction binaries, and every
+# build tree are third-party, machine-local, or derived, and are listed below.
+# `make setup` obtains the parts that are not in git.
 #
 # `cpoly/benches/` is tracked in full, the frozen `genesis/` crate included --
 # it is source, not output. No timings are committed anywhere: the harness keeps

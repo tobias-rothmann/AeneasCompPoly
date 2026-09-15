@@ -52,6 +52,26 @@ turns up in the axiom dependencies `Check.lean` prints.
 `CHARON=` or `AENEAS=` on the command line points `make extract` at binaries
 kept elsewhere.
 
+### Experimental RISC-V assembly path
+
+An isolated prototype replaces one reduced Hachi base-field multiplication on
+RV64IM with `mul` followed by `remu`, gives the unsafe leaf an Anneal contract,
+and proves the abstract instruction sequence against the Sail-derived model in
+`riscv-zkvm`:
+
+```sh
+make setup-riscv-prototype # once: optional RV64 + Anneal toolchains
+make riscv-prototype       # Rust tests/cross-build + Lean/Sail proof
+make riscv-anneal          # generate/check Anneal's opaque-leaf axiom
+```
+
+It is deliberately not enabled in `cpoly`. Anneal treats inline assembly as an
+axiom, the current tools require three incompatible Lean versions, and the Sail
+stack does not yet tie rustc's emitted bytes to its abstract instruction
+stream. The standalone code is shorter, but `remu` latency must be measured on
+the intended physical RISC-V CPU before making a speed claim. See the full
+[feasibility report](docs/riscv-asm-investigation.md).
+
 ### Skill-driven workflow
 
 The workflow is driven by skills. Start a human entry point with its bare slash
@@ -71,6 +91,11 @@ Makefile              setup, build, test, extraction, benchmarks
 INSTRUCTIONS.md       the skill catalogue: what to invoke, and the full reference
 toolchain/            charon and aeneas, put there by `make setup`; not in git
 .claude/skills/       local skills and the vendored upstream Aeneas suite
+docs/                  design and feasibility reports
+
+experiments/
+  riscv-fp-mul/        no_std RV64/Anneal field-multiplication leaf
+  riscv-fp-mul-proof/  Lean 4.33 proof against riscv-zkvm/Sail
 
 cpoly/
   Cargo.toml          the `cpoly` crate: a library, no dependencies
@@ -109,6 +134,17 @@ since `lean/Generated.lean` is only valid against the version that produced it �
 A Lean bump therefore moves the fork first, then `lake-manifest.json`,
 `lean-toolchain` and the Makefile pins together.
 
+The optional RV64 experiment has a separate dependency graph because it cannot
+currently share this toolchain:
+
+* **riscv-zkvm** — `Verified-zkEVM/riscv-zkvm` @ `v0.3.0`, pinned with its
+  inherited `lean-sail` revision in the experiment's `lake-manifest.json`; it
+  fixes Lean v4.33.0.
+* **cargo-anneal** — `0.1.0-alpha.24`, installed only by
+  `make setup-riscv-prototype`; its managed stack fixes Lean v4.30.0-rc2.
+
+These tools are not part of the production `make setup` or `make build` path.
+
 ## Trusted computing base
 
 The trusted computing base (TCB): components trusted because they lie outside
@@ -120,6 +156,12 @@ our verification boundary.
 | **Aeneas extraction** — [charon](https://github.com/AeneasVerif/charon) + [aeneas](https://github.com/AeneasVerif/aeneas), and their hand-written [model of Rust `std`](https://github.com/AeneasVerif/aeneas/blob/main/backends/lean/Aeneas/Std/Vec.lean) | [`Generated.lean`](cpoly/lean/Generated.lean) is asserted to model [`src/`](cpoly/src/), never proved: the paper proof covers a fragment, the OCaml that ran does not | The proofs are about a different program |
 | **Rust to machine code** — rustc, LLVM, linker, libc, OS, CPU | No verified Rust compiler exists; memory safety is inherited from the borrow checker, not proved | The binary betrays a correct proof |
 | **The specs** — [CompPoly](https://github.com/Verified-zkEVM/CompPoly)'s definitions and the `toExt`/`Reduced` relations | They *are* the definition of correct; degenerate ones would make every spec true and empty | True theorems about the wrong thing |
+
+The disabled RV64 experiment has an additional, explicitly audited boundary:
+Anneal imports the inline-assembly contract as an axiom, while its independent
+Sail refinement uses four generated platform axioms in addition to Lean's
+classical three. Enabling that path would also require trusting the missing
+emitted-byte/register-allocation link described in the feasibility report.
 
 ## License
 

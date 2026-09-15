@@ -109,8 +109,9 @@ macro_rules! define_cases {
                 // The length is folded in first: a trim that removes the wrong
                 // number of coefficients must not be able to collide with one
                 // that removes the right number.
-                v.iter()
-                    .fold(support::mix(0, v.len() as u64), |a, x| support::mix(a, d_ext4(x)))
+                v.iter().fold(support::mix(0, v.len() as u64), |a, x| {
+                    support::mix(a, d_ext4(x))
+                })
             }
 
             fn d_poly(p: &cp::UnivariatePoly) -> u64 {
@@ -179,11 +180,7 @@ macro_rules! define_cases {
             pub fn eval(m: Mode<'_, '_>, n: usize) -> u64 {
                 let p = poly(0x0303, n);
                 let pt = scalar(0x0304);
-                support::run(
-                    m,
-                    || black_box(&p).eval(black_box(pt)),
-                    d_ext4,
-                )
+                support::run(m, || black_box(&p).eval(black_box(pt)), d_ext4)
             }
 
             // -- arithmetic ---------------------------------------------------
@@ -205,7 +202,14 @@ macro_rules! define_cases {
 
             pub fn neg(m: Mode<'_, '_>, n: usize) -> u64 {
                 let p = poly(0x030B, n);
-                support::run(m, || { let p = black_box(&p); -p }, d_poly)
+                support::run(
+                    m,
+                    || {
+                        let p = black_box(&p);
+                        -p
+                    },
+                    d_poly,
+                )
             }
 
             pub fn smul(m: Mode<'_, '_>, n: usize) -> u64 {
@@ -224,10 +228,12 @@ macro_rules! define_cases {
             /// `support::control_workload`.
             pub fn control(m: Mode<'_, '_>, n: usize) -> u64 {
                 let xs = support::words(0x0000, n);
-                support::run(m, || support::control_workload(black_box(&xs)),
-                    |v: &Vec<u64>| v.iter().fold(0u64, |a, x| support::mix(a, *x)))
+                support::run(
+                    m,
+                    || support::control_workload(black_box(&xs)),
+                    |v: &Vec<u64>| v.iter().fold(0u64, |a, x| support::mix(a, *x)),
+                )
             }
-
         }
     };
 }
@@ -253,7 +259,12 @@ fn univariate_benches(c: &mut Criterion) {
     bench_case!(c, "univariate/trim", trim, [n]);
 
     // @covers univariate::UnivariatePoly::eval
-    bench_case!(c, "univariate/eval", eval, [support::UNI_EVAL_N[0], support::UNI_EVAL_N[1]]);
+    bench_case!(
+        c,
+        "univariate/eval",
+        eval,
+        [support::UNI_EVAL_N[0], support::UNI_EVAL_N[1]]
+    );
 
     // @covers univariate::<&UnivariatePoly as Add<&UnivariatePoly>>::add
     bench_case!(c, "univariate/add", add, [n]);
@@ -267,7 +278,12 @@ fn univariate_benches(c: &mut Criterion) {
     bench_case!(c, "univariate/smul", smul, [n]);
 
     // @covers univariate::<&UnivariatePoly as Mul<&UnivariatePoly>>::mul
-    bench_case!(c, "univariate/mul", mul, [support::UNI_MUL_N[0], support::UNI_MUL_N[1]]);
+    bench_case!(
+        c,
+        "univariate/mul",
+        mul,
+        [support::UNI_MUL_N[0], support::UNI_MUL_N[1]]
+    );
 }
 
 criterion_group! {

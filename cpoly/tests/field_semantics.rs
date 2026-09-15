@@ -42,12 +42,7 @@ use cpoly::field::*;
 type E = [u64; 4];
 
 fn of(a: Ext4) -> E {
-    [
-        a.c0.to_u64(),
-        a.c1.to_u64(),
-        a.c2.to_u64(),
-        a.c3.to_u64(),
-    ]
+    [a.c0.to_u64(), a.c1.to_u64(), a.c2.to_u64(), a.c3.to_u64()]
 }
 
 fn to(a: E) -> Ext4 {
@@ -185,7 +180,14 @@ fn sample_base(seed: u64, count: usize) -> Vec<u64> {
 fn sample_ext(seed: u64, count: usize) -> Vec<E> {
     let flat = sample_base(seed, 4 * count);
     (0..count)
-        .map(|i| [flat[4 * i], flat[4 * i + 1], flat[4 * i + 2], flat[4 * i + 3]])
+        .map(|i| {
+            [
+                flat[4 * i],
+                flat[4 * i + 1],
+                flat[4 * i + 2],
+                flat[4 * i + 3],
+            ]
+        })
         .collect()
 }
 
@@ -220,7 +222,11 @@ fn modulus_is_the_hachi_prime() {
 #[test]
 fn w_is_a_non_square() {
     assert_eq!(WV, 2);
-    assert_eq!(rpow(WV, ((P - 1) / 2) as u128), P - 1, "2 is a non-square mod P");
+    assert_eq!(
+        rpow(WV, ((P - 1) / 2) as u128),
+        P - 1,
+        "2 is a non-square mod P"
+    );
 }
 
 /// `P ≡ 1 mod 4` is the hypothesis that makes *every* non-square `W` give an
@@ -275,6 +281,27 @@ fn ext_ops_match_reference() {
             assert_eq!(of(to(a) + to(b)), eradd(a, b), "{a:?} + {b:?}");
             assert_eq!(of(to(a) - to(b)), ersub(a, b), "{a:?} - {b:?}");
             assert_eq!(of(to(a) * to(b)), ermul(a, b), "{a:?} * {b:?}");
+        }
+    }
+}
+
+/// Exercise the four unreduced-product carry bounds directly.  The production
+/// formula accumulates up to seven products before reducing; this independent
+/// `u128` reference catches both a missed carry and an incorrect `2^64` fold.
+#[test]
+fn ext_mul_carry_boundaries_match_reference() {
+    let xs = [
+        [P - 1, P - 1, P - 1, P - 1],
+        [P - 1, 0, P - 1, 0],
+        [0, P - 1, 0, P - 1],
+        [P - 1, P - 2, P - 3, P - 4],
+        [P - 4, P - 3, P - 2, P - 1],
+    ];
+    for &a in &xs {
+        for &b in &xs {
+            let product = of(to(a) * to(b));
+            assert_eq!(product, ermul(a, b), "{a:?} * {b:?}");
+            assert!(product.iter().all(|&coefficient| coefficient < P));
         }
     }
 }
@@ -375,11 +402,7 @@ fn ext_ring_axioms() {
         for &b in &xs {
             assert_eq!(of(to(a) + to(b)), of(to(b) + to(a)), "add comm");
             assert_eq!(of(to(a) * to(b)), of(to(b) * to(a)), "mul comm");
-            assert_eq!(
-                of(to(a) - to(b)),
-                of(to(a) + -to(b)),
-                "sub = add neg"
-            );
+            assert_eq!(of(to(a) - to(b)), of(to(a) + -to(b)), "sub = add neg");
             for &c in &xs {
                 assert_eq!(
                     of((to(a) + to(b)) + to(c)),
@@ -530,7 +553,11 @@ fn base_scalar_scaling_agrees_with_embedding() {
     for &s in &sample_base(61, 20) {
         for &a in &sample_ext(67, 20) {
             let scaled = Fp::new(s) * to(a);
-            assert_eq!(scaled, Ext4::from_base(Fp::new(s)) * to(a), "at ({s},{a:?})");
+            assert_eq!(
+                scaled,
+                Ext4::from_base(Fp::new(s)) * to(a),
+                "at ({s},{a:?})"
+            );
             // ... and coefficient by coefficient, against the u128 reference
             assert_eq!(
                 of(scaled),
